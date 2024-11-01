@@ -17,7 +17,7 @@ const (
 )
 const (
 	DefaultRPCPort            string = "9525"
-	DefaultWebSocketAddress   string = "127.0.0.1:8088"
+	DefaultWebSocketAddress   string = "0.0.0.0:8088"
 	DefaultRestAddress        string = ":9531"
 	DefaultDataDir            string = "./data"
 	DefaultMLBlockchainAPIUrl string = ":9520"

@@ -74,6 +74,7 @@ func GetAccountSubscriptions(payload entities.ClientPayload) (*[]models.TopicSta
 }
 
 func GetAccountSubscriptionsV2(payload entities.Subscription) (*[]models.TopicState, error) {
+	
 	var subscriptionStates []models.SubscriptionState
 	var subTopicStates []models.TopicState
 	var topicStates []models.TopicState

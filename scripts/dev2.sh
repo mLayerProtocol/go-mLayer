@@ -14,6 +14,6 @@ go run . daemon \
 -l "/ip4/127.0.0.1/tcp/6001" \
 --verbose true \
 --data-dir "./data/dev2/" \
---no-sync
+# --no-sync
 
  

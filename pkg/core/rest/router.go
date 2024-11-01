@@ -467,37 +467,31 @@ func (p *RestService) Initialize() *gin.Engine {
 
 	})
 
-	router.POST("/api/subscription/account", func(c *gin.Context) {
+	router.POST("/api/subscription", func(c *gin.Context) {
+		var payload entities.ClientPayload
+		if err := c.BindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
+			return
+		}
+		logger.Debugf("Payload %v", payload.Data)
+		subscription := entities.Subscription{}
+		d, _ := json.Marshal(payload.Data)
+		e := json.Unmarshal(d, &subscription)
+		if e != nil {
+			logger.Errorf("UnmarshalError %v", e)
+			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: e.Error()}))
+			return
+		}
+		// subscription.ID = id
+		payload.Data = subscription
+		event, err := client.CreateEvent(payload, p.Ctx)
 
-		_, parseError := utils.ParseQueryString(c)
-		if parseError != nil {
-			logger.Error(parseError)
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: parseError.Error()}))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
 
-		subs := entities.Subscription{}
-		// json.Unmarshal(*b, &subs)
-		// rawQuery := c.Request.URL.Query()
-		// err := c.ShouldBind(&subs)
-		// if err != nil {
-		// 	logger.Errorf("SUBSCR: %v",  err)
-		// }
-		logger.Debugf("SUBSCR: %s", c.Query("status"))
-		// //
-		// var payload entities.ClientPayload
-		// json.Unmarshal(*b, &payload)
-
-		// logger.Debugf("Payload %v", payload.Account)
-		// subscriptions, err := client.GetAccountSubscriptions(payload)
-
-		// if err != nil {
-		// 	logger.Error(err)
-		// 	c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
-		// 	return
-		// }
-		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: subs}))
-		// c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: subscriptions}))
+		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: event}))
 	})
 
 	router.GET("/api/subscription/account", func(c *gin.Context) {
