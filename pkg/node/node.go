@@ -55,42 +55,40 @@ var logger = &log.Logger
 // var subscribedWsClientIndex =  make(map[string]map[*websocket.Conn][]int)
 // var wsClients =  make(map[string][]*websocket.Conn)
 
-
 var wsClients = entities.NewWsClientLog()
 
 func Start(mainCtx *context.Context) {
-	time.Sleep(1*time.Second)
+	time.Sleep(1 * time.Second)
 	logger.Println("Starting network...")
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 	if !ok {
 		panic(apperror.Internal("Unable to load main config"))
 	}
-	
+
 	connectedSubscribers := make(map[string]map[string][]interface{})
 
 	// incomingEventsC := make(chan types.Log)
 
 	var wg sync.WaitGroup
-	systemStore := ds.New(mainCtx,  string(constants.SystemStore))
-	defer  systemStore.Close()
+	systemStore := ds.New(mainCtx, string(constants.SystemStore))
+	defer systemStore.Close()
 	ctx := context.WithValue(*mainCtx, constants.SystemStore, systemStore)
 
-
-	eventCountStore := ds.New(&ctx,   string(constants.EventCountStore))
+	eventCountStore := ds.New(&ctx, string(constants.EventCountStore))
 	defer eventCountStore.Close()
 	ctx = context.WithValue(ctx, constants.EventCountStore, eventCountStore)
 
-	claimedRewardStore := ds.New(&ctx,   string(constants.ClaimedRewardStore))
+	claimedRewardStore := ds.New(&ctx, string(constants.ClaimedRewardStore))
 	defer claimedRewardStore.Close()
 	ctx = context.WithValue(ctx, constants.ClaimedRewardStore, claimedRewardStore)
 	// ctx = context.WithValue(ctx, constants.NewTopicSubscriptionStore, newTopicSubscriptionStore)
 	// ctx = context.WithValue(ctx, constants.UnprocessedClientPayloadStore, unProcessedClientPayloadStore)
 	ctx = context.WithValue(ctx, constants.ConnectedSubscribersMap, connectedSubscribers)
 
-	p2pDhtStore := ds.New(&ctx,   string(constants.P2PDhtStore))
+	p2pDhtStore := ds.New(&ctx, string(constants.P2PDhtStore))
 	defer p2pDhtStore.Close()
 	ctx = context.WithValue(ctx, constants.P2PDhtStore, p2pDhtStore)
 
@@ -102,12 +100,11 @@ func Start(mainCtx *context.Context) {
 	// 		systemStore.Set(ctx, lastBlockKey, chain.NetworkInfo.CurrentBlock.Bytes(), true)
 	// 	}
 	// }()
-	
 
 	if err := loadChainInfo(cfg); err != nil {
 		logger.Fatal(err)
 	}
-	
+
 	defer wg.Wait()
 
 	//  wg.Add(1)
@@ -156,7 +153,6 @@ func Start(mainCtx *context.Context) {
 
 		}
 	}()
-	
 
 	// load network params
 	wg.Add(1)
@@ -168,7 +164,7 @@ func Start(mainCtx *context.Context) {
 		for {
 			if err := loadChainInfo(cfg); err != nil {
 				logger.Error(err)
-				time.Sleep(10*time.Second)
+				time.Sleep(10 * time.Second)
 				continue
 			}
 			time.Sleep(30 * time.Second)
@@ -193,7 +189,7 @@ func Start(mainCtx *context.Context) {
 			if err != nil {
 				logger.Error(err)
 			}
-			certResponse, err := certPayload.SendRequestToAddress(cfg.PrivateKeyEDD, addr, p2p.DataRequest )
+			certResponse, err := certPayload.SendRequestToAddress(cfg.PrivateKeyEDD, addr, p2p.DataRequest)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -204,21 +200,19 @@ func Start(mainCtx *context.Context) {
 	}
 
 	wg.Add(1)
-		// start the REST server
-		go func() {
-			for {
-				subscription, ok := <-channelpool.ClientWsSubscriptionChannel
-				if !ok {
-					logger.Errorf("Client WS subscription channel closed")
-					continue
-				}
-			
-				wsClients.RegisterClient(subscription)
+	// start the REST server
+	go func() {
+		for {
+			subscription, ok := <-channelpool.ClientWsSubscriptionChannel
+			if !ok {
+				logger.Errorf("Client WS subscription channel closed")
+				continue
 			}
-		
-		}()
 
-	
+			wsClients.RegisterClient(subscription)
+		}
+
+	}()
 
 	wg.Add(1)
 	go func() {
@@ -229,14 +223,13 @@ func Start(mainCtx *context.Context) {
 		// 	errc <- fmt.Errorf("P2P error: %g", err)
 		// }
 		// }()
-		
+
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.AuthModel, &entities.AuthorizationPubSub, &ctx, service.HandleNewPubSubAuthEvent)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.TopicModel, &entities.TopicPubSub, &ctx, service.HandleNewPubSubTopicEvent)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubnetModel, &entities.SubnetPubSub, &ctx, service.HandleNewPubSubSubnetEvent)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.WalletModel, &entities.WalletPubSub, &ctx, service.HandleNewPubSubWalletEvent)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubscriptionModel, &entities.SubscriptionPubSub, &ctx, service.HandleNewPubSubSubscriptionEvent)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.MessageModel, &entities.MessagePubSub, &ctx, service.HandleNewPubSubMessageEvent)
-		
 
 		p2p.Run(&ctx)
 		// if err != nil {
@@ -244,7 +237,6 @@ func Start(mainCtx *context.Context) {
 		// 	panic(err)
 		// }
 	}()
-
 
 	if cfg.Validator {
 		wg.Add(1)
@@ -261,13 +253,15 @@ func Start(mainCtx *context.Context) {
 			defer wg.Done()
 			ProcessPendingClaims(&ctx)
 		}()
+
+		wg.Add(1)
+		go func() {
+			_, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			defer wg.Done()
+			LivelinessPing(&ctx)
+		}()
 	}
-	
-	
-
-
-
-	
 
 	// wg.Add(1)
 	// go func() {
@@ -321,7 +315,7 @@ func Start(mainCtx *context.Context) {
 			defer wg.Done()
 			rpc.Register(rpcServer.NewRpcService(&ctx))
 			rpc.HandleHTTP()
-			host :=  cfg.RPCHost
+			host := cfg.RPCHost
 			if host == "" {
 				host = "127.0.0.1"
 			}
@@ -332,14 +326,13 @@ func Start(mainCtx *context.Context) {
 			defer listener.Close()
 			logger.Debugf("RPC server runing on: %+s", host+":"+cfg.RPCPort)
 			go http.Serve(listener, nil)
-			time.Sleep(time.Second) 
+			time.Sleep(time.Second)
 			sendHttp := rpcServer.NewHttpService(&ctx)
 			err = sendHttp.Start(cfg.RPCPort)
 			if err != nil {
 				logger.Fatal("Http error: ", err)
 			}
 		}()
-		
 
 		wg.Add(1)
 		// starting quick server
@@ -351,11 +344,11 @@ func Start(mainCtx *context.Context) {
 				return
 			}
 			// get the certificate from store
-			
+
 			cd := crypto.GetOrGenerateCert(&ctx)
 			keyByte, _ := hex.DecodeString(cd.Key)
 			certByte, _ := hex.DecodeString(cd.Cert)
-			tlsConfig, err :=  crypto.GenerateTLSConfig(keyByte, certByte)
+			tlsConfig, err := crypto.GenerateTLSConfig(keyByte, certByte)
 			if err != nil {
 				logger.Fatal("QuicTLSError", err)
 			}
@@ -364,7 +357,6 @@ func Start(mainCtx *context.Context) {
 				logger.Fatal(err)
 			}
 			defer listener.Close()
-			
 
 			for {
 				connection, err := listener.Accept(ctx)
@@ -401,74 +393,73 @@ func Start(mainCtx *context.Context) {
 			logger.Debugf("Starting REST api on: %s", cfg.RestAddress)
 			err := router.Run(cfg.RestAddress)
 			logger.Fatal(err)
-		
+
 		}()
 	}
 }
 func loadChainInfo(cfg *configs.MainConfiguration) error {
-	
+
 	info, err := chain.Provider(cfg.ChainId).GetChainInfo()
+	if err != nil {
+		return fmt.Errorf("pkg/node/NodeInfo/GetChainInfo: %v", err)
+	}
+	if chain.NetworkInfo.ActiveValidatorLicenseCount != info.ValidatorActiveLicenseCount.Uint64() {
+		// if chain.NetworkInfo.Validators == nil {
+		chain.NetworkInfo.Validators = map[string]string{}
+		// }
+		page := big.NewInt(1)
+		perPage := big.NewInt(100)
+		for {
+
+			validators, err := chain.Provider(cfg.ChainId).GetValidatorNodeOperators(page, perPage)
 			if err != nil {
-				return fmt.Errorf("pkg/node/NodeInfo/GetChainInfo: %v", err)
+				logger.Errorf("pkg/node/NodeInfo/GetValidatorNodeOperators: %v", err)
+				time.Sleep(10 * time.Second)
+				continue
 			}
-			if (chain.NetworkInfo.ActiveValidatorLicenseCount != info.ValidatorActiveLicenseCount.Uint64()) {
-				// if chain.NetworkInfo.Validators == nil {
-					chain.NetworkInfo.Validators = map[string]string{}
-				// }
-				page := big.NewInt(1)
-				perPage := big.NewInt(100)
-				for {
-					
-					validators, err := chain.Provider(cfg.ChainId).GetValidatorNodeOperators(page, perPage )
-					if err != nil {
-						logger.Errorf("pkg/node/NodeInfo/GetValidatorNodeOperators: %v", err)
-						time.Sleep(10 * time.Second)
-						continue
-					}
-					
-					for _, val := range validators {
-						pubKey := hex.EncodeToString(val.PublicKey)
-						// chain.NetworkInfo.Validators[pubKey] = val.LicenseOwner
-						chain.NetworkInfo.Validators[val.LicenseOwner] = "true"
-						chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/edd", pubKey)] = hex.EncodeToString(val.EddKey[:])
-						chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/addr", pubKey)] = val.LicenseOwner
-						chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/secp", hex.EncodeToString(val.EddKey[:]))] = pubKey
-						chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/addr", hex.EncodeToString(val.EddKey[:]))] = val.LicenseOwner
-					}
-					if len(validators) == 0 || big.NewInt(int64(len(validators))).Cmp(perPage) == -1 {
-						break
-					}
-					page = new(big.Int).Add(page, big.NewInt(1))
-				}
+
+			for _, val := range validators {
+				pubKey := hex.EncodeToString(val.PublicKey)
+				// chain.NetworkInfo.Validators[pubKey] = val.LicenseOwner
+				chain.NetworkInfo.Validators[val.LicenseOwner] = "true"
+				chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/edd", pubKey)] = hex.EncodeToString(val.EddKey[:])
+				chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/addr", pubKey)] = val.LicenseOwner
+				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/secp", hex.EncodeToString(val.EddKey[:]))] = pubKey
+				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/addr", hex.EncodeToString(val.EddKey[:]))] = val.LicenseOwner
 			}
-			ownerAddress := chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/addr", cfg.PublicKeySECPHex)]
-			if len(ownerAddress) > 0 {
-				cfg.Validator = true
-				cfg.OwnerAddress = common.HexToAddress(ownerAddress)
-			} else {
-				address, err := chain.Provider(cfg.ChainId).GetSentryLicenseOwnerAddress(cfg.PublicKeySECP)
-				if err != nil {
-					logger.Fatal(err)
-				}
-				cfg.OwnerAddress = common.BytesToAddress(address)
+			if len(validators) == 0 || big.NewInt(int64(len(validators))).Cmp(perPage) == -1 {
+				break
 			}
-			if cfg.NoSync {
-				chain.NetworkInfo.Synced = true
-			}
-			chain.NetworkInfo.StartBlock = info.StartBlock
-			chain.NetworkInfo.StartTime = info.StartTime
-			chain.NetworkInfo.CurrentCycle = info.CurrentCycle
-			chain.NetworkInfo.CurrentBlock = info.CurrentBlock
-			// chain.NetworkInfo.CurrentEpoch = info.CurrentEpoch
-			chain.NetworkInfo.ActiveValidatorLicenseCount = info.ValidatorActiveLicenseCount.Uint64()
-			chain.NetworkInfo.ActiveSentryLicenseCount = info.SentryActiveLicenseCount.Uint64()
-			
-			return err
+			page = new(big.Int).Add(page, big.NewInt(1))
+		}
+	}
+	ownerAddress := chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/addr", cfg.PublicKeySECPHex)]
+	if len(ownerAddress) > 0 {
+		cfg.Validator = true
+		cfg.OwnerAddress = common.HexToAddress(ownerAddress)
+	} else {
+		address, err := chain.Provider(cfg.ChainId).GetSentryLicenseOwnerAddress(cfg.PublicKeySECP)
+		if err != nil {
+			logger.Fatal(err)
+		}
+		cfg.OwnerAddress = common.BytesToAddress(address)
+	}
+	if cfg.NoSync {
+		chain.NetworkInfo.Synced = true
+	}
+	chain.NetworkInfo.StartBlock = info.StartBlock
+	chain.NetworkInfo.StartTime = info.StartTime
+	chain.NetworkInfo.CurrentCycle = info.CurrentCycle
+	chain.NetworkInfo.CurrentBlock = info.CurrentBlock
+	// chain.NetworkInfo.CurrentEpoch = info.CurrentEpoch
+	chain.NetworkInfo.ActiveValidatorLicenseCount = info.ValidatorActiveLicenseCount.Uint64()
+	chain.NetworkInfo.ActiveSentryLicenseCount = info.SentryActiveLicenseCount.Uint64()
+
+	return err
 }
 
-
 func waitToSync() {
-	for{
+	for {
 		if !chain.NetworkInfo.Synced {
 			time.Sleep(2 * time.Second)
 		} else {

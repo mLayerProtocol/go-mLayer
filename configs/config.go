@@ -15,14 +15,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-
-
 type IpfsConfig struct {
 	Host          string `toml:"ipfs_url"`
 	ProjectId     string `toml:"ipfs_username"`
 	ProjectSecret string `toml:"ipfs_password"`
 }
-
 
 func copyStructValues(src, dst interface{}) error {
 	srcVal := reflect.ValueOf(src)
@@ -31,7 +28,7 @@ func copyStructValues(src, dst interface{}) error {
 	if srcVal.Kind() != reflect.Struct || dstVal.Kind() != reflect.Struct {
 		return fmt.Errorf("input types must be structs")
 	}
-	
+
 	for i := 0; i < srcVal.NumField(); i++ {
 		fieldName := srcVal.Type().Field(i).Name
 		srcField := srcVal.Field(i)
@@ -44,21 +41,21 @@ func copyStructValues(src, dst interface{}) error {
 
 	return nil
 }
+
 type EthConfig struct {
-	Name string  `toml:"name"`
-	Http  string `toml:"http"`
-	Wss   string  `toml:"wss"`
-	TokenContract string `toml:"token_contract"`
-	XTokenContract string  `toml:"x_token_contract"`
-	ChainInfoContract  string `toml:"chain_info_contract"`
-	SentryNodeContract   string  `toml:"sentry_node_contract"`
-	ValidatorNodeContract   string  `toml:"validator_node_contract"`
-	SubnetContract	string `toml:"subnet_contract"`
-	RegistryContract string  `toml:"registry_contract"`
+	Name                  string `toml:"name"`
+	Http                  string `toml:"http"`
+	Wss                   string `toml:"wss"`
+	TokenContract         string `toml:"token_contract"`
+	XTokenContract        string `toml:"x_token_contract"`
+	ChainInfoContract     string `toml:"chain_info_contract"`
+	SentryNodeContract    string `toml:"sentry_node_contract"`
+	ValidatorNodeContract string `toml:"validator_node_contract"`
+	SubnetContract        string `toml:"subnet_contract"`
+	RegistryContract      string `toml:"registry_contract"`
 }
 
 type SqlConfig struct {
-
 	DbDialect         string `toml:"db_dialect"`
 	DbHost            string `toml:"db_host"`
 	DbStoragePath     string `toml:"db_storage_dir"`
@@ -71,9 +68,7 @@ type SqlConfig struct {
 	DbMaxOpenConns    int    `toml:"db_max_open_conns"`
 	DbMaxIdleConns    int    `toml:"db_max_idle_conns"`
 	DbMaxConnLifetime int    `toml:"db_max_conn_lifetime_seconds"`
-	
 }
-
 
 type ChainId string
 
@@ -91,55 +86,54 @@ func (n *ChainId) Equals(s ChainId) bool {
 }
 
 type MainConfiguration struct {
-	AddressPrefix            string         `toml:"network_address_prefix"`
+	AddressPrefix string `toml:"network_address_prefix"`
 	// StakeContract            string         `toml:"stake_contract"`
-	ChainId                  ChainId        `toml:"chain_id"`
+	ChainId ChainId `toml:"chain_id"`
 	// Token                    string         `toml:"token_address"`
 	// EVMRPCUrl                string         `toml:"evm_rpc_url"` // deprecated
 	// EVMRPCHttp               string         `toml:"evm_rpc_http"`
 	// EVMRPCWss                string         `toml:"evm_rpc_wss"`
-	ProtocolVersion          string         `toml:"protocol_version"`
-	ChannelMessageBufferSize uint           `toml:"channel_message_buffer_size"`
-	Ipfs                     IpfsConfig     `toml:"ipfs"`
-	LogLevel                 string         `toml:"log_level"`
-	BootstrapPeers           []string       `toml:"bootstrap_peers"`
-	ListenerAdresses         []string       `toml:"listener_addresses"`
-	RPCHost                  string         `toml:"rpc_host"`
-	WSAddress                string         `toml:"ws_address"`
-	RestAddress              string         `toml:"rest_address"`
-	RPCPort                  string         `toml:"rpc_port"`
-	RPCHttpPort              string         `toml:"rpc_http_port"`
-	Validator                bool           `toml:"validator"`
-	BootstrapNode            bool           `toml:"bootstrap_node"`
-	DataDir                  string         `toml:"data_dir"`
-	KeyStoreDir              string         `toml:"keystore_dir"`
-	SQLDB                    SqlConfig      `toml:"sql"`
-	MLBlockchainAPIUrl       string         `toml:"mlayer_api_url"`
-	PrivateKey               string         `toml:"private_key"`
-	EvmRpcConfig			 map[string]EthConfig `toml:"evm_rpc"`
-	QuicHost                 string         `toml:"quic_host"`
+	ProtocolVersion          string               `toml:"protocol_version"`
+	ChannelMessageBufferSize uint                 `toml:"channel_message_buffer_size"`
+	Ipfs                     IpfsConfig           `toml:"ipfs"`
+	LogLevel                 string               `toml:"log_level"`
+	BootstrapPeers           []string             `toml:"bootstrap_peers"`
+	ListenerAdresses         []string             `toml:"listener_addresses"`
+	RPCHost                  string               `toml:"rpc_host"`
+	WSAddress                string               `toml:"ws_address"`
+	RestAddress              string               `toml:"rest_address"`
+	RPCPort                  string               `toml:"rpc_port"`
+	RPCHttpPort              string               `toml:"rpc_http_port"`
+	Validator                bool                 `toml:"validator"`
+	BootstrapNode            bool                 `toml:"bootstrap_node"`
+	DataDir                  string               `toml:"data_dir"`
+	KeyStoreDir              string               `toml:"keystore_dir"`
+	SQLDB                    SqlConfig            `toml:"sql"`
+	MLBlockchainAPIUrl       string               `toml:"mlayer_api_url"`
+	PrivateKey               string               `toml:"private_key"`
+	EvmRpcConfig             map[string]EthConfig `toml:"evm_rpc"`
+	QuicHost                 string               `toml:"quic_host"`
+	PingUrl                  string               `toml:"ping_url"`
 	// PublicKey        string
-	OperatorAddress          string
-	
-	PrivateKeyEDD  []byte 
-	PublicKeyEDD []byte 
-	PublicKeyEDDHex string
-	PrivateKeySECP  []byte 
-	PublicKeySECP []byte 
+	OperatorAddress string
+
+	PrivateKeyEDD    []byte
+	PublicKeyEDD     []byte
+	PublicKeyEDDHex  string
+	PrivateKeySECP   []byte
+	PublicKeySECP    []byte
 	PublicKeySECPHex string
 
-	OwnerAddress common.Address 
-	NoSync bool 
-	Context *context.Context
+	OwnerAddress  common.Address
+	NoSync        bool
+	Context       *context.Context
 	SyncBatchSize uint
-	TestMode bool
-
+	TestMode      bool
 }
 
 type MLChainAPI struct {
 	url string `mapstructure:"ml_api_url"`
 }
-
 
 var (
 	Config MainConfiguration
@@ -151,8 +145,7 @@ var possiblePaths = []string{
 }
 
 func initViper() *viper.Viper {
-	
-	
+
 	v := viper.New()
 	v.AutomaticEnv()
 	v.SetEnvPrefix("ml")
@@ -164,7 +157,7 @@ func initViper() *viper.Viper {
 
 	err := v.ReadInConfig() // Find and read the config file
 	if err != nil {         // Handle errors reading the config file
-	 // panic( err)
+		// panic( err)
 	}
 	v.SetDefault("log_level", "info")
 	v.SetDefault("channel_message_buffer_size", 128)
@@ -173,20 +166,21 @@ func initViper() *viper.Viper {
 	v.SetDefault("db_max_conn_lifetime_seconds", 120)
 	return v
 }
+
 // func init() {
 // 	c := LoadMainConfig(true)
-	
-// 	Config = *c
-// }
+
+//		Config = *c
+//	}
 func LoadConfig(testnet bool) (*MainConfiguration, error) {
 	var config MainConfiguration
 
 	if testnet {
-		config =  TestNetConfig
+		config = TestNetConfig
 	} else {
 		config = MainNetConfig
 	}
-	
+
 	// Try loading the configuration file from the possible paths
 	for _, path := range possiblePaths {
 		if _, err := os.Stat(path); err == nil {
@@ -196,14 +190,14 @@ func LoadConfig(testnet bool) (*MainConfiguration, error) {
 				panic(err)
 				//return nil, fmt.Errorf("failed to decode config file %s: %w", path, err)
 			}
-			fmt.Printf("\nLoaded configuration from: %s",path)
+			fmt.Printf("\nLoaded configuration from: %s", path)
 			// Override with environment variables
 			// kong.Parse(&config)
-			
+
 			if err = copyStructValues(configData, &config); err != nil {
 				panic(err)
 			}
-			
+
 		}
 	}
 	return &config, nil
@@ -216,23 +210,19 @@ func Init(testnet bool) *MainConfiguration {
 	d := make(map[string]interface{})
 	json.Unmarshal(m, &d)
 	v.MergeConfigMap(d)
-	if err != nil {         // Handle errors reading the config file
-		panic( err)
-	   }
-	
+	if err != nil { // Handle errors reading the config file
+		panic(err)
+	}
+
 	if err := v.Unmarshal(&c); err != nil {
 		fmt.Printf("Fatal: Couldn't read config: %s \n", err.Error())
 	}
 
-	
 	c.PrivateKey = v.GetString("private_key") // needed to load from environment var
 	if len(v.GetString("private_key")) > 0 {
 		c.PrivateKey = v.GetString("private_key") // needed to load from environment var
 	}
 
-	
-
-	
 	if len(v.GetString("data_dir")) > 0 {
 		c.DataDir = v.GetString("data_dir") // needed to load from environment var or flag
 	}
