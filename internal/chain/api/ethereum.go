@@ -196,6 +196,10 @@ func (n EthereumAPI) GetMessagePrice(cycle *big.Int) (*big.Int, error) {
 }
 
 
+func (n EthereumAPI) GetTotalValueLockedInSubnets() (*big.Int, error) {
+	return n.subnetContract.TotalValueLocked(nil)
+}
+
 func (n EthereumAPI) GetChainInfo() (info *ChainInfo, err error) {
 	chain, err := n.chainInfoContract.GetChainInfo(nil)
 	if err != nil {

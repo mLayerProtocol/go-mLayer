@@ -28,8 +28,12 @@ type Wallet struct {
 	BlockNumber uint64          `json:"blk"`
 	Cycle   	uint64			`json:"cy"`
 	Epoch		uint64			`json:"ep"`
+	Signature  string    `json:"sig,omitempty" gorm:"type:char(64)"`
 }
 
+func (d Wallet) GetSignature() (string) {
+	return d.Signature
+}
 func (d *Wallet) BeforeCreate(tx *gorm.DB) (err error) {
 	if d.ID == "" {
 		uuid, err := GetId(*d)
@@ -88,14 +92,14 @@ func (entity Wallet) GetAgent() (DeviceString) {
 	return entity.Agent
 }
 
-func (e Wallet) ToString() string {
+func (e Wallet) ToString() (string, error) {
 	values := []string{}
 	values = append(values, e.Hash)
 	values = append(values, e.Name)
 	values = append(values, e.Subnet)
 	values = append(values, e.Account.ToString())
 
-	return strings.Join(values, "")
+	return strings.Join(values, ""), nil
 }
 
 func (e Wallet) EncodeBytes() ([]byte, error) {

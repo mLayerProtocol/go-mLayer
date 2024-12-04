@@ -2,6 +2,8 @@ package constants
 
 import "html/template"
 
+
+
 const (
 	NETWORK_NAME = "mlayer" // time interval within which to accept a handshake
 )
@@ -23,6 +25,11 @@ const (
 	DefaultMLBlockchainAPIUrl string = ":9520"
     DefaultQuickHost        string = "127.0.0.1:9533"
 	DefaultProtocolVersion           string = "/mlayer/1.0.0"
+)
+
+type ContextPath string;
+const (
+    ConnectedSubscribersMap  ContextPath  = "connected-subscribers-map"
 )
 
 type NodeType uint
@@ -80,11 +87,13 @@ const (
 
 const SignatureMessageString string = `{"entity":"%s","network":"%s","identifier":"%s","hash":"%s"}`
 
+
+const MAX_SYNC_FILE_SIZE  = 100 * 1024 * 1024 // 100 MB
 /* KEY MAPS
 Always enter map in sorted order
 
 Abi             = abi
-Account         = acct
+Account pu        = acct
 Action          = a
 Actions         = as
 Address         = addr
@@ -139,7 +148,7 @@ NodeType        = nT
 Origin          = o
 Owner			= own
 Parameters      = pa
-ParentTopicHash = pTH
+ParentTopic = pTH
 Paylaod         = pld
 Platform        = p
 Privilege       = privi

@@ -60,6 +60,10 @@ func (n GenericAPI) GetCycle(blockNumber *big.Int) (*big.Int, error) {
 	}
 	return cycle, err
 }
+func (n GenericAPI) GetTotalValueLockedInSubnets() (*big.Int, error) {
+	amount, _ := new(big.Int).SetString("2000000000000000000000", 10)
+	return amount, nil
+}
 
 func (n GenericAPI) GetCurrentBlockNumber() (*big.Int, error) {
 	// return big.NewInt(int64(time.Now().UnixMilli() - NetworkStartDate) / 6000), nil

@@ -12,11 +12,10 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	"github.com/mlayerprotocol/go-mlayer/internal/sql/query"
 	"github.com/mlayerprotocol/go-mlayer/pkg/client"
 	"github.com/mlayerprotocol/go-mlayer/pkg/log"
-	"github.com/sirupsen/logrus"
 )
 
 var logger = &log.Logger
@@ -120,7 +119,7 @@ func (p *RestService) Initialize() *gin.Engine {
 
 		json.Unmarshal(*b, &authEntity)
 		logger.Debugf("authEntity %v", authEntity)
-		auths, err := client.GetAccountAuthorizations(&authEntity)
+		auths, err := client.GetAuthorizations(&authEntity)
 
 		if err != nil {
 			logger.Error(err)
@@ -136,24 +135,43 @@ func (p *RestService) Initialize() *gin.Engine {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-		authorization := entities.Authorization{}
-		d, _ := json.Marshal(payload.Data)
-		e := json.Unmarshal(d, &authorization)
-		if e != nil {
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: e.Error()}))
-		}
-		// Subnet.ID = id
-		payload.Data = authorization
-
-		logger.WithFields(logrus.Fields{"payload": string(payload.ToJSON())}).Debug("New auth payload from REST api")
-		authEvent, err := client.CreateEvent(payload, p.Ctx)
+		event, err := requestProcessor.Process(client.WriteAuthorizationRequest, nil, payload)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-		// Send a response back
 		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: map[string]any{
-			"event": authEvent,
+			"event": event,
+		}}))
+	})
+
+
+	router.PUT("/api/topics", func(c *gin.Context) {
+
+		var payload entities.ClientPayload
+		if err := c.BindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
+			return
+		}
+		payload.EventType = uint16(constants.UpdateTopicEvent)
+		topic := entities.Topic{}
+		d, _ := json.Marshal(payload.Data)
+		e := json.Unmarshal(d, &topic)
+		if e != nil {
+			logger.Errorf("UnmarshalError %v", e)
+		}
+		// topic.Hash = id
+		payload.Data = topic
+		event, err := client.CreateEvent(payload, p.Ctx)
+
+		if err != nil {
+			logger.Error(err)
+			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
+			return
+		}
+
+		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: map[string]any{
+			"event": event,
 		}}))
 	})
 
@@ -163,7 +181,7 @@ func (p *RestService) Initialize() *gin.Engine {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-		logger.Debugf("Payload %v", payload)
+		// logger.Debugf("Payload %v", payload)
 		topic := entities.Topic{}
 		d, _ := json.Marshal(payload.Data)
 		e := json.Unmarshal(d, &topic)
@@ -174,7 +192,7 @@ func (p *RestService) Initialize() *gin.Engine {
 
 		payload.Data = topic
 		event, err := client.CreateEvent(payload, p.Ctx)
-
+		logger.Infof("%+v", event)
 		if err != nil {
 			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
@@ -200,27 +218,28 @@ func (p *RestService) Initialize() *gin.Engine {
 
 		logger.Debugf("Payload %v", topicPayload.Agent)
 
-		topics, err := query.GetTopics(topicPayload)
+		topics, err := dsquery.GetAccountTopics(topicPayload, nil, nil)
 
 		if err != nil {
 			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
+
 		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: topics}))
 	})
 
-	router.GET("/api/topics/subscribers/:id", func(c *gin.Context) {
-		id := c.Param("id")
-		topic, err := client.GetSubscription(id)
+	// router.GET("/api/topics/subscribers/:id", func(c *gin.Context) {
+	// 	id := c.Param("id")
+	// 	topic, err := client.GetSubscription(id)
 
-		if err != nil {
-			logger.Error(err)
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
-			return
-		}
-		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: topic}))
-	})
+	// 	if err != nil {
+	// 		logger.Error(err)
+	// 		c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
+	// 		return
+	// 	}
+	// 	c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: topic}))
+	// })
 
 	router.GET("/api/topics/subscribers", func(c *gin.Context) {
 
@@ -282,7 +301,7 @@ func (p *RestService) Initialize() *gin.Engine {
 
 	router.GET("/api/topics/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		topic, err := query.GetTopicById(id)
+		topic, err := dsquery.GetTopicById(id)
 
 		if err != nil {
 			logger.Error(err)
@@ -300,19 +319,20 @@ func (p *RestService) Initialize() *gin.Engine {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-		logger.Debugf("Payload %v", payload.Data)
-		subscription := entities.Subscription{}
-		d, _ := json.Marshal(payload.Data)
-		e := json.Unmarshal(d, &subscription)
-		if e != nil {
-			logger.Errorf("UnmarshalError %v", e)
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: e.Error()}))
-			return
-		}
-		// subscription.ID = id
-		payload.Data = subscription
-		event, err := client.CreateEvent(payload, p.Ctx)
-
+		// logger.Debugf("Payload %v", payload.Data)
+		// subscription := entities.Subscription{}
+		// d, _ := json.Marshal(payload.Data)
+		// e := json.Unmarshal(d, &subscription)
+		// if e != nil {
+		// 	logger.Errorf("UnmarshalError %v", e)
+		// 	c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: e.Error()}))
+		// 	return
+		// }
+		// // subscription.ID = id
+		// payload.Data = subscription
+		// event, err := client.CreateEvent(payload, p.Ctx)
+		
+		event, err := requestProcessor.Process(client.WriteSubscriptionRequest, nil, payload)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
@@ -409,35 +429,6 @@ func (p *RestService) Initialize() *gin.Engine {
 
 	})
 
-	router.PUT("/api/topics", func(c *gin.Context) {
-
-		var payload entities.ClientPayload
-		if err := c.BindJSON(&payload); err != nil {
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
-			return
-		}
-		payload.EventType = uint16(constants.UpdateTopicEvent)
-		logger.Debugf("Payload %v", payload.Data)
-		topic := entities.Topic{}
-		d, _ := json.Marshal(payload.Data)
-		e := json.Unmarshal(d, &topic)
-		if e != nil {
-			logger.Errorf("UnmarshalError %v", e)
-		}
-		// topic.Hash = id
-		payload.Data = topic
-		event, err := client.CreateEvent(payload, p.Ctx)
-
-		if err != nil {
-			logger.Error(err)
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
-			return
-		}
-
-		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: map[string]any{
-			"event": event,
-		}}))
-	})
 
 	router.POST("/api/topics/messages", func(c *gin.Context) {
 		var payload entities.ClientPayload
@@ -530,31 +521,31 @@ func (p *RestService) Initialize() *gin.Engine {
 		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: subscriptions}))
 	})
 
-	router.GET("/api/sync", func(c *gin.Context) {
-		b, parseError := utils.ParseQueryString(c)
-		if parseError != nil {
-			logger.Error(parseError)
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: parseError.Error()}))
-			return
-		}
-		var authEntity entities.Authorization
-		var payload entities.ClientPayload
-		json.Unmarshal(*b, &authEntity)
-		json.Unmarshal(*b, &payload)
+	// router.GET("/api/sync", func(c *gin.Context) {
+	// 	b, parseError := utils.ParseQueryString(c)
+	// 	if parseError != nil {
+	// 		logger.Error(parseError)
+	// 		c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: parseError.Error()}))
+	// 		return
+	// 	}
+	// 	var authEntity entities.Authorization
+	// 	var payload entities.ClientPayload
+	// 	json.Unmarshal(*b, &authEntity)
+	// 	json.Unmarshal(*b, &payload)
 
-		syncResponse := entities.SyncResponse{}
-		client.SyncAgent(&entities.SyncRequest{}, &entities.ClientPayload{})
+	// 	syncResponse := entities.SyncResponse{}
+	// 	client.SyncAgent(&entities.SyncRequest{}, &entities.ClientPayload{})
 
-		// if err != nil {
-		// 	logger.Error(err)
-		// 	c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
-		// 	return
-		// }
-		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: syncResponse}))
-	})
+	// 	// if err != nil {
+	// 	// 	logger.Error(err)
+	// 	// 	c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
+	// 	// 	return
+	// 	// }
+	// 	c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: syncResponse}))
+	// })
 
 	router.GET("/api/block-stats", func(c *gin.Context) {
-		blockStats, err := client.GetBlockStats()
+		blockStats, err := client.GetCycleStats(0,nil)
 		if err != nil {
 			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
@@ -580,7 +571,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		typeParam := c.Param("type")
 		typeParamInt := client.GetEventTypeFromModel(entities.EntityModel(typeParam))
 
-		topic, err := client.GetEventByHash(hash, int(typeParamInt))
+		topic, err := client.GetEvent(hash, int(typeParamInt))
 
 		if err != nil {
 			logger.Error(err)
@@ -612,6 +603,7 @@ func (p *RestService) Initialize() *gin.Engine {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
+		
 		event, err := requestProcessor.Process(client.WriteSubnetRequest, nil, payload)
 		if err != nil {
 			logger.Error(err)

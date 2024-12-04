@@ -12,7 +12,9 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
+
+	// query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 )
 
 type RequestType string
@@ -95,25 +97,8 @@ func getNodeInfo(cfg *configs.MainConfiguration) (interface{}, error) {
 
 }
 
-func getAuthorizations(authEntity *entities.Authorization) (*[]models.AuthorizationState, error) {
 
-	logger.Debugf("authEntity %v", authEntity)
-	auths, err := GetAccountAuthorizations(authEntity)
 
-	if err != nil {
-		logger.Error(err)
-		return nil, err
-	}
-	return auths, nil
-}
-
-func setAuthorization(ctx *context.Context, payload entities.ClientPayload) (*models.EventInterface, error) {
-	authEvent, err := CreateEvent(payload, ctx)
-	if err != nil {
-		return nil, err
-	}
-	return authEvent, nil
-}
 
 func parseEntity[M any](_type M, payload *entities.ClientPayload) {
 	d, _ := json.Marshal(payload.Data)
@@ -156,6 +141,7 @@ func parseClientPayload(payload *entities.ClientPayload, requestType RequestType
 
 func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[string]interface{}, payload interface{}) (interface{}, error) {
 	var request RequestType
+	queryLimit := dsquery.DefaultQueryLimit
 	for _, pattern := range requestPatterns {
 		match, par := utils.MatchUrlPath(string(pattern), string(requestPath))
 		if match {
@@ -166,13 +152,30 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 			break;
 		}
 	}
+	page := 1;
+	perPage := queryLimit.Limit
+	if params["page"] != nil {
+		d, err := strconv.Atoi(fmt.Sprint(params["page"]))
+		if err != nil {
+			page = 1
+		} else {
+			page = d
+		}
+	}
+	if params["perPage"] != nil {
+		if page == 0 {
+			page = 1
+		}
+		queryLimit.Offset = page - 1 * perPage
+	}
+	
 	switch request {
 	case "READ:ping":
 		return entities.ClientResponse{}, nil
 	case GetNodeInfoRequest:
 		return getNodeInfo(p.Cfg)
 	case FindAuthorizationsRequest:
-		return GetAccountAuthorizations(payload.(*entities.Authorization))
+		return GetAuthorizations(payload.(*entities.Authorization))
 		// b, parseError := utils.ParseQueryString(c)
 		// if parseError != nil {
 		// 	logger.Error(parseError)
@@ -182,7 +185,7 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 		// json.Unmarshal(*payload, &authEntity)
 		// return getAuthorizations(&authEntity)
 	case FindTopicsRequest:
-		return query.GetTopics(payload.(entities.Topic))
+		return dsquery.GetAccountTopics(payload.(entities.Topic), dsquery.DefaultQueryLimit, nil)
 	case WriteSubnetRequest: // "WRITE:topics/subscribers/approve", "PATCH:topics/unsubscribe", "PATCH:topics/ban":
 		cpl := payload.(entities.ClientPayload)
 		data := entities.Subnet{}
@@ -237,8 +240,8 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 		}
 		cpl.Data = data
 		return CreateEvent(cpl, p.Ctx)
-	case GetSubscriptionByIdRequest:
-		return GetSubscription(params["id"].(string))
+	// case GetSubscriptionByIdRequest:
+	// 	return dsquery.GetSubsc(params["id"].(string))
 	case GetTopicSubscribersRequest:
 		subPayload := payload.(entities.Subscription)
 		subPayload.Topic = params["topic"].(string)
@@ -246,7 +249,7 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 	case GetTopicMessagesRequest:
 		return GetMessages(params["id"].(string))
 	case GetTopicByIdRequest:
-		return query.GetTopicById(params["id"].(string))
+		return dsquery.GetTopicById(params["id"].(string))
 	case GetAccountSubscriptionsRequest:
 
 		status := params["status"]
@@ -265,17 +268,27 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 		}
 		json.Unmarshal(pB, &subs)
 		return GetAccountSubscriptionsV2(subs)
-	case SyncClientRequest:
-		//var authEntity entities.Authorization
-		// var payload entities.ClientPayload
-		// json.Unmarshal(*b, &authEntity)
+	// case SyncClientRequest:
+	// 	//var authEntity entities.Authorization
+	// 	// var payload entities.ClientPayload
+	// 	// json.Unmarshal(*b, &authEntity)
 
-		syncResponse := entities.SyncResponse{}
-		SyncAgent(&entities.SyncRequest{}, &entities.ClientPayload{})
+	// 	syncResponse := entities.SyncResponse{}
+	// 	SyncAgent(&entities.SyncRequest{}, &entities.ClientPayload{})
 
-		return syncResponse, nil
+	// 	return syncResponse, nil
 	case BlockStatsRequest:
-		blockStats, err := GetBlockStats()
+		block := params["block"].(string)
+	
+		blockNumber := uint64(0)
+		if len(block) > 0 {
+			n, err := strconv.Atoi(block)
+			if err != nil {
+				return nil, err
+			}
+			blockNumber = uint64(n)
+		}
+		blockStats, err := GetBlockStats(blockNumber,  queryLimit)
 		if err != nil {
 
 			return nil, err
@@ -291,9 +304,9 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 	case "GET:event-path/:hash/:type/:id":
 		hash := params["hash"].(string)
 		typeParam := params["type"].(string)
-		typeParamInt := GetEventTypeFromModel(entities.EntityModel(typeParam))
+		// typeParamInt := GetEventTypeFromModel(entities.EntityModel(typeParam))
 
-		topic, err := GetEventByHash(hash, int(typeParamInt))
+		topic, err := dsquery.GetStateFromEventPath(&entities.EventPath{EntityPath: entities.EntityPath{Hash: hash, Model: entities.EntityModel(typeParam)}})
 
 		if err != nil {
 			return nil, err
@@ -325,11 +338,15 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 
 		return GetSubscribedSubnets(subnetState)
 	case GetSubnetByIdRequest:
-		return query.GetSubnetById(params["id"].(string))
+		subnet, err := dsquery.GetSubnetStateById(params["id"].(string))
+		if err != nil {
+			return nil, err
+		}
+		return models.SubnetState{Subnet: *subnet}, nil
 	default:
 		return nil, ErrorInvalidRequest
 	}
 
 	// get info about the node
-	return nil, ErrorInvalidRequest
+	// return nil, ErrorInvalidRequest
 }

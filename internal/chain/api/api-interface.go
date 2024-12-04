@@ -68,6 +68,8 @@ type IChainAPI interface {
 	// subnet
 	GetSubnetBalance(id [16]byte) (*big.Int, error)
 
+	GetTotalValueLockedInSubnets() (*big.Int, error)
+
 	// sentry
 	// GetMinStakeAmountForValidators() (*big.Int, error)
 	GetMinStakeAmountForSentry() (*big.Int, error)

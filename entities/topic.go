@@ -4,6 +4,7 @@ import (
 	// "errors"
 
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -20,7 +21,7 @@ type Topic struct {
 	// Name            string        `json:"n,omitempty" binding:"required"`
 	Ref             string        `json:"ref,omitempty" binding:"required" gorm:"uniqueIndex:idx_unique_subnet_ref;type:varchar(64);default:null"`
 	Meta            string        `json:"meta,omitempty"`
-	ParentTopicHash string        `json:"pTH,omitempty" gorm:"type:char(64)"`
+	ParentTopic string        `json:"pT,omitempty" gorm:"type:char(64)"`
 	SubscriberCount uint64        `json:"sC,omitempty"`
 	Account         DIDString `json:"acct,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 
@@ -44,11 +45,59 @@ type Topic struct {
 	BlockNumber uint64          `json:"blk"`
 	Cycle   	uint64			`json:"cy"`
 	Epoch		uint64			`json:"ep"`
+	EventSignature  string    `json:"csig,omitempty"`
 }
 
-func (topic *Topic) Key() string {
-	return fmt.Sprintf("/%s/%s", topic.Account, topic.Hash)
+func (d Topic) GetSignature() (string) {
+	return d.EventSignature
 }
+
+func (item *Topic) DataKey() string {
+	return fmt.Sprintf(DataKey, GetModel(item), item.Event.Hash )
+}
+
+func (item *Topic) MsgPack() []byte {
+	b, _ := encoder.MsgPackStruct(item)
+	return b
+}
+
+func (item *Topic) Key() string {
+	if item.ID == "" {
+		item.ID, _ = GetId(item)
+	}
+	return fmt.Sprintf("%s/id/%s", GetModel(item), item.ID)
+}
+
+
+func (g *Topic) GetKeys() (keys []string)  {
+	keys = append(keys, fmt.Sprintf("%s/%s/%s",  g.GetAccountTopicsKey(), utils.IntMilliToTimestampString(int64(g.Timestamp)), g.ID))
+	// keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s", TopicModel, g.Account, g.Subnet, g.ID))
+	keys = append(keys, g.Key())
+	keys = append(keys, g.DataKey())
+	keys = append(keys, g.RefKey())
+	return keys;
+}
+
+
+func (item *Topic) RefKey() string {
+	if item.Ref == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s|ref|%s|%s", TopicModel, item.Subnet, item.Ref)
+}
+
+func (g *Topic) GetAccountTopicsKey() (string) {
+	if (g.Subnet != "") {
+		if g.Agent != ""  {
+			return fmt.Sprintf("%s/sub/%s/%s/%s", TopicModel, g.Subnet, g.Account, g.Agent)
+		}
+		return fmt.Sprintf("%s/sub/%s/%s", TopicModel, g.Subnet, g.Account)
+	} else {
+		return fmt.Sprintf("%s/sub/%s", TopicModel, g.Subnet)
+	}
+}
+
+
 
 func (topic *Topic) ToJSON() []byte {
 	m, e := json.Marshal(topic)
@@ -58,10 +107,6 @@ func (topic *Topic) ToJSON() []byte {
 	return m
 }
 
-func (topic *Topic) MsgPack() []byte {
-	b, _ := encoder.MsgPackStruct(topic)
-	return b
-}
 
 func TopicToByte(i uint64) []byte {
 	b := make([]byte, 8)
@@ -95,9 +140,9 @@ func (p *Topic) IsMember(channel string, sender DIDString) bool {
 }
 
 func (topic Topic) GetHash() ([]byte, error) {
-	// if topic.Hash != "" {
-	// 	return hex.DecodeString(topic.Hash)
-	// }
+	if topic.Hash != "" {
+		return hex.DecodeString(topic.Hash)
+	}
 	b, err := topic.EncodeBytes()
 	if err != nil {
 		return []byte(""), err
@@ -105,7 +150,7 @@ func (topic Topic) GetHash() ([]byte, error) {
 	return crypto.Sha256(b), nil
 }
 
-func (topic Topic) ToString() string {
+func (topic Topic) ToString() (string, error) {
 	values := []string{}
 	values = append(values, topic.Hash)
 	values = append(values, topic.Meta)
@@ -114,7 +159,7 @@ func (topic Topic) ToString() string {
 	values = append(values, string(topic.Account))
 	values = append(values, fmt.Sprintf("%t", topic.Public))
 	// values = append(values, fmt.Sprintf("%s", topic.Signature))
-	return strings.Join(values, ",")
+	return strings.Join(values, ","), nil
 }
 
 func (topic Topic) GetEvent() EventPath {
@@ -127,14 +172,14 @@ func (topic Topic) GetAgent() DeviceString {
 func (topic Topic) EncodeBytes() ([]byte, error) {
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: utils.SafePointerValue(topic.DefaultSubscriberRole, 0)},
-		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.ID},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.ID)},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.Meta},
-		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: topic.ParentTopicHash},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.ParentTopic)},
 		encoder.EncoderParam{Type: encoder.BoolEncoderDataType, Value: utils.SafePointerValue(topic.Public, false)},
 		encoder.EncoderParam{Type: encoder.BoolEncoderDataType, Value:  utils.SafePointerValue(topic.ReadOnly, false)},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.Ref},
 		// encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *topic.DefaultSubscriptionStatus},
-		// encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.Subnet},
+		// encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.Subnet)},
 	)
 }
 

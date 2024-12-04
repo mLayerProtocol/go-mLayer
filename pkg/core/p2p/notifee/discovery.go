@@ -19,6 +19,9 @@ type DiscoveryNotifee struct {
 	HandleConnect func (*host.Host, peer.AddrInfo)
 }
 func (n *DiscoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
+	if n == nil {
+		return
+	}
 	logger.Debugf("Discovered new peer in notifee %s\n", pi.ID.String())
 	if n.Host.ID() == pi.ID {
 		return

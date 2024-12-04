@@ -55,6 +55,14 @@ func (address DID) ToDeviceString() DeviceString {
 	return DeviceString(address.ToString())
 }
 
+func (address DID) ToDIDString() DIDString {
+	if address.Prefix == "" {
+		address.Prefix = "did"
+	}
+	return DIDString(address.ToString())
+}
+
+
 func StringToDeviceString(str string) (DeviceString) {
 	return AddressFromString(str).ToDeviceString()
 }

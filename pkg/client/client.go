@@ -4,15 +4,16 @@ import (
 	"encoding/hex"
 	"os"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
+	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
-	"gorm.io/gorm"
 )
 
 type NodeInfo struct {
@@ -67,6 +68,7 @@ func Info(cfg *configs.MainConfiguration) (*NodeInfo, error) {
 
 }
 func ValidateClientPayload(
+	ds *ds.Datastore,
 	payload *entities.ClientPayload,
 	strictAuth bool,
 	chainId configs.ChainId,
@@ -79,7 +81,7 @@ func ValidateClientPayload(
 	// }
 	// logger.Debug("ENCODEDBYTESSS"," ", hex.EncodeToString(d), " ", hex.EncodeToString(crypto.Keccak256Hash(d)))
 
-	if payload.Subnet == "" {
+	if payload.Subnet == ""  {
 		return nil, nil, apperror.Forbidden("Subnet Id is required")
 	}
 	if string(payload.ChainId) != string(chainId) {
@@ -96,10 +98,12 @@ func ValidateClientPayload(
 	// 	return nil, nil, apperror.BadRequest("Agent is required")
 	// }
 	// logger.Debugf("AGENTTTT %s", agent)
-	subnet := models.SubnetState{}
-	err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: payload.Subnet}}, &subnet)
+	// subnet := models.SubnetState{}
+	// err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: payload.Subnet}}, &subnet)
+	subnet, err := dsquery.GetSubnetStateById(payload.Subnet)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		// if err == gorm.ErrRecordNotFound {
+		if err == datastore.ErrNotFound {
 			return nil,  nil, apperror.Forbidden("Invalid subnet id")
 		}
 		return nil, nil, apperror.Internal(err.Error())
@@ -111,22 +115,39 @@ func ValidateClientPayload(
 
 	// check if device is authorized
 	if agent != "" {
-		logger.Debugf("New Event for Agent/Device %s", agent)
+		
 		agent = entities.DeviceString(agent)
 		
 		if strictAuth || string(payload.Account) != ""  {
-			authData := models.AuthorizationState{}
-			err := query.GetOne(models.AuthorizationState{
-				Authorization: entities.Authorization{Account: payload.Account,
-					Subnet: payload.Subnet,
-					Agent:  agent},
-			}, &authData)
+			
+			var authData models.AuthorizationState
+			// err := query.GetOne(models.AuthorizationState{
+			// 	Authorization: entities.Authorization{Account: payload.Account,
+			// 		Subnet: payload.Subnet,
+			// 		Agent:  agent},
+			// }, &authData)
+			filter := entities.Authorization{
+				Account: payload.Account,
+				Subnet: payload.Subnet,
+				Agent: agent,
+			}
+			
+			authDatas, err := dsquery.GetAccountAuthorizations(filter, dsquery.DefaultQueryLimit, nil)
 			if err != nil {
 				// if err == gorm.ErrRecordNotFound {
 				// 	return nil, nil
 				// }
+				logger.Errorf("GetAuthError: %v", err)
 				return nil, &agent, err
 			} else {
+				if len(authDatas) == 0 {
+					return nil, &agent, apperror.Unauthorized("agent not authorized")
+				}
+				for _, a := range authDatas {
+					logger.Debugf("AuthStatesss::: %s", a.Event.Hash)
+				}
+				logger.Debugf("New Event for Agent/Device %+v", authDatas)
+				authData = models.AuthorizationState{Authorization: *authDatas[0]};
 				return &authData, &agent,  nil
 			}
 		} else {
@@ -139,4 +160,24 @@ func ValidateClientPayload(
 func SyncRequest(payload *entities.ClientPayload) entities.SyncResponse {
 	var response = entities.SyncResponse{}
 	return response
+}
+
+
+func validateAgent(payload *entities.ClientPayload) error {
+	if len(payload.Account) > 0 &&  len(payload.Agent) > 0  {
+		// check if its an admin
+		// auth := models.AuthorizationState{}
+		// err = query.GetOneState(entities.Authorization{Agent: payload.Agent, Account: payload.Account}, &auth)
+		auth, err := dsquery.GetAccountAuthorizations(entities.Authorization{
+			Agent: payload.Agent, Account: payload.Account, Subnet: payload.Subnet,
+		}, nil, nil)
+		if err != nil {
+			return  apperror.Unauthorized("Invalid subnet")
+		}
+		
+		if len(auth) == 0 || *auth[0].Priviledge  < constants.MemberPriviledge {
+			return  apperror.Unauthorized("agent not authorized")
+		}
+	}
+		return nil
 }

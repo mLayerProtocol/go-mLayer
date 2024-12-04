@@ -60,6 +60,8 @@ const (
 	ARCHIVE_MODE         Flag = "archive"
 	TEST_MODE         Flag = "testing"
 	VERBOSE         Flag = "verbose"
+	BOOTSTRAP_NODE         Flag = "bootstrap-node"
+	SYNC_HOST         Flag = "sync-host"
 )
 const MaxDeliveryProofBlockSize = 1000
 
@@ -104,6 +106,8 @@ func init() {
 	daemonCmd.Flags().BoolP(string(TEST_MODE), "", false, "Run test functions")
 	daemonCmd.Flags().StringP(string(QUIC_HOST), "", "", "Quic server listening address")
 	daemonCmd.Flags().BoolP(string(VERBOSE), "", false, "Sets log level to debug")
+	daemonCmd.Flags().BoolP(string(BOOTSTRAP_NODE), "", false, "Run as bootstrap node")
+	daemonCmd.Flags().StringP(string(SYNC_HOST), "", "", "IP address of sync node")
 }
 
 func daemonFunc(cmd *cobra.Command, _ []string) {
@@ -197,7 +201,6 @@ func daemonFunc(cmd *cobra.Command, _ []string) {
 	}
 
 	
-	
 
 	cfg.SyncBatchSize, _ = cmd.Flags().GetUint(string(SYNC_BATCH_SIZE))
 	
@@ -271,7 +274,24 @@ func daemonFunc(cmd *cobra.Command, _ []string) {
 		cfg.Validator = true
 	}
 
+	isBootstrap, _ := cmd.Flags().GetBool(string(BOOTSTRAP_NODE))
+	if !cfg.BootstrapNode {
+		cfg.BootstrapNode = isBootstrap
+	}
 	
+	archiveDir := filepath.Join( cfg.DataDir, "archive")
+	if strings.HasPrefix(cfg.DataDir, "./") && !strings.HasPrefix(archiveDir, "./") {
+		archiveDir = "./"+archiveDir
+	}
+	if strings.HasPrefix(cfg.DataDir, "../") && !strings.HasPrefix(archiveDir, "../") {
+		archiveDir = "../"+archiveDir
+	}
+	if err := os.MkdirAll(archiveDir, os.ModePerm); err!=nil {
+		panic(err)
+	}
+	cfg.ArchiveDir = archiveDir
+
+	cfg.SyncHost, _ = cmd.Flags().GetString(string(SYNC_HOST))
 	
 
 	// ****** INITIALIZE CONTEXT ****** //

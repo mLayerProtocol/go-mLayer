@@ -149,7 +149,8 @@ func SaveAuthorizationStateAndEvent(authEvent *entities.Event, tx *gorm.DB) (*mo
 
 	hash, _ := auth.GetHash()
 	auth.Hash = hex.EncodeToString(hash)
-	auth.Event = *entities.NewEventPath(authEvent.Validator, entities.AuthModel, authEvent.Hash)
+	id, _ := authEvent.GetId()
+	auth.Event =  *entities.NewEventPath(authEvent.Validator, entities.AuthModel, id)
 	event, created, err := SaveAuthorizationEvent(authEvent, false, tx)
 	if err != nil {
 		logger.Errorf("SQL: %v", err)

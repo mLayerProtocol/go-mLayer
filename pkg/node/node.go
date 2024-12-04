@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"time"
 
-	"strings"
 	"sync"
 
 	"net"
@@ -20,9 +19,9 @@ import (
 	// "net/rpc/jsonrpc"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/gorilla/websocket"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsstores "github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/quic-go/quic-go"
 
@@ -50,7 +49,7 @@ import (
 // } // use default options
 
 var logger = &log.Logger
-
+var syncedBlockMutex sync.Mutex
 // var wsClients =  make(map[string]map[*websocket.Conn]*entities.ClientWsSubscription)
 // var subscribedWsClientIndex =  make(map[string]map[*websocket.Conn][]int)
 // var wsClients =  make(map[string][]*websocket.Conn)
@@ -73,33 +72,37 @@ func Start(mainCtx *context.Context) {
 
 	// incomingEventsC := make(chan types.Log)
 
+	
 	var wg sync.WaitGroup
-	systemStore := ds.New(mainCtx,  string(constants.SystemStore))
-	defer  systemStore.Close()
-	ctx := context.WithValue(*mainCtx, constants.SystemStore, systemStore)
+
+	ctx, stores := dsstores.InitStores(mainCtx)
+
+	for _, store := range stores {
+		defer store.Close()
+	}
+	
+
 
 
 	eventCountStore := ds.New(&ctx,   string(constants.EventCountStore))
 	defer eventCountStore.Close()
 	ctx = context.WithValue(ctx, constants.EventCountStore, eventCountStore)
 
-	claimedRewardStore := ds.New(&ctx,   string(constants.ClaimedRewardStore))
-	defer claimedRewardStore.Close()
-	ctx = context.WithValue(ctx, constants.ClaimedRewardStore, claimedRewardStore)
 	// ctx = context.WithValue(ctx, constants.NewTopicSubscriptionStore, newTopicSubscriptionStore)
-	// ctx = context.WithValue(ctx, constants.UnprocessedClientPayloadStore, unProcessedClientPayloadStore)
+
+	newClientPayloadStore := ds.New(&ctx,   string(constants.NewClientPayloadStore))
+	ctx = context.WithValue(ctx, constants.NewClientPayloadStore, newClientPayloadStore)
+
+	
 	ctx = context.WithValue(ctx, constants.ConnectedSubscribersMap, connectedSubscribers)
 
-	p2pDhtStore := ds.New(&ctx,   string(constants.P2PDhtStore))
-	defer p2pDhtStore.Close()
-	ctx = context.WithValue(ctx, constants.P2PDhtStore, p2pDhtStore)
 
 	ctx = context.WithValue(ctx, constants.WSClientLogId, &wsClients)
 
 	// defer func () {
-	// 	if chain.NetworkInfo.Synced && systemStore != nil && !systemStore.DB.IsClosed() {
+	// 	if chain.NetworkInfo.Synced && SystemStore != nil && !SystemStore.DB.IsClosed() {
 	// 		lastBlockKey :=  ds.Key(ds.SyncedBlockKey)
-	// 		systemStore.Set(ctx, lastBlockKey, chain.NetworkInfo.CurrentBlock.Bytes(), true)
+	// 		SystemStore.Set(ctx, lastBlockKey, chain.NetworkInfo.CurrentBlock.Bytes(), true)
 	// 	}
 	// }()
 	
@@ -122,6 +125,42 @@ func Start(mainCtx *context.Context) {
 	//  }()
 
 	// distribute message to event listeners and topic subscribers
+	// wg.Add(1)
+	// go func() {
+	// 	_, cancel := context.WithCancel(context.Background())
+	// 	defer cancel()
+	// 	defer wg.Done()
+	// 	for {
+	// 		select {
+	// 		case inEvent, ok := <-channelpool.IncomingMessageEvent_P2P_D_C:
+	// 			if !ok {
+	// 				logger.Errorf("Incoming Message channel closed. Please restart server to try or adjust buffer size in config")
+	// 				wg.Done()
+	// 				return
+	// 			}
+	// 			// VALIDATE, STORE AND DISTRIBUTE
+	// 			go func() {
+	// 				inMessage := inEvent.Payload.Data.(entities.Message)
+	// 				logger.Debugf("Received new message %s\n", inMessage.DataHash)
+	// 				// validMessagesStore.Set(ctx, db.Key(inMessage.Key()), inMessage.MsgPack(), false)
+	// 				_reciever := inMessage.Receiver
+	// 				_recievers := strings.Split(string(_reciever), ":")
+	// 				_currentTopic := connectedSubscribers[_recievers[1]]
+	// 				logger.Debug("connectedSubscribers : ", connectedSubscribers, "---", _reciever)
+	// 				logger.Debug("_currentTopic : ", _currentTopic, "/n")
+	// 				for _, signerConn := range _currentTopic {
+	// 					for i := 0; i < len(signerConn); i++ {
+	// 						signerConn[i].(*websocket.Conn).WriteMessage(1, inMessage.MsgPack())
+	// 					}
+	// 				}
+	// 			}()
+
+	// 		}
+
+	// 	}
+	// }()
+	
+
 	wg.Add(1)
 	go func() {
 		_, cancel := context.WithCancel(context.Background())
@@ -129,26 +168,53 @@ func Start(mainCtx *context.Context) {
 		defer wg.Done()
 		for {
 			select {
-			case inEvent, ok := <-channelpool.IncomingMessageEvent_P2P_D_C:
+			case event, ok := <-channelpool.EventProcessorChannel:
 				if !ok {
-					logger.Errorf("Incoming Message channel closed. Please restart server to try or adjust buffer size in config")
+					logger.Errorf("Incoming event channel closed. Please restart server to try or adjust buffer size in config")
 					wg.Done()
 					return
 				}
-				// VALIDATE, STORE AND DISTRIBUTE
 				go func() {
-					inMessage := inEvent.Payload.Data.(entities.Message)
-					logger.Debugf("Received new message %s\n", inMessage.DataHash)
-					// validMessagesStore.Set(ctx, db.Key(inMessage.Key()), inMessage.MsgPack(), false)
-					_reciever := inMessage.Receiver
-					_recievers := strings.Split(string(_reciever), ":")
-					_currentTopic := connectedSubscribers[_recievers[1]]
-					logger.Debug("connectedSubscribers : ", connectedSubscribers, "---", _reciever)
-					logger.Debug("_currentTopic : ", _currentTopic, "/n")
-					for _, signerConn := range _currentTopic {
-						for i := 0; i < len(signerConn); i++ {
-							signerConn[i].(*websocket.Conn).WriteMessage(1, inMessage.MsgPack())
+					logger.Debugf("StartedProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
+					cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
+					if !ok {
+						logger.Errorf("unable to get config from context")
+						return
+					}
+					if event.Validator != entities.PublicKeyString(hex.EncodeToString(cfg.PublicKeyEDD)) {
+						isValidator, err := chain.NetworkInfo.IsValidator(string(event.Validator))
+						if err != nil {
+							logger.Error(err)
+							return
 						}
+						if !isValidator {
+							logger.Error(fmt.Errorf("not signed by a validator"))
+							return
+						}
+					}
+					go func() {
+						syncedBlockMutex.Lock()
+						defer syncedBlockMutex.Unlock()
+						if chain.NetworkInfo.Synced {
+							lastSynced, err := ds.GetLastSyncedBlock(mainCtx)
+							eventBlock := new(big.Int).SetUint64(event.BlockNumber)
+							if err == nil && lastSynced.Cmp(eventBlock) == -1 {
+								ds.SetLastSyncedBlock(mainCtx, eventBlock)
+							}
+						}
+					}()
+					modelType := event.GetDataModelType()
+					switch modelType {
+					case entities.SubnetModel:
+						service.HandleNewPubSubSubnetEvent(event, &ctx)
+					case entities.AuthModel:
+						service.HandleNewPubSubAuthEvent(event, &ctx)
+					case entities.TopicModel:
+						service.HandleNewPubSubTopicEvent(event, &ctx)
+					case entities.SubscriptionModel:
+						service.HandleNewPubSubSubscriptionEvent(event, &ctx)
+					case entities.MessageModel:
+						service.HandleNewPubSubMessageEvent(event, &ctx)
 					}
 				}()
 
@@ -156,7 +222,6 @@ func Start(mainCtx *context.Context) {
 
 		}
 	}()
-	
 
 	// load network params
 	wg.Add(1)
@@ -193,7 +258,7 @@ func Start(mainCtx *context.Context) {
 			if err != nil {
 				logger.Error(err)
 			}
-			certResponse, err := certPayload.SendRequestToAddress(cfg.PrivateKeyEDD, addr, p2p.DataRequest )
+			certResponse, err := certPayload.SendP2pRequestToAddress(cfg.PrivateKeyEDD, addr, p2p.DataRequest )
 			if err != nil {
 				logger.Error(err)
 			}
@@ -230,12 +295,12 @@ func Start(mainCtx *context.Context) {
 		// }
 		// }()
 		
-		go p2p.ProcessEventsReceivedFromOtherNodes(entities.AuthModel, &entities.AuthorizationPubSub, &ctx, service.HandleNewPubSubAuthEvent)
-		go p2p.ProcessEventsReceivedFromOtherNodes(entities.TopicModel, &entities.TopicPubSub, &ctx, service.HandleNewPubSubTopicEvent)
-		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubnetModel, &entities.SubnetPubSub, &ctx, service.HandleNewPubSubSubnetEvent)
-		go p2p.ProcessEventsReceivedFromOtherNodes(entities.WalletModel, &entities.WalletPubSub, &ctx, service.HandleNewPubSubWalletEvent)
-		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubscriptionModel, &entities.SubscriptionPubSub, &ctx, service.HandleNewPubSubSubscriptionEvent)
-		go p2p.ProcessEventsReceivedFromOtherNodes(entities.MessageModel, &entities.MessagePubSub, &ctx, service.HandleNewPubSubMessageEvent)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubnetModel, &entities.SubnetPubSub, &ctx)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.AuthModel, &entities.AuthorizationPubSub, &ctx)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.TopicModel, &entities.TopicPubSub, &ctx)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.WalletModel, &entities.WalletPubSub, &ctx)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubscriptionModel, &entities.SubscriptionPubSub, &ctx)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.MessageModel, &entities.MessagePubSub, &ctx)
 		
 
 		p2p.Run(&ctx)
@@ -261,7 +326,29 @@ func Start(mainCtx *context.Context) {
 			defer wg.Done()
 			ProcessPendingClaims(&ctx)
 		}()
+		
 	}
+
+	if cfg.Validator || cfg.BootstrapNode  {
+		wg.Add(1)
+		go func() {
+			_, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			defer wg.Done()
+			// for {
+			// 	if chain.NetworkInfo.Synced {
+			// 		if err := ArchiveBlocks(&ctx); err != nil {
+			// 			logger.Error(err)
+			// 			time.Sleep(10 * time.Second)
+			// 			continue
+			// 		}
+			// 	}
+			// 	time.Sleep(10 * time.Second)
+			// }
+		}()
+	}
+
+	
 	
 	
 
@@ -405,6 +492,7 @@ func Start(mainCtx *context.Context) {
 		}()
 	}
 }
+
 func loadChainInfo(cfg *configs.MainConfiguration) error {
 	
 	info, err := chain.Provider(cfg.ChainId).GetChainInfo()
@@ -452,9 +540,9 @@ func loadChainInfo(cfg *configs.MainConfiguration) error {
 				}
 				cfg.OwnerAddress = common.BytesToAddress(address)
 			}
-			if cfg.NoSync {
+			// if cfg.NoSync {
 				chain.NetworkInfo.Synced = true
-			}
+			// }
 			chain.NetworkInfo.StartBlock = info.StartBlock
 			chain.NetworkInfo.StartTime = info.StartTime
 			chain.NetworkInfo.CurrentCycle = info.CurrentCycle

@@ -29,8 +29,12 @@ type WalletBalance struct {
 	BlockNumber uint64          `json:"blk"`
 	Cycle   	uint64			`json:"cy"`
 	Epoch		uint64			`json:"ep"`
+	Signature		string			`json:"sig"`
 }
 
+func (d WalletBalance) GetSignature() (string) {
+	return d.Signature
+}
 func (d *WalletBalance) BeforeCreate(tx *gorm.DB) (err error) {
 	if d.ID == "" {
 		uuid, err := GetId(*d)
@@ -87,12 +91,12 @@ func (e WalletBalance) GetHash() ([]byte, error) {
 	return crypto.Sha256(b), nil
 }
 
-func (e WalletBalance) ToString() string {
+func (e WalletBalance) ToString() (string, error) {
 	values := []string{}
 	values = append(values, fmt.Sprintf("%s", e.Account))
 	values = append(values, fmt.Sprintf("%s", e.Wallet))
 	
-	return strings.Join(values, "")
+	return strings.Join(values, ""), nil
 }
 
 func (e WalletBalance) EncodeBytes() ([]byte, error) {

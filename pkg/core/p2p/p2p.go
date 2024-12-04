@@ -28,13 +28,12 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/channelpool"
-	"github.com/mlayerprotocol/go-mlayer/internal/sql/query"
+	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
+	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p/notifee"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/sql"
 	"github.com/mlayerprotocol/go-mlayer/pkg/log"
 	"github.com/multiformats/go-multiaddr"
-	"gorm.io/gorm"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -180,7 +179,7 @@ func discover(ctx context.Context, h host.Host, kdht *dht.IpfsDHT, rendezvous st
 					err := h.Connect(ctx, p)
 					// _, err = h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
-						logger.Debugf("Failed to connect to peer: %s \n%s", p.ID.String(), err.Error())
+						logger.Debugf("[%s] Failed to connect to peer: %s \n%s",h.ID().String(),  p.ID.String(), err.Error())
 						h.Peerstore().ClearAddrs(p.ID)
 						kdht.ForceRefresh()
 						connectedPeer[p.ID.String()] = false
@@ -217,10 +216,10 @@ func Run(mainCtx *context.Context) {
 		panic("Unable to load config from context")
 	}
 	discoveryService := fmt.Sprintf("%s/%s", cfg.ProtocolVersion, cfg.ChainId)
-	p2pDhtStore, ok := (*MainContext).Value(constants.P2PDhtStore).(*ds.Datastore)
-	if !ok {
-		logger.Fatalf("node.Run: unable to load p2pDhtStore from context")
-	}
+	// p2pDhtStore, ok := (*MainContext).Value(constants.P2PDhtStore).(*ds.Datastore)
+	// if !ok {
+	// 	logger.Fatalf("node.Run: unable to load p2pDhtStore from context")
+	// }
 	
 
 	if !ok {
@@ -344,7 +343,7 @@ func Run(mainCtx *context.Context) {
 				dht.ProtocolPrefix(protocol.ID(p2pProtocolId)),
 				dht.ProtocolPrefix(protocol.ID(handShakeProtocolId)),
 				dht.ProtocolPrefix(protocol.ID(syncProtocolId)),
-				dht.Datastore(p2pDhtStore),
+				dht.Datastore(stores.P2pDhtStore),
 				dht.NamespacedValidator("pk", record.PublicKeyValidator{}),
 				dht.NamespacedValidator("ipns", record.PublicKeyValidator{}),
 				dht.NamespacedValidator("ml", &DhtValidator{config: cfg}),
@@ -658,86 +657,118 @@ type SqliteColumnInfo struct {
 // sync block range
 func syncBlocks(cfg *configs.MainConfiguration, hostQuicAddress multiaddr.Multiaddr, signer string, _range Range) error {
 		packedRange, _ := encoder.MsgPackStruct(_range) 
-		payload := NewP2pPayload(cfg, P2pActionSyncBlock, packedRange )
+		payload := NewP2pPayload(cfg, P2pActionSyncCycle, packedRange )
+		logger.Infof("GettingSyncData")
 		resp, err := payload.SendQuicSyncRequest(hostQuicAddress, entities.PublicKeyString(signer))
+		logger.Infof("GotSyncData")
 		if err != nil || resp == nil{
+			logger.Errorf("ERRROSYNC %v", err)
 			return err
 		}
+		
 		if len(resp.Error) == 0 {
 		data, err := utils.DecompressGzip(resp.Data)
 		if err != nil {
 			logger.Error(err)
 			return err
 		}
-		 parts := bytes.Split(data, []byte(":|"))
+		delimiter := []byte{':', '|'}		
+		 parts := bytes.Split(data, delimiter)
 		 for _, part := range parts {
 			if len(part) < 2 {
 				continue
 			}
-			
-			b := query.ExportData{}
-			err := encoder.MsgPackUnpackStruct(part, &b)
-			if err != nil {
-				logger.Error(err)
-				continue
-			}
-			batchSize := 100
-			var postgresData [][]string
-			values := ""
-			for i, row := range b.Data {
-				if sql.Driver(cfg.SQLDB.DbDialect) == sql.Postgres {
-					postgresData = append(postgresData, utils.ToStringSlice(row))
-					if i==len(b.Data)-1 || i+1 % batchSize == 0 {
-						err := query.ImportDataPostgres(cfg, b.Table, strings.Split(b.Columns, ","), postgresData)
-						if err != nil {
-							logger.Error(err)
-							return err
-						}
-						postgresData = [][]string{}
-					}
+			eventTmp, err := entities.UnpackEventGeneric(part)
+				if err != nil {
+					logger.Infof("ErrorUnpackingEvent: %v", err)
+					return err
 				}
-				if sql.Driver(cfg.SQLDB.DbDialect) == sql.Sqlite {
-					values = fmt.Sprintf("%s%s, \n", values, fmt.Sprintf("(%s)", query.FormatSQL(row)))
+				eventModel := entities.GetModelTypeFromEventType(constants.EventType(eventTmp.EventType))
+				event, err :=  entities.UnpackEvent(part, eventModel)
+				if err != nil {
+					return err
+				}
+				logger.Infof("SyncEvent: %+v", event.ID)
+				channelpool.EventProcessorChannel <- event
+			// b := dsquery.ExportData{}
+			// err := encoder.MsgPackUnpackStruct(part, &b)
+			// if err != nil {
+			// 	logger.Error(err)
+			// 	continue
+			// }
+			// for _, evB := range b.Data {
+			// 	eventTmp, err := entities.UnpackEventGeneric(evB)
+			// 	if err != nil {
+			// 		logger.Infof("ErrorUnpackingEvent: %v", err)
+			// 		return err
+			// 	}
+			// 	eventModel := entities.GetModelTypeFromEventType(constants.EventType(eventTmp.EventType))
+			// 	event, err :=  entities.UnpackEvent(evB, eventModel)
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// 	logger.Infof("SyncEvent: %+v", event)
+			// 	channelpool.EventProcessorChannel <- event
+			// 	// go service.HandleNewPubSubEvent(*event, cfg.Context)
+			// }
+			
+		// 	batchSize := 100
+		// 	var postgresData [][]string
+		// 	values := ""
+		// 	for i, row := range b.Data {
+		// 		if sql.Driver(cfg.SQLDB.DbDialect) == sql.Postgres {
+		// 			postgresData = append(postgresData, utils.ToStringSlice(row))
+		// 			if i==len(b.Data)-1 || i+1 % batchSize == 0 {
+		// 				err := query.ImportDataPostgres(cfg, b.Table, strings.Split(b.Columns, ","), postgresData)
+		// 				if err != nil {
+		// 					logger.Error(err)
+		// 					return err
+		// 				}
+		// 				postgresData = [][]string{}
+		// 			}
+		// 		}
+		// 		if sql.Driver(cfg.SQLDB.DbDialect) == sql.Sqlite {
+		// 			values = fmt.Sprintf("%s%s, \n", values, fmt.Sprintf("(%s)", query.FormatSQL(row)))
 					
 
-					if i==len(b.Data)-1 || i+1 % batchSize == 0 {
-						// var columns []SqliteColumnInfo
-						// colNames := map[string]bool
-						// colQuery := fmt.Sprintf("PRAGMA table_info(%s);", b.Table)
+		// 			if i==len(b.Data)-1 || i+1 % batchSize == 0 {
+		// 				// var columns []SqliteColumnInfo
+		// 				// colNames := map[string]bool
+		// 				// colQuery := fmt.Sprintf("PRAGMA table_info(%s);", b.Table)
 
-						// // Execute the query using GORM's Raw method
-						// err = sql.SqlDb.Raw(colQuery).Scan(&columns).Error
-						// if err != nil {
-						// 	logger.Fatal("error executing query:", err)
-						// }
-						// for i, col := range currentCols {
-						// 	colNames[col.Name] = true
-						// }
-						// validColumns := []string{}
-						// validColumns := []string{}
-						// validColumnsMap := map[string]bool
+		// 				// // Execute the query using GORM's Raw method
+		// 				// err = sql.SqlDb.Raw(colQuery).Scan(&columns).Error
+		// 				// if err != nil {
+		// 				// 	logger.Fatal("error executing query:", err)
+		// 				// }
+		// 				// for i, col := range currentCols {
+		// 				// 	colNames[col.Name] = true
+		// 				// }
+		// 				// validColumns := []string{}
+		// 				// validColumns := []string{}
+		// 				// validColumnsMap := map[string]bool
 						
-						// var validValues []interface{}
-						// currentCols := strings.Split(b.Columns, ",")
-						// for _, col := range currentCols {
-						// 	if colNames[col] {
-						// 		validColumns = append(validColumns, col)
-						// 	}
-						// }
-						query := fmt.Sprintf("INSERT OR IGNORE INTO %s (%s) values %s", b.Table, b.Columns, values)
+		// 				// var validValues []interface{}
+		// 				// currentCols := strings.Split(b.Columns, ",")
+		// 				// for _, col := range currentCols {
+		// 				// 	if colNames[col] {
+		// 				// 		validColumns = append(validColumns, col)
+		// 				// 	}
+		// 				// }
+		// 				query := fmt.Sprintf("INSERT OR IGNORE INTO %s (%s) values %s", b.Table, b.Columns, values)
 						
-						query = query[0:strings.LastIndex(query, ",")]
-						err = sql.SqlDb.Transaction(func(tx *gorm.DB) error {
-							return tx.Exec(query).Error
-						})
-						if err != nil {
-							logger.Error(err)
-							return err
-						}
-						values = ""
-					}
-				}
-			}
+		// 				query = query[0:strings.LastIndex(query, ",")]
+		// 				err = sql.SqlDb.Transaction(func(tx *gorm.DB) error {
+		// 					return tx.Exec(query).Error
+		// 				})
+		// 				if err != nil {
+		// 					logger.Error(err)
+		// 					return err
+		// 				}
+		// 				values = ""
+		// 			}
+		// 		}
+		// 	}
 		   }
 		 }
 		 return nil
@@ -745,6 +776,10 @@ func syncBlocks(cfg *configs.MainConfiguration, hostQuicAddress multiaddr.Multia
 
 func SyncNode(cfg *configs.MainConfiguration, endBlock *big.Int, hostMaddr multiaddr.Multiaddr, pubKey string) error {
 	if cfg.NoSync {
+		return nil
+	}
+	one := 1
+	if one == 1 {
 		return nil
 	}
 	// hostQuicAddress, _, _ := extractQuicAddress(cfg, []multiaddr.Multiaddr{hostMaddr})
@@ -758,7 +793,7 @@ func SyncNode(cfg *configs.MainConfiguration, endBlock *big.Int, hostMaddr multi
 	}
 	// logger.Infof("LASTSYNCEDBLOC", lastBlock,  chain.NetworkInfo.StartBlock)
 	if lastBlock.Cmp(chain.NetworkInfo.StartBlock) == -1 {
-		lastBlock = chain.NetworkInfo.StartBlock
+		lastBlock = utils.IfThenElse(cfg.ChainId.Equals("84532"), big.NewInt(18222587), chain.NetworkInfo.StartBlock)
 	}
 	logger.Println("Starting node sync from block: ", lastBlock)
 	// if chain.NetworkInfo.CurrentBlock != new(big.Int).SetBytes(lastBlock) {
@@ -777,11 +812,12 @@ func SyncNode(cfg *configs.MainConfiguration, endBlock *big.Int, hostMaddr multi
 				From: big.NewInt(from).Bytes(),
 				To:  to.Bytes(),
 			}
+			
 			err := syncBlocks(cfg, hostMaddr, pubKey, _range)
 			if err != nil {
 				return fmt.Errorf("error syncing block %d-%d: %v", from, from+batchSize, err)
 			}
-			ds.SetLastSyncedBlock(MainContext, new(big.Int).SetBytes(_range.To) )
+			// ds.SetLastSyncedBlock(MainContext, new(big.Int).SetBytes(_range.To) )
 			
 			logger.Printf("Synced blocks %s to %s",  new(big.Int).SetBytes(_range.From), new(big.Int).SetBytes(_range.To))
 			fmt.Println()
@@ -871,7 +907,7 @@ func storeAddress(ctx *context.Context, h *host.Host) {
 func GetNodeMultiAddressData(ctx *context.Context, key string) (*NodeMultiAddressData, error) {
 	
 		key = "/ml/val/" + key
-		data, err := idht.GetValue(*ctx, key, nil)
+		data, err := idht.GetValue(*ctx, key)
 		if err != nil {
 			return  nil, err
 		}
@@ -926,7 +962,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 	// 	logger.Error(err)
 	// 	return
 	// }
-	responsePayload, err := payload.SendRequestToAddress(cfg.PrivateKeyEDD, quicmad, DataRequest)
+	responsePayload, err := payload.SendP2pRequestToAddress(cfg.PrivateKeyEDD, quicmad, DataRequest)
 	
 	if err != nil ||  responsePayload == nil || len(responsePayload.Error) > 0 || !responsePayload.IsValid(cfg.ChainId) {
 		disconnect(pairAddr.ID)
@@ -943,7 +979,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 	}
 	if validateHandShake(cfg, handshake, pairAddr.ID) {
 		lastSync, err := ds.GetLastSyncedBlock(MainContext)
-	
+		
 		if err == nil {
 			if handshake.NodeType == constants.ValidatorNodeType && new(big.Int).SetBytes(handshake.LastSyncedBlock).Cmp(lastSync) == 1 {
 				isBootStrap := false
@@ -959,10 +995,10 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 				
 				syncMutex.Lock()
 				defer syncMutex.Unlock()
+				
 				if !chain.NetworkInfo.Synced  {
 					// hostIP, err := extractIP((stream).Conn().RemoteMultiaddr())
 					//if err == nil {
-					logger.Debugf("HANDSHAKESIGNER %s", hex.EncodeToString(handshake.PubKeyEDD))
 					err :=	SyncNode(cfg, new(big.Int).SetBytes(handshake.LastSyncedBlock), quicmad, hex.EncodeToString(handshake.PubKeyEDD))	
 					if err == nil  {
 						lastSync, _ := ds.GetLastSyncedBlock(MainContext)
@@ -970,7 +1006,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 							chain.NetworkInfo.Synced = true
 						}
 					} else {
-						logger.Debugf("Failed to sync with peer: %v", err)
+						logger.Errorf("Failed to sync with peer: %v", err)
 						// wait for another node
 					}
 				}
@@ -1095,7 +1131,7 @@ func disconnect(id peer.ID) {
 // setupDiscovery creates an mDNS discovery service and attaches it to the libp2p Host.
 // This lets us automatically discover peers on the same LAN and connect to them.
 func setupMDNSDiscovery(h host.Host, serviceName string) error {
-	logger.Debugf("Setting up Discovery on %s ....", serviceName)
+	logger.Debugf("[%s] Setting up Discovery on %s ....", h.ID(), serviceName)
 	n := notifee.DiscoveryNotifee{Host: h, HandleConnect: handleConnectV2, Dht: idht}
 
 	disc := mdns.NewMdnsService(h, serviceName, &n)
@@ -1237,18 +1273,18 @@ func readPayload(rw *bufio.ReadWriter, peerId peer.ID, stream network.Stream) {
 		}
 		response, err := processP2pPayload(cfg, payload, true)
 		if err != nil {
-			logger.Debugf("readPayload: %v", err)
+			logger.Debugf("readP2pPayload: %v", err)
 		}
 		delimeter := []byte{'\n'}
 		b := response.MsgPack()
 		_, err = UnpackP2pPayload(b)
 		if err != nil {
-			logger.Errorf("readPayload: %v", err)
+			logger.Errorf("readP2pPayload: %v", err)
 			return
 		}
 		_, err = stream.Write(append(b, delimeter...))
 		if err != nil {
-			logger.Errorf("readPayload: %v", err)
+			logger.Errorf("readP2pPayload: %v", err)
 		}
 	
 		err = rw.Flush()
@@ -1267,16 +1303,8 @@ func GetDhtValue(key string)  ([]byte, error) {
 
 
 func GetCycleMessageCost(ctx context.Context, cycle uint64) (*big.Int, error) {
-	_, ok := (ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-	if !ok {
-		return nil, fmt.Errorf("failed to load config")
-	}
-	claimedRewardStore, ok := (ctx).Value(constants.ClaimedRewardStore).(*ds.Datastore)
-	if !ok {
-		return nil, fmt.Errorf("failed to load store")
-	}
 	priceKey := datastore.NewKey(fmt.Sprintf("/ml/cost/%d", cycle))
-	priceByte, err := claimedRewardStore.Get(ctx, priceKey)
+	priceByte, err := stores.SystemStore.Get(ctx, priceKey)
 	//
 	if err != nil && err != datastore.ErrNotFound {
 		return nil, err
@@ -1291,10 +1319,7 @@ func GetCycleMessageCost(ctx context.Context, cycle uint64) (*big.Int, error) {
 func GetAndSaveMessageCostFromChain(ctx *context.Context, cycle uint64) (*big.Int, error) {
 	
 	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-	claimedRewardStore, ok := (*ctx).Value(constants.ClaimedRewardStore).(*ds.Datastore)
-	if !ok {
-		return nil, fmt.Errorf("GetAndSaveMessageCostFromChain: failed to load store")
-	}
+
 	price, err := chain.DefaultProvider(cfg).GetMessagePrice(big.NewInt(int64(cycle)))
 	if err != nil {
 		return nil, err
@@ -1302,7 +1327,7 @@ func GetAndSaveMessageCostFromChain(ctx *context.Context, cycle uint64) (*big.In
 	logger.Debugf("MESSAGEPRICE: %s", price)
 	priceKey := datastore.NewKey(fmt.Sprintf("/ml/cost/%d", cycle))
 	
-	err = claimedRewardStore.Put(*ctx, priceKey, utils.ToUint256(price))
+	err = stores.SystemStore.Put(*ctx, priceKey, utils.ToUint256(price))
 	return price, err
 }
 
@@ -1324,4 +1349,46 @@ func GetNodeAddress(ctx *context.Context, pubKey string) (multiaddr.Multiaddr, e
 		addr = mad.Addresses[0]
 	}
 	return multiaddr.StringCast(addr), nil
+}
+
+
+func PublishEvent(event entities.Event) *models.EventInterface {
+	eventPayloadType := entities.GetModelTypeFromEventType(constants.EventType(event.EventType))
+	var model *models.EventInterface
+	switch eventPayloadType {
+		case entities.SubnetModel:
+			channelpool.SubnetEventPublishC <- &event
+			returnModel := models.EventInterface(models.SubnetEvent{Event: event})
+			model = &returnModel
+		
+		case entities.AuthModel:
+		
+			channelpool.AuthorizationEventPublishC <- &event
+			returnModel := models.EventInterface(models.AuthorizationEvent{Event: event})
+			model = &returnModel
+		case entities.TopicModel:
+
+			channelpool.TopicEventPublishC <- &event
+			var returnModel = models.EventInterface(models.TopicEvent{Event: event})
+			model = &returnModel
+
+
+		case entities.SubscriptionModel:
+			channelpool.SubscriptionEventPublishC <- &event
+			logger.Infof("SubscriptionEvent: %+v", event)
+			var returnModel = models.EventInterface(models.SubscriptionEvent{Event: event})
+			model = &returnModel
+
+		case entities.MessageModel:
+			channelpool.MessageEventPublishC <- &event
+			var returnModel = models.EventInterface(models.MessageEvent{Event: event})
+			model = &returnModel
+
+		case entities.WalletModel:
+			channelpool.WalletEventPublishC <- &event
+			var returnModel = models.EventInterface(models.WalletEvent{Event: event})
+			model = &returnModel
+
+	}
+	return model
 }

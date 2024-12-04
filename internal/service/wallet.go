@@ -30,7 +30,7 @@ func ValidateWalletData(Wallet *entities.Wallet) (currentWalletState *models.Wal
 	return nil, nil
 }
 
-func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
+func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) error {
 	logger.WithFields(logrus.Fields{"event": event}).Debug("New Wallet event from pubsub channel")
 	markAsSynced := false
 	updateState := false
@@ -40,7 +40,7 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 
 	if err != nil {
 		logger.Error(err)
-		return
+		return err
 	}
 
 	logger.Debugf("Event is a valid event %s", event.PayloadHash)
@@ -57,7 +57,7 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 	if err != nil {
 		// penalize node for broadcasting invalid data
 		logger.Debugf("Invalid Wallet data %v. Node should be penalized", err)
-		return
+		return err
 	}
 
 	// check if we are upto date on this event
@@ -138,8 +138,8 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 	if string(event.Validator) != (*cfg).PublicKeyEDDHex  {
 		// save the event
 		event.Error = eventError
-		event.IsValid = markAsSynced && len(eventError) == 0.
-		event.Synced = markAsSynced
+		event.IsValid = utils.BoolPtr(markAsSynced && len(eventError) == 0)
+		event.Synced = &markAsSynced
 		event.Broadcasted = true
 		_, _, err := query.SaveRecord(models.WalletEvent{
 			Event: entities.Event{
@@ -151,7 +151,7 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 		if err != nil {
 			tx.Rollback()
 			logger.Error("1000: Db Error", err)
-			return
+			return err
 		}
 	} else {
 		if markAsSynced {
@@ -162,7 +162,7 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 				Event: *event,
 			},
 			&models.WalletEvent{
-				Event: entities.Event{Synced: true, Broadcasted: true, Error: eventError, IsValid: len(eventError) == 0},
+				Event: entities.Event{Synced: utils.TruePtr(), Broadcasted: true, Error: eventError, IsValid: utils.BoolPtr(len(eventError) == 0)},
 			}, tx)
 			if err != nil {
 				logger.Error("DB error", err)
@@ -192,7 +192,7 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 	// if err != nil {
 	// 	logger.Errorf("Invalid event payload")
 	// }
-	data.Event = *entities.NewEventPath(event.Validator, entities.WalletModel, event.Hash)
+	data.Event = *entities.NewEventPath(event.Validator, entities.WalletModel, event.ID)
 	// data.Agent = entities.DIDString(agent)
 	data.Account = event.Payload.Account
 	// logger.Error("data.Public ", data.Public)
@@ -208,7 +208,7 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 		if err != nil {
 			tx.Rollback()
 			logger.Error("7000: Db Error", err)
-			return
+			return err
 		}
 	}
 	tx.Commit()
@@ -222,6 +222,6 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) {
 			go HandleNewPubSubWalletEvent(&dep, ctx)
 		}
 	}
-
+return nil
 	// TODO Broadcast the updated state
 }

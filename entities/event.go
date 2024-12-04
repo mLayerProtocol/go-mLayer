@@ -5,13 +5,17 @@ import (
 
 	"context"
 	"database/sql/driver"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
+	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/common/encoder"
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
@@ -20,7 +24,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var synced = "sync"
 
 type EntityModel string
 
@@ -60,6 +63,25 @@ func (e *EntityPath) ToString() string {
 		return ""
 	}
 	return fmt.Sprintf("%s/%s/%s", e.Validator, e.Model, e.Hash)
+}
+
+func (e *EntityPath) ToByteHash() ([]byte, error) {
+	
+	if e == nil || e.Hash == "" {
+		return []byte(""), fmt.Errorf("hash is empty")
+	}
+	if strings.Contains(e.Hash, "-") {
+		return utils.UuidToBytes(e.Hash), nil
+	}
+	return hex.DecodeString(e.Hash)
+	
+}
+func (e *EntityPath) ToHexHash() (string) {
+	b, err := e.ToByteHash()
+	if err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
 }
 
 func NewEntityPath(validator PublicKeyString, model EntityModel, hash string) *EntityPath {
@@ -175,22 +197,74 @@ type Event struct {
 	BlockNumber uint64          `json:"blk"`
 	Cycle   	uint64			`json:"cy"`
 	Epoch		uint64			`json:"ep"`
-	IsValid     bool            `json:"isVal" gorm:"default:false"`
-	Synced      bool            `json:"sync" gorm:"default:false"`
+	IsValid     *bool            `json:"isVal" gorm:"default:false"`
+	Synced      *bool            `json:"sync" gorm:"default:false"`
 	Validator   PublicKeyString `json:"val"`
 	Subnet   	string			`json:"snet"`
 
 	Total int `json:"total"`
 }
+
+func (g *Event) GetKeys() (keys []string)  {
+	keys = append(keys, g.SubnetKey())
+	keys = append(keys, g.BlockKey())
+	// keys = append(keys, fmt.Sprintf("cy/%d/%d/%s/%s", g.Cycle, utils.IfThenElse(g.Synced, 1,0), g.Subnet, g.ID))
+	
+	keys = append(keys, g.Key())
+	// keys = append(keys, fmt.Sprintf("%s/%s/%s", EntityModel, g.Subnet, g.ID))
+	// keys = append(keys,fmt.Sprintf("hash/%s",  g.GetIdHash()))
+	// keys = append(keys,fmt.Sprintf("%s/%s", TopicModel, g.Hash))
+	// keys = append(keys,fmt.Sprintf("prev/%s", g.PreviousEvent.Hash ))
+	
+	// keys = append(keys, fmt.Sprintf("cy/%d/%s/%s", g.Cycle, GetModelTypeFromEventType(constants.EventType(g.EventType)), g.ID))
+	return keys;
+}
+func (e *Event) Key() string {
+	return fmt.Sprintf("id/%s",  e.ID)
+}
+
+
+func (e *Event) SubnetKey()  string {
+	return  fmt.Sprintf("snet/%s/%015d", e.Subnet, e.Cycle)
+}
+func (e *Event) BlockKey() string {
+	// if e.ID != "" {
+	// 	return  fmt.Sprintf("bl/%d/%d/%s/%s/%s", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1), GetModelTypeFromEventType(constants.EventType(e.EventType)), e.Subnet, e.ID)
+	// }
+	// if e.Subnet != "" {
+	// 	return  fmt.Sprintf("bl/%d/%d/%s/%s", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1), GetModelTypeFromEventType(constants.EventType(e.EventType)), e.Subnet)
+	// }
+	if e.ID != "" {
+		return  fmt.Sprintf("/bl/%020d/%015d/%s", e.BlockNumber, time.Now().UnixMilli(), e.ID)
+	}
+	// if e.EventType != 0 {
+	// 	return  fmt.Sprintf("bl/%d/%d", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced,0,1))
+	// }
+	// if e.Synced != nil {
+	// 	return  fmt.Sprintf("/bl/%020d/", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1))
+	// }
+	if e.BlockNumber != 0 {
+		return  fmt.Sprintf("/bl/%020d", e.BlockNumber)
+	}    
+	return "bl"
+}
 func (d *Event) BeforeCreate(tx *gorm.DB) (err error) {
 	if d.ID == "" {
-		hash, _ := d.GetHash()
-		u, err := uuid.FromBytes(hash[:16])
-		if err != nil {
-			return err
-		}
+		// //hash, _ := d.GetId()
+		// if d.Signature == "" {
+		// 	return fmt.Errorf("signature is required")
+		// }
+		// hash, err := hex.DecodeString(d.Signature[:16])
+		// if err != nil {
+		// 	return err
+		// }
+		// u, err := uuid.FromBytes(hash)
+		// if err != nil {
+		// 	return err
+		// }
 
-		d.ID = u.String()
+		d.ID, err = d.GetId()
+		return err
 	}
 	if d.Payload.Nonce > 0 {
 		d.Nonce = fmt.Sprintf("%s:%d", string(d.Payload.Account), d.Payload.Nonce)
@@ -198,9 +272,29 @@ func (d *Event) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-func (e *Event) Key() string {
-	return fmt.Sprintf("/%s", e.Hash)
+func (d *Event) GetId() (string, error) {
+	if d.Signature == "" {
+		return  "", fmt.Errorf("signature is required")
+		}
+	hash, err := hex.DecodeString(d.GetIdHash())
+		if err != nil {
+			return "", err
+		}
+		u, err := uuid.FromBytes(hash)
+		if err != nil {
+			return "", err
+		}
+
+		return u.String(), nil
 }
+
+func (d *Event) GetIdHash() (string)  {
+	if d.Signature == "" {
+		return ""
+	}
+	return d.Signature[:32]
+}
+
 
 func (e *Event) ToJSON() []byte {
 	m, err := json.Marshal(e)
@@ -220,7 +314,11 @@ func (e *Event) GetDataModelType() EntityModel {
 
 func GetModel(ent any) EntityModel {
 	var model EntityModel
-	switch val := ent.(type) {
+	val := reflect.ValueOf(ent)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	switch val.Interface().(type) {
 		case Subnet:
 			logger.Debug(val)
 			model = SubnetModel
@@ -237,7 +335,11 @@ func GetModel(ent any) EntityModel {
 }
 
 func (e *Event) GetPath() *EventPath {
-	return NewEventPath(e.Validator, e.GetDataModelType(), e.Hash)
+	id, err := e.GetId()
+	if err != nil {
+		return nil
+	}
+	return NewEventPath(e.Validator, e.GetDataModelType(), id)
 }
 
 func UnpackEvent(b []byte, model EntityModel) (*Event, error) {
@@ -301,6 +403,16 @@ func UnpackEvent(b []byte, model EntityModel) (*Event, error) {
 }
 
 
+func UnpackEventGeneric(b []byte) (*Event, error) {
+	// e.Payload = payload
+	e := Event{}
+	if err := encoder.MsgPackUnpackStruct(b, &e); err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
+
 
 func EventFromJSON(b []byte) (Event, error) {
 	var e Event
@@ -312,6 +424,14 @@ func EventFromJSON(b []byte) (Event, error) {
 }
 
 func (e Event) GetHash() ([]byte, error) {
+	b, err := e.EncodeBytes()
+	if err != nil {
+		return []byte(""), err
+	}
+	return crypto.Sha256(b), nil
+}
+
+func (e Event) GetHIdHash() ([]byte, error) {
 	b, err := e.EncodeBytes()
 	if err != nil {
 		return []byte(""), err
@@ -339,15 +459,22 @@ func (e Event) EncodeBytes() ([]byte, error) {
 	if err != nil {
 		return []byte(""), err
 	}
+	// previousEvent := []byte{}
+	// if e.PreviousEvent.Hash  != "" {
+	// 	previousEvent, err =  e.PreviousEvent.ToByteHash()
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: d},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: strings.Join(e.Associations, "")},
-		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: e.AuthEvent.Hash},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.AuthEvent.Hash)},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.BlockNumber},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Cycle},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Epoch},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.EventType},
-		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: e.PreviousEvent.Hash},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.PreviousEvent.Hash)},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.Subnet)},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Timestamp},
 	)
@@ -393,4 +520,82 @@ func GetEventEntityFromModel(eventType EntityModel) *Event {
 
 	return event
 
+}
+
+
+
+func GetStateModelFromEntityType(entityType EntityModel) any {
+	switch entityType {
+	case AuthModel:
+
+		return Authorization{}
+
+	case TopicModel:
+		return Topic{}
+
+	case SubscriptionModel:
+		return Subscription{}
+
+	case MessageModel:
+		return Message{}
+
+	case SubnetModel:
+		return Subnet{}
+
+	case WalletModel:
+		return Wallet{}
+	}
+
+	return 0
+
+}
+
+
+func GetModelTypeFromEventType(eventType constants.EventType ) EntityModel {
+	if eventType < 600 {
+		return  SubnetModel	
+	}
+	if eventType < 700 {	
+		return  AuthModel	
+	}
+	if eventType < 1100 {
+		
+		return  TopicModel	
+	}
+	if eventType < 1200 {
+		return  SubscriptionModel	
+	}
+	if eventType < 1300 {
+		return  MessageModel	
+	}
+	
+	if eventType < 1500 {
+		return  WalletModel	
+	}
+	return ""
+
+}
+
+func CycleCounterKey(cycle uint64, validator *PublicKeyString, claimed *bool, subnet *string) string {
+	if validator == nil && claimed == nil && subnet == nil {
+		return fmt.Sprintf("cy/%015d/n", cycle)
+	}
+	if claimed == nil {
+		return fmt.Sprintf("cy/%015d/%s", cycle, *validator )
+	}
+	if subnet == nil {
+		return fmt.Sprintf("cy/%015d/%s/%d", cycle, *validator, utils.IfThenElse(*claimed, 1, 0) )
+	}
+	return fmt.Sprintf("cy/%015d/%s/%d/%s", cycle, *validator, utils.IfThenElse(*claimed, 1, 0), *subnet)
+}
+
+
+func NetworkCounterKey(subnet *string) string {
+	if subnet == nil {
+		return "net"
+	}
+	return fmt.Sprintf("net/%s", *subnet)
+}
+func CycleSubnetKey(cycle uint64, subnet string) string {
+	return fmt.Sprintf("cyc/%015d/%s", cycle, subnet)
 }

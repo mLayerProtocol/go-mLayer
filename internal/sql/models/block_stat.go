@@ -7,7 +7,7 @@ import (
 )
 
 type BlockStat struct {
-	entities.Stats
+	entities.BlockStats
 	BaseModel
 }
 

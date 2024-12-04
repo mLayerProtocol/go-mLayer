@@ -51,3 +51,11 @@ var SyncModels = []any{
 	MessageState{},
 	EventCounter{},
 }
+
+var SyncEvents = []any{
+	SubnetEvent{},
+	AuthorizationEvent{},
+	TopicEvent{},
+	SubscriptionEvent{},
+	MessageEvent{},
+}

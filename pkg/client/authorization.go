@@ -7,15 +7,14 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
-	"gorm.io/gorm"
 )
 
 
 
-func ValidateAuthPayloadData(cfg *configs.MainConfiguration, payload entities.ClientPayload) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, err error) {
+func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.ClientPayload) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, err error) {
 	authData := entities.Authorization{}
 	
 	d, _ := json.Marshal(payload.Data)
@@ -23,17 +22,19 @@ func ValidateAuthPayloadData(cfg *configs.MainConfiguration, payload entities.Cl
 	if e != nil {
 		logger.Errorf("UnmarshalError %v", e)
 	}
+	
 	payload.Data = authData
 	if uint64(*authData.Timestamp) == 0 || uint64(*authData.Timestamp) > uint64(time.Now().UnixMilli())+15000 || uint64(*authData.Timestamp) < uint64(time.Now().UnixMilli())-15000 {
 		return nil, nil, apperror.BadRequest("Invalid event timestamp")
 	}
+	logger.Debugf("CurrentStateDD: %+v", payload.Data)
 	if *authData.Duration != 0 && uint64(time.Now().UnixMilli()) >
 		(uint64(*authData.Timestamp)+uint64(*authData.Duration)) {
 		return nil, nil, apperror.BadRequest("Authorization duration exceeded")
 	}
+	logger.Debugf("CurrentStateEE")
+	currentState, grantorAuthState, _, err := service.ValidateAuthPayloadData(&payload, cfg.ChainId)
 	
-	currentState, grantorAuthState, subnet, err := service.ValidateAuthPayloadData(&payload, cfg.ChainId)
-	logger.Debugf("CurrentState %v, %v", currentState, subnet)
 	// TODO If error is because the subnet was not found, check the dht for the subnet
 	if err != nil {
 		logger.Error(err)
@@ -51,8 +52,9 @@ func ValidateAuthPayloadData(cfg *configs.MainConfiguration, payload entities.Cl
 		// }.ToString()
 	} else {
 		// Get the subnets state event
-		subnetState := &models.SubnetState{}
-		err = query.GetOne(&models.SubnetState{Subnet: entities.Subnet{ID: authData.Subnet }}, subnetState)
+		// subnetState := &models.SubnetState{}
+		//err = query.GetOne(&models.SubnetState{Subnet: entities.Subnet{ID: authData.Subnet }}, subnetState)
+		subnetState, err := dsquery.GetSubnetStateById(authData.Subnet)
 		if err != nil {
 			// find ways to get the subnet
 		} else {
@@ -72,17 +74,19 @@ func ValidateAuthPayloadData(cfg *configs.MainConfiguration, payload entities.Cl
 	return assocPrevEvent, assocAuthEvent, nil
 }
 
-func GetAccountAuthorizations(auth *entities.Authorization) (*[]models.AuthorizationState, error) {
+func GetAuthorizations(auth *entities.Authorization) (*[]models.AuthorizationState, error) {
 	var authState []models.AuthorizationState
 
-	err := query.GetMany(models.AuthorizationState{
-		Authorization: *auth,
-	}, &authState, nil)
+	auths, err := dsquery.GetAccountAuthorizations(*auth, dsquery.DefaultQueryLimit, nil)
+	
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if dsquery.IsErrorNotFound(err) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	for _, auth := range auths {
+		authState = append(authState, models.AuthorizationState{Authorization: *auth})
 	}
 	return &authState, nil
 }

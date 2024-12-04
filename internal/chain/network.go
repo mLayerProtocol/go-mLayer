@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mlayerprotocol/go-mlayer/configs"
+	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain/api"
 )
 var syncMu sync.Mutex
@@ -24,6 +25,21 @@ type NetworkParams struct {
 	Config *configs.MainConfiguration `json:"-"`
 	Synced bool `json:"synced"`
 }
+
+func (n *NetworkParams) GetValidatorKeys(key entities.PublicKeyString) (edd entities.PublicKeyString, secp entities.PublicKeyString) {
+	secp = ""
+	if len(NetworkInfo.Validators[fmt.Sprintf("secp/%s/edd", key)]) > 0 {
+		edd = entities.PublicKeyString(NetworkInfo.Validators[fmt.Sprintf("secp/%s/edd", key)])
+		secp = key
+	} else {
+		if len(NetworkInfo.Validators[fmt.Sprintf("edd/%s/secp", key)]) > 0 {
+			secp = entities.PublicKeyString(NetworkInfo.Validators[fmt.Sprintf("edd/%s/secp", key)])
+			edd = key
+		} 
+	}
+	return edd, secp
+}
+
 func (n *NetworkParams) IsValidator(key string) (bool, error) {
 	if len(key) == 0 {
 		return false, fmt.Errorf("IsValidator: invalid key")
@@ -49,6 +65,9 @@ func (n *NetworkParams) IsValidatorOwner(address string) (bool, error) {
 	
 		return DefaultProvider(n.Config).IsValidatorLicenseOwner(address)	
 }
+
+
+
 func (n *NetworkParams) IsSentry(pubKey string, cycle *big.Int) (bool, error)  {
 	if n.Sentries[pubKey] > 0 &&  uint64(time.Now().UnixMicro()) - n.Sentries[pubKey] < uint64(10 * time.Minute.Microseconds()) {
 		return true, nil
