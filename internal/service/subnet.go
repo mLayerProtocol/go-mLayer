@@ -25,8 +25,10 @@ import (
 /*
 Validate an agent authorization
 */
-func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.ChainId) (currentSubnetState *models.SubnetState, err error) {
+func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.ChainId) ( *models.SubnetState,error) {
 	// check fields of Subnet
+	
+	var currentSubnetState *models.SubnetState
 	subnet := clientPayload.Data.(entities.Subnet)
 	agent := entities.AddressFromString(string(subnet.Agent))
 	account := entities.AddressFromString(string(subnet.Account))
@@ -84,7 +86,7 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 	action :=  "write_subnet"
 	switch subnet.SignatureData.Type {
 	case entities.EthereumPubKey:
-		authMsg := fmt.Sprintf(constants.SignatureMessageString, action, chainID, subnet.Ref, encoder.ToBase64Padded(msg))
+		authMsg := fmt.Sprintf(constants.SignatureMessageString, action,  subnet.Ref, chainID, encoder.ToBase64Padded(msg))
 		logger.Debug("MSG:: ", authMsg)
 		msgByte := crypto.EthMessage([]byte(authMsg))
 
@@ -110,6 +112,7 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 		}
 
 	}
+	
 	if !valid {
 		return nil, apperror.Unauthorized("Invalid subnet data signature")
 	}
@@ -127,7 +130,8 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 		}
 		currentSubnetState = &models.SubnetState{Subnet: *snetS}
 	}
-	
+	// logger.Infof("IsValidSigner %v, subId: %s, currentstate: %v, error: %v", valid, subnet.ID, currentSubnetState, err)
+	// logger.Infof("IsValidSigner %v, subId: %s, currentstate: %v, error: %v", valid, subnet.ID, currentSubnetState, err)
 	return currentSubnetState, nil
 }
 

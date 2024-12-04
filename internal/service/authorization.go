@@ -107,7 +107,7 @@ func VerifyAuthDataSignature(auth entities.Authorization, msg []byte, chainId co
 	action := "write_authorization"
 	switch auth.SignatureData.Type {
 	case entities.EthereumPubKey:
-		authMsg := fmt.Sprintf(constants.SignatureMessageString, action, chainId, agent.Addr, encoder.ToBase64Padded(msg))
+		authMsg := fmt.Sprintf(constants.SignatureMessageString, action, agent.Addr, chainId, encoder.ToBase64Padded(msg))
 		logger.Debug("MSG:: ", authMsg)
 
 		msgByte := crypto.EthMessage([]byte(authMsg))

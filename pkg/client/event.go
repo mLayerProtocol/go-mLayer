@@ -121,12 +121,13 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		// if authState.Authorization.Priviledge < constants.AdminPriviledge {
 		// 	return nil, apperror.Forbidden("Agent not authorized to perform this action")
 		// }
-
+		logger.Infof("ValidatingSubnetPayload: %v", payload)
 		assocPrevEvent, assocAuthEvent, err = ValidateSubnetPayload(payload, authState, ctx)
 		if err != nil {
+			logger.Errorf("InvalidSubnetPayload: %v", err)
 			return nil, err
 		}
-		
+		logger.Infof("ValidSubnetPayload: %v", payload)
 		
 	case uint16(constants.CreateWalletEvent), uint16(constants.UpdateWalletEvent):
 	

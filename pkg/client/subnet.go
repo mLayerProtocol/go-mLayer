@@ -183,6 +183,7 @@ func GetSubscribedSubnets(item models.SubnetState) (*[]models.SubnetState, error
 //		}
 //	}
 func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.AuthorizationState, ctx *context.Context) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, err error) {
+
 	payloadData := entities.Subnet{}
 	d, _ := json.Marshal(payload.Data)
 	e := json.Unmarshal(d, &payloadData)
@@ -198,18 +199,16 @@ func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.Aut
 		return nil, nil, apperror.BadRequest("Invalid event timestamp")
 	}
 	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-
-	currentState, err := service.ValidateSubnetData(&payload, cfg.ChainId)
-	if err != nil {
-		return nil, nil, err
+	logger.Infof("BeforeValidate 1: %s", payload.Signature)
+	currentState, err2 := service.ValidateSubnetData(&payload, cfg.ChainId)
+	if err2 != nil {
+		return nil, nil, err2
 	}
-	logger.Infof("SUBNETCURRSTATE: %s", currentState.Event)
 	if payload.EventType == uint16(constants.CreateSubnetEvent) {
 		// dont worry validating the AuthHash for Authorization requests
 		// if entities.AddressFromString(payloadData.Owner.ToString()).Addr == "" {
 		// 	return nil, nil, apperror.BadRequest("You must specify the owner of the subnet")
 		// }
-
 		if payloadData.ID != "" {
 			return nil, nil, apperror.BadRequest("You cannot set an id when creating a subnet")
 		}
