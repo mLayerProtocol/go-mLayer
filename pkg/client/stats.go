@@ -160,6 +160,8 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 		return nil, err
 	}
 
+	logger.Infof("TotalsCount: %v", totalEventsCount)
+
 	agentCounBytes, err  := stores.StateStore.Get(context.Background(), datastore.NewKey(entities.AgentCountKey()))
 	if err != nil && !dsquery.IsErrorNotFound(err) {
 		return nil, err

@@ -75,15 +75,13 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 }
 
 func GetAuthorizations(auth *entities.Authorization) (*[]models.AuthorizationState, error) {
-	var authState []models.AuthorizationState
-
+	authState := []models.AuthorizationState{}
 	auths, err := dsquery.GetAccountAuthorizations(*auth, dsquery.DefaultQueryLimit, nil)
-	
 	if err != nil {
 		if dsquery.IsErrorNotFound(err) {
-			return nil, nil
+			return &authState, nil
 		}
-		return nil, err
+		return &authState, err
 	}
 	for _, auth := range auths {
 		authState = append(authState, models.AuthorizationState{Authorization: *auth})

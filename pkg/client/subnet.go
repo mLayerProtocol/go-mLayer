@@ -112,7 +112,7 @@ func GetSubscribedSubnets(item models.SubnetState) (*[]models.SubnetState, error
 
 	_subnets, err := dsquery.GetAccountSubnets(item.Account, *dsquery.DefaultQueryLimit)
 	if err != nil {
-		return nil, err
+		return &SubnetStates, err
 	}
 	logger.Infof("AccountSubnets: %v", _subnets)
 	for _, _sub := range _subnets {
@@ -127,7 +127,7 @@ func GetSubscribedSubnets(item models.SubnetState) (*[]models.SubnetState, error
 
 	if err != nil {
 
-		return nil, err
+		return &SubnetStates, err
 	}
 	var subnetIds = []string{}
 
@@ -138,7 +138,7 @@ func GetSubscribedSubnets(item models.SubnetState) (*[]models.SubnetState, error
 	if len(subnetIds) > 0 {
 		subSubnetErr := query.GetWithIN(models.SubnetState{}, &subSubnetStates, subnetIds)
 		if subSubnetErr != nil {
-			return nil, err
+			return &SubnetStates, err
 		}
 	}
 

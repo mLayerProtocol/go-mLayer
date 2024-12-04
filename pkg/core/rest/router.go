@@ -118,7 +118,6 @@ func (p *RestService) Initialize() *gin.Engine {
 		var authEntity entities.Authorization
 
 		json.Unmarshal(*b, &authEntity)
-		logger.Debugf("authEntity %v", authEntity)
 		auths, err := client.GetAuthorizations(&authEntity)
 
 		if err != nil {

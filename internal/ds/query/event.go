@@ -180,7 +180,7 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 		// datastore.NewKey(entities.CycleCounterKey(cycle, nil, nil, nil)),
 		datastore.NewKey(entities.NetworkCounterKey(nil)),
 	}
-	logger.Infof("IncrementingCounterForSubnet: %s, cycle: %d", subnet, cycle)
+	
 	keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), nil)))
 	if len(subnet) > 0 {
 		// keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), &subnet)))
@@ -190,6 +190,7 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 		
 	}
 	for _, key := range keys {
+
 		if value, err := txn.Get(context.Background(), key); err != nil {
 			if !IsErrorNotFound(err) {
 				return err
@@ -198,6 +199,7 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 		} else {
 			count = new(big.Int).Add(new(big.Int).SetBytes(value), big.NewInt(1))
 		}
+		logger.Infof("IncrementingCounterForSubnet: %s", key)
 		err = txn.Put(context.Background(), key, count.Bytes())
 		if err != nil {
 			return err
@@ -241,6 +243,20 @@ func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *b
 }
 
 func GetNetworkCounts(subnet *string, limit *QueryLimit) ([]models.EventCounter, error) {
+	counts := []models.EventCounter{}
+	if subnet == nil {
+		rsl, err := stores.EventStore.Get(context.Background(), datastore.NewKey(entities.NetworkCounterKey(subnet)))
+		if err != nil && !IsErrorNotFound(err) {
+			return counts, err
+		}
+		if len(rsl) > 0 {
+			count := new(big.Int).SetBytes(rsl).Uint64()
+			counts = append(counts, models.EventCounter{
+				Count:  &count,
+			})
+		}
+		return counts, nil
+	}
 	rsl, err := stores.EventStore.Query(context.Background(), query.Query{
 		Prefix: entities.NetworkCounterKey(subnet),
 		Limit:  limit.Limit,
@@ -250,9 +266,9 @@ func GetNetworkCounts(subnet *string, limit *QueryLimit) ([]models.EventCounter,
 		if !IsErrorNotFound(err) {
 			return nil, err
 		}
-		return []models.EventCounter{}, nil
+		return counts, nil
 	}
-	counts := []models.EventCounter{}
+	
 	for {
 		entry, ok := <-rsl.Next()
 		if !ok {
