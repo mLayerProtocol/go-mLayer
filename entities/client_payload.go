@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	// "math"
 
@@ -21,17 +22,30 @@ import (
 
 type Payload interface {
 	GetHash() ([]byte, error)
-	ToString() string
+	ToString() (string, error)
 	EncodeBytes() ([]byte, error)
-	GetEvent() EventPath
+	// GetEvent() EventPath
+	GetSignature() string
+}
+func (g ClientPayload) GetSignature()  string {
+	return g.Signature
+}
+
+func (g ClientPayload) GetId()  (string, error) {
+	return GetId(g)
 }
 
 func GetId(d Payload) (string, error) {
-	hash, err := d.GetHash()
+	sig := d.GetSignature()
+	if len(sig) == 0 {
+		return "", fmt.Errorf("payload has no signature")
+	}
+	logger.Info("SIGNATUIRE", sig)
+	b, err := hex.DecodeString(strings.ReplaceAll(sig, "0x","")[:32])
 	if err != nil {
 		return "", err
 	}
-	u, err := uuid.FromBytes(hash[:16])
+	u, err := uuid.FromBytes(b)
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +103,7 @@ func MsgUnpackClientPayload(b []byte) (ClientPayload, error) {
 	return p, err
 }
 
-func (msg *ClientPayload) ToString() (string, error) {
+func (msg ClientPayload) ToString() (string, error) {
 	// return fmt.Sprintf("Data: %s, EventType: %d, Authority: %s", (msg.Data).(Payload).ToString(), msg.EventType, msg.Account)
 	b, err := json.Marshal(msg)
 	if err != nil {
@@ -99,6 +113,9 @@ func (msg *ClientPayload) ToString() (string, error) {
 }
 
 func (msg ClientPayload) GetHash() ([]byte, error) {
+	if msg.Hash != "" {
+		return hex.DecodeString(msg.Hash)
+	}
 	b, err := msg.EncodeBytes()
 	if err != nil {
 		logger.Debugf("ENCODBYTEERROR: %v",err)
@@ -110,11 +127,9 @@ func (msg ClientPayload) GetHash() ([]byte, error) {
 	return bs, nil
 }
 
-func (msg ClientPayload) GetSigner() (DeviceString, error) {
+func (msg *ClientPayload) GetSigner() (DeviceString, error) {
 
-	//if len(msg.Agent) == 0 {
 		b, err := msg.EncodeBytes()
-		logger.Debug("ENCODEDBBBBB", " ", hex.EncodeToString(b), " ", hex.EncodeToString(crypto.Keccak256Hash(b)), " Err: ", err)
 		if err != nil {
 			return "", err
 		}
@@ -122,32 +137,11 @@ func (msg ClientPayload) GetSigner() (DeviceString, error) {
 		agent, _ := crypto.GetSignerECC(&b,  &msg.Signature)
 		msg.Agent = AddressFromString(agent).ToDeviceString()
 		return msg.Agent, nil
-	//}
-	// return msg.Agent, nil
 }
-// 0000000000014a34f22033dbd9823243a3ae6ab8b42bacec84688a267d750a028e51d46e16d3f4ea00000000000005156469643a307833466436454344434432323563334445306530373342333337433463424143353334326532414338ddb466a5dd4a5c0835614c7a46e18943ef750a9d000000000000000000000191bdd35250
-// 0000000000014a34f22033dbd9823243a3ae6ab8b42bacec84688a267d750a028e51d46e16d3f4ea00000000000005156469643a307833466436454344434432323563334445306530373342333337433463424143353334326532414338ddb466a5dd4a5c0835614c7a46e18943ef750a9d000000000000000000000191bdd35250
-// func (msg *ClientPayload) Validate(pubKey PublicKeyString) error {
-// 	if string(msg.Validator)  != string(pubKey) {
-// 		// logger.Debugf("VALIDIATOR %s %s, %s", msg.Validator, crypto.GetPublicKeyEDD(privateKey), crypto.ToBech32Address(crypto.GetPublicKeyEDD(privateKey)))
-// 		return errors.New("Invalid message. Message not registered to this validator")
-// 	}
-// 	_, err := msg.EncodeBytes()
-// 	if err != nil {
-// 		return err
-// 	}
 
-// 	return nil
-// }
-
-// func (msg *ClientPayload) Key() string {
-// 	hash, _  := msg.GetHash()
-// 	return fmt.Sprintf("/%s", hex.EncodeToString(hash))
-// }
 
 func (msg ClientPayload) EncodeBytes() ([]byte, error) {
 	hashed := []byte("")
-	
 	if msg.Data != nil {
 		d, _ :=  json.Marshal(msg.Data.(Payload))
 		logger.Debugf(string(d))
@@ -157,21 +151,21 @@ func (msg ClientPayload) EncodeBytes() ([]byte, error) {
 			return nil, err
 		}
 		hashed = crypto.Keccak256Hash(b)
-		
-		logger.Debug("ENCODED==== ", hex.EncodeToString(b), " HASHED==== ", hex.EncodeToString(hashed))
 	}
-
 	var params []encoder.EncoderParam
 	params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: msg.ChainId.Bytes()})
 	params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: hashed})
 	params = append(params, encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: msg.EventType})
+	
 	params = append(params, encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: msg.Id})
+	
 	if msg.Subnet != "" {
 		params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(msg.Subnet)})
 	}
 	if msg.Account != "" {
 		params = append(params, encoder.EncoderParam{Type: encoder.AddressEncoderDataType, Value: msg.Account})
 	}
+	
 	params = append(params, encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: msg.Validator})
 	params = append(params, encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: msg.Nonce})
 	params = append(params, encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: msg.Timestamp})

@@ -9,132 +9,101 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
-	"gorm.io/gorm"
 )
 
 func GetSubscriptions(payload entities.Subscription) (*[]models.SubscriptionState, error) {
-	var subscriptionStates []models.SubscriptionState
-	order := map[string]query.Order{"timestamp": query.OrderDec, "created_at": query.OrderDec}
-	err := query.GetMany(models.SubscriptionState{
-		Subscription: payload,
-	}, &subscriptionStates, &order)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
+	subscriptionStates  := []models.SubscriptionState{}
+	subs, err := dsquery.GetSubscriptions(payload, dsquery.DefaultQueryLimit, nil)
+	if err !=nil && !dsquery.IsErrorNotFound(err) {
+			
 		return nil, err
 	}
+	for _, sub := range subs {
+		subscriptionStates = append(subscriptionStates, models.SubscriptionState{Subscription: *sub})
+	}
+	
 	return &subscriptionStates, nil
 }
 
-func GetAccountSubscriptions(payload entities.ClientPayload) (*[]models.TopicState, error) {
-	var subscriptionStates []models.SubscriptionState
-	var subTopicStates []models.TopicState
-	var topicStates []models.TopicState
-	order := map[string]query.Order{"timestamp": query.OrderDec, "created_at": query.OrderDec}
-	err := query.GetMany(models.SubscriptionState{Subscription: entities.Subscription{Subscriber: payload.Account}},
-		&subscriptionStates, &order)
+
+func GetAccountSubscriptionsV2(payload entities.Subscription) (*[]models.SubscriptionState, error) {
+	var states []models.SubscriptionState
+
+	_states, err := dsquery.GetSubscriptions(payload, dsquery.DefaultQueryLimit, nil)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if dsquery.IsErrorNotFound(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	var topicIds = []string{}
-
-	for _, sub := range subscriptionStates {
-		topicIds = append(topicIds, sub.Topic)
+	for _, _state := range _states {
+		states = append(states, models.SubscriptionState{Subscription: *_state})
 	}
-
-	if len(topicIds) > 0 {
-		subTopErr := query.GetWithIN(models.TopicState{}, &subTopicStates, topicIds)
-		if subTopErr != nil {
-			if subTopErr == gorm.ErrRecordNotFound {
-				return nil, nil
-			}
-			return nil, err
-		}
-	}
-
-	topErr := query.GetMany(models.TopicState{Topic: entities.Topic{Account: payload.Account}}, &topicStates, nil)
-	if topErr != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	topicStates = append(topicStates, subTopicStates...)
-
-	return &topicStates, nil
-}
-
-func GetAccountSubscriptionsV2(payload entities.Subscription) (*[]models.TopicState, error) {
+	return &states, nil
 	
-	var subscriptionStates []models.SubscriptionState
-	var subTopicStates []models.TopicState
-	var topicStates []models.TopicState
-	order := map[string]query.Order{"timestamp": query.OrderDec, "created_at": query.OrderDec}
-	err := query.GetMany(models.SubscriptionState{Subscription: payload},
-		&subscriptionStates, &order)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	var topicIds []string
-
-	for _, sub := range subscriptionStates {
-		if sub.Topic == "" {
-			continue
-		}
-		topicIds = append(topicIds, sub.Topic)
-	}
-
-	if len(topicIds) > 0 {
-		subTopErr := query.GetWithIN(models.TopicState{}, &subTopicStates, topicIds)
-		if subTopErr != nil {
-			if subTopErr == gorm.ErrRecordNotFound {
-				return nil, nil
-			}
-			return nil, err
-		}
-	}
-
-	// topErr := query.GetMany(models.TopicState{Topic: entities.Topic{Account: payload.Subscriber}}, &topicStates, nil)
-	// if topErr != nil {
+	// var subscriptionStates []models.SubscriptionState
+	// var subTopicStates []models.TopicState
+	// var topicStates []models.TopicState
+	// order := map[string]query.Order{"timestamp": query.OrderDec, "created_at": query.OrderDec}
+	// err := query.GetMany(models.SubscriptionState{Subscription: payload},
+	// 	&subscriptionStates, &order)
+	// if err != nil {
 	// 	if err == gorm.ErrRecordNotFound {
 	// 		return nil, nil
 	// 	}
 	// 	return nil, err
 	// }
 
-	topicStates = append(topicStates, subTopicStates...)
+	// var topicIds []string
 
-	return &topicStates, nil
+	// for _, sub := range subscriptionStates {
+	// 	if sub.Topic == "" {
+	// 		continue
+	// 	}
+	// 	topicIds = append(topicIds, sub.Topic)
+	// }
+
+	// if len(topicIds) > 0 {
+	// 	subTopErr := query.GetWithIN(models.TopicState{}, &subTopicStates, topicIds)
+	// 	if subTopErr != nil {
+	// 		if subTopErr == gorm.ErrRecordNotFound {
+	// 			return nil, nil
+	// 		}
+	// 		return nil, err
+	// 	}
+	// }
+
+	// // topErr := query.GetMany(models.TopicState{Topic: entities.Topic{Account: payload.Subscriber}}, &topicStates, nil)
+	// // if topErr != nil {
+	// // 	if err == gorm.ErrRecordNotFound {
+	// // 		return nil, nil
+	// // 	}
+	// // 	return nil, err
+	// // }
+
+	// topicStates = append(topicStates, subTopicStates...)
+
+	// return &topicStates, nil
 }
 
-func GetSubscription(id string) (*models.SubscriptionState, error) {
-	subscriptionState := models.SubscriptionState{}
+// func GetSubscription(id string) (*models.SubscriptionState, error) {
+// 	subscriptionState := models.SubscriptionState{}
 
-	err := query.GetOne(models.SubscriptionState{
-		Subscription: entities.Subscription{ID: id},
-	}, &subscriptionState)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &subscriptionState, nil
+// 	err := query.GetOne(models.SubscriptionState{
+// 		Subscription: entities.Subscription{ID: id},
+// 	}, &subscriptionState)
+// 	if err != nil {
+// 		if err == gorm.ErrRecordNotFound {
+// 			return nil, nil
+// 		}
+// 		return nil, err
+// 	}
+// 	return &subscriptionState, nil
 
-}
+// }
 
 func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *models.AuthorizationState) (
 	assocPrevEvent *entities.EventPath,
@@ -156,18 +125,19 @@ func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *mode
 	// }
 	payload.Data = payloadData
 
-	var topicData *models.TopicState
-	query.GetOne(models.TopicState{
-		Topic: entities.Topic{ID: payloadData.Topic, Subnet: payload.Subnet},
-	}, &topicData)
-
-	if topicData == nil {
-		return nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in subnet %s", topicData.ID, payload.Subnet))
+	// var topicData *models.TopicState
+	// query.GetOne(models.TopicState{
+	// 	Topic: entities.Topic{ID: payloadData.Topic, Subnet: payload.Subnet},
+	// }, &topicData)
+	_topic, err := dsquery.GetTopicById(payloadData.Topic)
+	
+	if dsquery.IsErrorNotFound(err) || _topic == nil {
+		return nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in subnet %s", _topic.ID, payload.Subnet))
 	}
 
-	currentState, err := service.ValidateSubscriptionData(&payload, &topicData.Topic)
-	
-	if err != nil && (err != gorm.ErrRecordNotFound && payload.EventType == uint16(constants.SubscribeTopicEvent)) {
+	currentState, err := service.ValidateSubscriptionData(&payload, _topic)
+	logger.Infof("SubscriptionError: %+v", err)
+	if err != nil && (!dsquery.IsErrorNotFound(err) && payload.EventType == uint16(constants.SubscribeTopicEvent)) {
 		return nil, nil, err
 	}
 
@@ -183,23 +153,24 @@ func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *mode
 	// 	return nil, nil, apperror.BadRequest("Invalid Subscription Status 01")
 	// }
 
-	if currentState != nil && payloadData.Subscriber == topicData.Account && payload.EventType == uint16(constants.SubscribeTopicEvent) {
+	if currentState != nil && payloadData.Subscriber == _topic.Account && payload.EventType == uint16(constants.SubscribeTopicEvent) {
 		return nil, nil, apperror.BadRequest("Topic already owned by account")
 	}
 
 	// if currentState != nil && currentState.Status != &constants.UnsubscribedSubscriptionStatus && payload.EventType == uint16(constants.SubscribeTopicEvent) {
 	// 	return nil, nil, apperror.BadRequest("Account already subscribed")
 	// }
-
+	logger.Infof("SubscriptionError2: %+v", err)
 	// generate associations
 	if currentState != nil {
 		assocPrevEvent = &currentState.Event
 	} else {
-		assocPrevEvent = &topicData.Event
+		assocPrevEvent = &_topic.Event
 	}
 
 	if authState != nil {
 		assocAuthEvent = &authState.Event
 	}
+	logger.Infof("SubscriptionError3: %+v", err)
 	return assocPrevEvent, assocAuthEvent, nil
 }

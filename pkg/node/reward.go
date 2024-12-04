@@ -20,9 +20,9 @@ import (
 	dsquery "github.com/ipfs/go-datastore/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto/schnorr"
+	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/query"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	p2p "github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/sql"
 )
@@ -44,10 +44,7 @@ func TrackReward(ctx *context.Context) {
 	
 	
 	// validator := (*cfg).PublicKey  
-	claimedRewardStore, ok := (*ctx).Value(constants.ClaimedRewardStore).(*ds.Datastore)
-	if !ok {
-		panic("Unable to load claimedRewardStore") 
-	}
+	
 
 	currentCycle, err := chain.DefaultProvider(cfg).GetCurrentCycle()
 	
@@ -59,13 +56,13 @@ func TrackReward(ctx *context.Context) {
 		return;
 		
 	}
-	lastCycleClaimedKey :=  datastore.NewKey("claimed")
+	lastCycleClaimedKey :=  datastore.NewKey("c")
 	lastClaimedCycle := uint64(0)
 	//batch, err :=	claimedRewardStore.Batch(*ctx)
 	// if err != nil {
 	// 	panic(err)
 	// }
-	lastClaimed, err := claimedRewardStore.Get(*ctx, lastCycleClaimedKey)
+	lastClaimed, err := stores.ClaimedRewardStore.Get(*ctx, lastCycleClaimedKey)
 		if err != nil  {
 			if err != datastore.ErrNotFound {
 				logger.Error(err)
@@ -91,15 +88,15 @@ func TrackReward(ctx *context.Context) {
 			}
 			if rewardBatch.Closed {
 				// save batch
-				unclaimedBatchKey :=  datastore.NewKey(fmt.Sprintf("unclaimed/%s", rewardBatch.Id))
-				err :=	claimedRewardStore.Put(*ctx, unclaimedBatchKey, rewardBatch.MsgPack())
+				unclaimedBatchKey :=  datastore.NewKey(fmt.Sprintf("u/%s", rewardBatch.Id))
+				err :=	stores.ClaimedRewardStore.Put(*ctx, unclaimedBatchKey, rewardBatch.MsgPack())
 				if err != nil {
 					panic(err)
 				}
 				go processSentryRewardBatch(*ctx, cfg, rewardBatch)
 			}
 		}
-		claimedRewardStore.Set(*ctx, lastCycleClaimedKey,  encoder.NumberToByte(i), true)
+		stores.ClaimedRewardStore.Set(*ctx, lastCycleClaimedKey,  encoder.NumberToByte(i), true)
 }
 			
 	
@@ -160,10 +157,7 @@ func generateBatch(cycle uint64, index int, ctx *context.Context) (*entities.Rew
 
 func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguration, batch *entities.RewardBatch) {
 	logger.Debugf("Processing Batch....: %v", batch.Id)
-	claimedRewardStore, ok := (ctx).Value(constants.ClaimedRewardStore).(*ds.Datastore)
-	if !ok {
-		panic("Unable to load claimedRewardStore") 
-	}
+
 	hashNumber :=  new(big.Int).SetBytes(batch.DataHash)
 	logger.Debugf("Hash: %s", hashNumber)
 		totalLicenses, err := chain.DefaultProvider(cfg).GetSentryActiveLicenseCount(big.NewInt(int64(batch.Cycle)))
@@ -320,7 +314,7 @@ func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguratio
 							proofData.Signers = signers
 							proofData.Commitment = []byte(commitment)
 							pendingClaimsKey :=  datastore.NewKey(fmt.Sprintf("validClaim/%s",  hex.EncodeToString(hash[:])))
-							err = claimedRewardStore.Put(ctx, pendingClaimsKey, batch.MsgPack())
+							err = stores.ClaimedRewardStore.Put(ctx, pendingClaimsKey, batch.MsgPack())
 							if err != nil {
 								logger.Error(err)
 							} else {
@@ -381,12 +375,8 @@ func ProcessPendingClaims(ctx *context.Context) {
 	logger.Debug("Processing pending claims...")
 	
 	pendingClaimsKey :=  datastore.NewKey("validClaim/")
-	claimedRewardStore, ok := (*ctx).Value(constants.ClaimedRewardStore).(*ds.Datastore)
-	if !ok {
-		logger.Errorf("error: failed loading claimRewardStore")
-	}
-	
-	results, err := claimedRewardStore.Query(*ctx, dsquery.Query{
+
+	results, err := stores.ClaimedRewardStore.Query(*ctx, dsquery.Query{
 		Prefix: pendingClaimsKey.String(),
 	})
 	
@@ -448,7 +438,7 @@ func ProcessPendingClaims(ctx *context.Context) {
 			}
 			
 			if claimed || err == nil {
-				claimedRewardStore.Delete(*ctx, datastore.NewKey(result.Key))
+				stores.ClaimedRewardStore.Delete(*ctx, datastore.NewKey(result.Key))
 				var claimed = true
 				result := sql.SqlDb.Where(
 					models.EventCounter{Cycle: &batch.Cycle,

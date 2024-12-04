@@ -133,6 +133,8 @@ type MainConfiguration struct {
 	Context *context.Context
 	SyncBatchSize uint
 	TestMode bool
+	ArchiveDir string
+	SyncHost string
 
 }
 

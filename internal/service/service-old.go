@@ -38,7 +38,7 @@ package service
 // // 		}
 // // 		return nil, apperror.Internal(err.Error())
 // // 	}
-// // 	if  *authState.Priviledge < constants.StandardPriviledge {
+// // 	if  *authState.Priviledge < constants.MemberPriviledge {
 // // 		return nil, apperror.Forbidden("Agent does not have enough permission to create topics")
 // // 	}
 

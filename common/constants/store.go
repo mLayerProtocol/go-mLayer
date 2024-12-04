@@ -3,7 +3,11 @@ package constants
 type DataStore string
 
 const (
-	// UnprocessedClientPayloadStore DataStore = "unprocessed-client-payload-store"
+	NewClientPayloadStore DataStore = "new-client-payload-store"
+	EventStore DataStore = "event-store"
+	ValidStateStore DataStore = "valid-state-store"
+	MessageStateStore DataStore = "message-state-store"
+	RefDataStore DataStore = "entity-refs"
 	// ValidMessageStore             DataStore = "valid-messages"
 	// UnsentMessageStore                      = "unsent-messages"
 	// SentMessageStore                        = "sent-messages"
@@ -16,9 +20,10 @@ const (
 	SubscriptionBlockStateStore             = "subscription-block-state-store"
 	DeliveryProofBlockStore                 = "dp-block-store"
 	SubscriptionBlockStore                  = "sub-block-store"
-	ConnectedSubscribersMap          DataStore       = "connected-subscribers-map"
+	
 	EventCountStore                 DataStore		= "event-count-store"
 	ClaimedRewardStore               DataStore  		= "claimed-reward-store"
 	P2PDhtStore                 DataStore		= "p2p-data-store"
 	SystemStore                 DataStore		= "system-store"
+	NetworkStatsStore                 DataStore		= "network-stats-store"
 )

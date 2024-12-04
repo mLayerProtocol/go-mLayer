@@ -13,10 +13,10 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
-	"gorm.io/gorm"
 )
 
 // type SubnetService struct {
@@ -54,65 +54,76 @@ import (
 Validate and Process the Subnet request
 */
 
-func GetSubnetById(id string) (*models.SubnetState, error) {
-	SubnetState := models.SubnetState{}
+// func GetSubnetById(id string) (*models.SubnetState, error) {
+// 	SubnetState := models.SubnetState{}
 
-	err := query.GetOne(models.SubnetState{
-		Subnet: entities.Subnet{ID: id},
-	}, &SubnetState)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &SubnetState, nil
+// 	err := query.GetOne(models.SubnetState{
+// 		Subnet: entities.Subnet{ID: id},
+// 	}, &SubnetState)
+// 	if err != nil {
+// 		if err == gorm.ErrRecordNotFound {
+// 			return nil, nil
+// 		}
+// 		return nil, err
+// 	}
+// 	return &SubnetState, nil
 
-}
-func GetSubnetByHash(hash string) (*models.SubnetState, error) {
-	SubnetState := models.SubnetState{}
+// }
+// func GetSubnetByHash(hash string) (*models.SubnetState, error) {
+// 	SubnetState := models.SubnetState{}
 
-	err := query.GetOne(models.SubnetState{
-		Subnet: entities.Subnet{Hash: hash},
-	}, &SubnetState)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &SubnetState, nil
+// 	err := query.GetOne(models.SubnetState{
+// 		Subnet: entities.Subnet{Hash: hash},
+// 	}, &SubnetState)
+// 	if err != nil {
+// 		if err == gorm.ErrRecordNotFound {
+// 			return nil, nil
+// 		}
+// 		return nil, err
+// 	}
+// 	return &SubnetState, nil
 
-}
+// }
 
-func GetSubnets(item models.SubnetState) (*[]models.SubnetState, error) {
-	var SubnetStates []models.SubnetState
+// func GetSubnets(item models.SubnetState) (*[]models.SubnetState, error) {
+// 	var SubnetStates []models.SubnetState
 
-	err := query.GetMany(item, &SubnetStates, nil)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &SubnetStates, nil
-}
+// 	err := query.GetMany(item, &SubnetStates, nil)
+// 	if err != nil {
+// 		if err == gorm.ErrRecordNotFound {
+// 			return nil, nil
+// 		}
+// 		return nil, err
+// 	}
+// 	return &SubnetStates, nil
+// }
 
 func GetSubscribedSubnets(item models.SubnetState) (*[]models.SubnetState, error) {
 
-	var SubnetStates []models.SubnetState
+	 SubnetStates := []models.SubnetState{}
 
-	err := query.GetMany(item, &SubnetStates, nil)
+	// err := query.GetMany(item, &SubnetStates, nil)
+	// if err != nil {
+	// 	if err == gorm.ErrRecordNotFound {
+	// 		return nil, nil
+	// 	}
+	// 	return nil, err
+	// }
+
+	_subnets, err := dsquery.GetAccountSubnets(item.Account, *dsquery.DefaultQueryLimit)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
 		return nil, err
 	}
+	logger.Infof("AccountSubnets: %v", _subnets)
+	for _, _sub := range _subnets {
+		SubnetStates = append(SubnetStates, models.SubnetState{Subnet: *_sub})
+	}
 
-	var subscriptionStates []models.SubscriptionState
-	err = query.GetMany(models.SubscriptionState{Subscription: entities.Subscription{Subscriber: item.Account}},
-		&subscriptionStates, nil)
+
+	//var subscriptionStates []models.SubscriptionState
+	// err = query.GetMany(models.SubscriptionState{Subscription: entities.Subscription{Subscriber: item.Account}},
+	// 	&subscriptionStates, nil)
+	subscriptionStates, err := dsquery.GetSubscriptions(entities.Subscription{Subscriber: item.Account}, nil, nil)
 
 	if err != nil {
 
@@ -136,22 +147,22 @@ func GetSubscribedSubnets(item models.SubnetState) (*[]models.SubnetState, error
 	return &SubnetStates, nil
 }
 
-func GetSubnetEvents() (*[]models.SubnetEvent, error) {
-	var SubnetEvents []models.SubnetEvent
+// func GetSubnetEvents() (*[]models.SubnetEvent, error) {
+// 	var SubnetEvents []models.SubnetEvent
 
-	err := query.GetMany(models.SubnetEvent{
-		Event: entities.Event{
-			BlockNumber: 1,
-		},
-	}, &SubnetEvents, nil)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &SubnetEvents, nil
-}
+// 	err := query.GetMany(models.SubnetEvent{
+// 		Event: entities.Event{
+// 			BlockNumber: 1,
+// 		},
+// 	}, &SubnetEvents, nil)
+// 	if err != nil {
+// 		if err == gorm.ErrRecordNotFound {
+// 			return nil, nil
+// 		}
+// 		return nil, err
+// 	}
+// 	return &SubnetEvents, nil
+// }
 
 // func ListenForNewSubnetEventFromPubSub (mainCtx *context.Context) {
 // 	ctx, cancel := context.WithCancel(*mainCtx)
@@ -172,7 +183,6 @@ func GetSubnetEvents() (*[]models.SubnetEvent, error) {
 //		}
 //	}
 func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.AuthorizationState, ctx *context.Context) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, err error) {
-
 	payloadData := entities.Subnet{}
 	d, _ := json.Marshal(payload.Data)
 	e := json.Unmarshal(d, &payloadData)
@@ -187,6 +197,13 @@ func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.Aut
 	if uint64(payloadData.Timestamp) == 0 || uint64(payloadData.Timestamp) > uint64(time.Now().UnixMilli())+15000 || uint64(payloadData.Timestamp) < uint64(time.Now().UnixMilli())-15000 {
 		return nil, nil, apperror.BadRequest("Invalid event timestamp")
 	}
+	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
+
+	currentState, err := service.ValidateSubnetData(&payload, cfg.ChainId)
+	if err != nil {
+		return nil, nil, err
+	}
+	logger.Infof("SUBNETCURRSTATE: %s", currentState.Event)
 	if payload.EventType == uint16(constants.CreateSubnetEvent) {
 		// dont worry validating the AuthHash for Authorization requests
 		// if entities.AddressFromString(payloadData.Owner.ToString()).Addr == "" {
@@ -196,9 +213,16 @@ func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.Aut
 		if payloadData.ID != "" {
 			return nil, nil, apperror.BadRequest("You cannot set an id when creating a subnet")
 		}
-		var found []models.SubnetState
-		query.GetMany(&models.SubnetState{Subnet: entities.Subnet{Ref: payloadData.Ref}}, &found, nil)
-		if len(found) > 0 {
+		// var found []models.SubnetState
+		// query.GetMany(&models.SubnetState{Subnet: entities.Subnet{Ref: payloadData.Ref}}, &found, nil)
+		refExists, err := dsquery.RefExists(entities.SubnetModel, payloadData.Ref, "")
+		if err != nil {
+			return nil, nil, err
+		}
+		// if len(found) > 0 {
+		// 	return nil, nil, apperror.BadRequest(fmt.Sprintf("Subnet with reference %s already exists", payloadData.Ref))
+		// }
+		if refExists {
 			return nil, nil, apperror.BadRequest(fmt.Sprintf("Subnet with reference %s already exists", payloadData.Ref))
 		}
 		// logger.Debug("FOUNDDDDD", found, payloadData.Ref)
@@ -209,12 +233,7 @@ func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.Aut
 			return nil, nil, apperror.BadRequest("Subnet ID must be provided")
 		}
 	}
-	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-
-	currentState, err := service.ValidateSubnetData(&payload, cfg.ChainId)
-	if err != nil {
-		return nil, nil, err
-	}
+	
 	
 	// generate associations
 	if currentState != nil {

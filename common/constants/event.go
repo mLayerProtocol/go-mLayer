@@ -19,27 +19,42 @@ package constants
 // m.room.third_party_invite: Represents an invitation to the room via a third-party service.
 // m.room.pinned_events: Indicates messages that are pinned in the room.
 
+// type EventPayloadType string
 
-
-type EventPayloadType string
-
-const (
-	AuthorizationPayloadType EventPayloadType = "authorization"
-	TopicPayloadType         EventPayloadType = "topic"
-	SubscriptionPayloadType  EventPayloadType = "subscription"
-	MessagePayloadType       EventPayloadType = "message"
-	SubnetPayloadType        EventPayloadType = "sub_network"
-	WalletPayloadType        EventPayloadType = "wallet"
-)
+// const (
+// 	AuthorizationPayloadType EventPayloadType = "auth"
+// 	TopicPayloadType         EventPayloadType = "topic"
+// 	SubscriptionPayloadType  EventPayloadType = "subscription"
+// 	MessagePayloadType       EventPayloadType = "message"
+// 	SubnetPayloadType        EventPayloadType = "sub_network"
+// 	WalletPayloadType        EventPayloadType = "wallet"
+// )
 
 
 
 type EventType uint16
 
 // Authrization
+
+
+// Administrative Subnet Actions
 const (
-	AuthorizationEvent   EventType = 100
-	UnauthorizationEvent EventType = 101
+	DeleteSubnetEvent EventType = 500
+	CreateSubnetEvent EventType = 501 // m.room.create
+	// PrivacySetEvent        EventType = 1002
+	// BanMemberEvent         EventType = 1003
+	// UnbanMemberEvent       EventType = 1004
+	// ContractSetEvent       EventType = 1005
+	// UpdateNameEvent        EventType = 1006 //  m.room.name
+	// UpdateDescriptionEvent EventType = 1007 //  m.room.topic
+	// UpdateAvatarEvent      EventType = 1008 //  m.room.avatar
+	// PinMessageEvent        EventType = 1008 //  m.room.avatar
+	UpdateSubnetEvent EventType = 509
+	// UpgradeSubscriberEvent EventType = 1010
+)
+const (
+	AuthorizationEvent   EventType = 600
+	UnauthorizationEvent EventType = 601
 )
 
 // Administrative Topic Actions
@@ -76,21 +91,6 @@ const (
 )
 
 
-// Administrative Subnet Actions
-const (
-	DeleteSubnetEvent EventType = 1300
-	CreateSubnetEvent EventType = 1301 // m.room.create
-	// PrivacySetEvent        EventType = 1002
-	// BanMemberEvent         EventType = 1003
-	// UnbanMemberEvent       EventType = 1004
-	// ContractSetEvent       EventType = 1005
-	// UpdateNameEvent        EventType = 1006 //  m.room.name
-	// UpdateDescriptionEvent EventType = 1007 //  m.room.topic
-	// UpdateAvatarEvent      EventType = 1008 //  m.room.avatar
-	// PinMessageEvent        EventType = 1008 //  m.room.avatar
-	UpdateSubnetEvent EventType = 1309
-	// UpgradeSubscriberEvent EventType = 1010
-)
 
 // Administrative Wallet Actions
 const (

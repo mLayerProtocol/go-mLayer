@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/common/encoder"
@@ -20,8 +21,8 @@ type Subscription struct {
 
 	ID         string    `gorm:"primaryKey;type:char(36);not null"  json:"id,omitempty"`
 	Topic      string    `json:"top" binding:"required"  gorm:"not null;uniqueIndex:idx_sub_topic;type:char(36);index"`
-	Ref        string    `json:"ref" gorm:"uniqueIndex:idx_ref_subnet;type:varchar(100);default:null"`
-	Meta       string    `json:"meta"  gorm:"type:varchar(100);"`
+	Ref        string    `json:"ref,omitempty" gorm:"uniqueIndex:idx_ref_subnet;type:varchar(100);default:null"`
+	Meta       string    `json:"meta,omitempty"  gorm:"type:varchar(100);"`
 	Subnet     string    `json:"snet"  binding:"required" gorm:"not null;uniqueIndex:idx_ref_subnet;type:varchar(36)"`
 	Subscriber DIDString `json:"sub"  gorm:"not null;uniqueIndex:idx_sub_topic;type:varchar(100);index"`
 	// Device     DeviceString                  `json:"dev,omitempty" binding:"required"  gorm:"not null;uniqueIndex:idx_acct_dev_topic;type:varchar(100);index"`
@@ -29,18 +30,65 @@ type Subscription struct {
 	Role   *constants.SubscriberRole  `json:"rol" gorm:"default:0"`
 
 	//Signature string                         `json:"sig"`
-	Timestamp *uint64       `json:"ts"`
-	Hash      string       `json:"h" gorm:"unique" `
-	Event     EventPath    `json:"e" gorm:"index;char(64);"`
+	Timestamp *uint64       `json:"ts,omitempty"`
+	Hash      string       `json:"h,omitempty" gorm:"unique" `
+	Event     EventPath    `json:"e,omitempty" gorm:"index;char(64);"`
 	Agent     DeviceString `json:"agt,omitempty"  gorm:"not null;type:varchar(100);index"`
-	BlockNumber uint64          `json:"blk"`
-	Cycle   	uint64			`json:"cy"`
-	Epoch		uint64			`json:"ep"`
-
+	BlockNumber uint64          `json:"blk,omitempty"`
+	Cycle   	uint64			`json:"cy,omitempty"`
+	Epoch		uint64			`json:"ep,omitempty"`
+	EventSignature  string    `json:"sig,omitempty"`
 }
 
+func (d Subscription) GetSignature() (string) {
+	return d.EventSignature
+}
+
+func (g *Subscription) GetKeys() (keys []string)  {
+	keys = append(keys, fmt.Sprintf("%s/%s", g.SubscriberKey(), utils.IntMilliToTimestampString(int64(utils.SafePointerValue(g.Timestamp, uint64(time.Now().UnixMilli())))),))
+	keys = append(keys, fmt.Sprintf("%s/%d/%s", g.SubscriptionStatusKey(), *g.Status, utils.IntMilliToTimestampString(int64(utils.SafePointerValue(g.Timestamp, uint64(time.Now().UnixMilli()))))))
+	if g.Status != &constants.UnsubscribedSubscriptionStatus &&  g.Status != &constants.BannedSubscriptionStatus {
+		keys = append(keys, g.SubscribedTopicsKey())
+	}
+	keys = append(keys, fmt.Sprintf("%s/%d/%s", g.SubscriptionStatusKey(), *g.Status, utils.IntMilliToTimestampString(int64(utils.SafePointerValue(g.Timestamp, uint64(time.Now().UnixMilli()))))))
+	keys = append(keys, g.Key())	
+	keys = append(keys, g.DataKey())
+	if len(g.Ref) > 0 {
+		keys = append(keys, g.RefKey())
+	}
+	// keys = append(keys, fmt.Sprintf("%s/%d/%s", AuthModel, g.Cycle, g.ID))
+	return keys;
+}
+func (item *Subscription) DataKey() string {
+	return fmt.Sprintf(DataKey, GetModel(item), item.Event.Hash )
+}
+func (item *Subscription) RefKey() string {
+	return fmt.Sprintf("%s|ref|%s", SubscriptionModel, item.Ref)
+}
+
+
+
+func (g *Subscription) SubscriberKey() (string) {
+	if (g.Subscriber != "") {
+			return fmt.Sprintf("%s/sub/%s/%s", SubscriptionModel, g.Topic, g.Subscriber)
+	} else {
+		return fmt.Sprintf("%s/sub/%s", SubscriptionModel, g.Topic)
+	}
+}
+
+func (g *Subscription) SubscribedTopicsKey() (string) {
+	if (g.Subscriber != "") {
+			return fmt.Sprintf("%s/sub/%s/%s", SubscriptionModel, g.Subscriber, g.Topic,)
+	} else {
+		return fmt.Sprintf("%s/sub/%s", SubscriptionModel, g.Subscriber)
+	}
+}
+func (g *Subscription) SubscriptionStatusKey() (string) {
+	return fmt.Sprintf("%s/st/%s/%s", SubscriptionModel, g.Topic, g.Subscriber)
+}
 func (sub *Subscription) Key() string {
-	return fmt.Sprintf("/%s/%s", sub.Subscriber, sub.Topic)
+	key := strings.ReplaceAll(sub.SubscriberKey(), "/", ":")
+	return fmt.Sprintf("%s/id/%s", SubscriptionModel, key)
 }
 
 func (sub Subscription) ToJSON() []byte {
@@ -51,14 +99,14 @@ func (sub Subscription) ToJSON() []byte {
 	return m
 }
 
-func (subscription Subscription) ToString() string {
+func (subscription Subscription) ToString() (string, error) {
 	values := []string{}
 	values = append(values, subscription.Hash)
 	values = append(values, subscription.ID)
 	// values = append(values, fmt.Sprintf("%d", subscription.Timestamp))
 	values = append(values, string(subscription.Subscriber))
 	values = append(values, fmt.Sprintf("%d", subscription.Timestamp))
-	return strings.Join(values, ",")
+	return strings.Join(values, ","), nil
 }
 
 func (sub Subscription) MsgPack() []byte {
@@ -104,6 +152,6 @@ func (sub Subscription) EncodeBytes() ([]byte, error) {
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: utils.SafePointerValue(sub.Role, 0)},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: utils.SafePointerValue(sub.Status, 0)},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: sub.Subscriber.ToString()},
-		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: sub.Topic},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(sub.Topic)},
 	)
 }

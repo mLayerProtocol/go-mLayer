@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
@@ -60,7 +59,7 @@ func ValidateEvent(event interface{}) error {
 	if !strings.EqualFold(utils.AddressToHex(chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/addr", string(e.GetValidator()))]), utils.AddressToHex(e.Payload.Validator)) {
 		return apperror.Forbidden("payload validator does not match event validator")
 	}
-	logger.Debugf("EVENT:: %s %s", string(e.GetValidator()), e.GetSignature())
+	
 	sign, _ := hex.DecodeString(e.GetSignature())
 	valid, err := crypto.VerifySignatureEDD(e.GetValidator().Bytes(), &b, sign)
 	if err != nil {
@@ -111,20 +110,21 @@ func ValidateMessageClient(
 	return nil
 }
 
-func HandleNewPubSubEvent(event entities.Event, ctx *context.Context) {
+func HandleNewPubSubEvent(event entities.Event, ctx *context.Context) error {
 	switch val := event.Payload.Data.(type) {
 	case entities.Subnet:
 		logger.Debug(val)
-		HandleNewPubSubSubnetEvent(&event, ctx)
+		return HandleNewPubSubSubnetEvent(&event, ctx)
 	case entities.Authorization:
-		HandleNewPubSubAuthEvent(&event, ctx)
+		return HandleNewPubSubAuthEvent(&event, ctx)
 	case entities.Topic:
-		HandleNewPubSubTopicEvent(&event, ctx)
+		return HandleNewPubSubTopicEvent(&event, ctx)
 	case entities.Subscription:
-		HandleNewPubSubSubscriptionEvent(&event, ctx)
+		return HandleNewPubSubSubscriptionEvent(&event, ctx)
 	case entities.Message:
-		HandleNewPubSubMessageEvent(&event, ctx)
+		return HandleNewPubSubMessageEvent(&event, ctx)
 	}
+	return nil
 }
 
 func OnFinishProcessingEvent(ctx *context.Context, event  *entities.Event, state  interface{}, eventId *string) {
@@ -261,26 +261,31 @@ func OnFinishProcessingEvent(ctx *context.Context, event  *entities.Event, state
 }
 
 func IsMoreRecentEvent(
-	eventHash string,
-	eventTimestamp int,
-	event2Hash string,
-	event2Timestamp int,
+	oldEventHash string,
+	oldEventTimestamp int,
+	recentEventHash string,
+	recentEventTimestamp int,
 ) bool {
 
-	if eventTimestamp < event2Timestamp {
+	if oldEventTimestamp < recentEventTimestamp {
 		return true
 	}
-	if eventTimestamp > event2Timestamp {
+	if oldEventTimestamp > recentEventTimestamp {
 		return false
 	}
-	// if the authorization was created at exactly the same time but their hash is different
-	// use the last 4 digits of their event hash
-	csN := new(big.Int)
-	csN.SetString(eventHash[50:], 16)
-	nsN := new(big.Int)
-	nsN.SetString(eventHash[50:], 16)
-
-	return csN.Cmp(nsN) < 1
+	// // if the authorization was created at exactly the same time but their hash is different
+	// // use the last 4 digits of their event hash
+	// csN := new(big.Int)
+	// csN.SetString(oldEventHash[50:], 16)
+	// nsN := new(big.Int)
+	// nsN.SetString(recentEventHash[50:], 16)
+	if oldEventHash < recentEventHash {
+		return true
+	}
+	if oldEventHash > recentEventHash {
+		return false
+	}
+	return false
 }
 
 func IsMoreRecent(
@@ -315,15 +320,21 @@ func IsMoreRecent(
 			// }
 			// if currentStateEvent.Payload.Timestamp == event.Payload.Timestamp {
 			// logger.Debugf("Current state %v", currentStateEvent.Payload)
-			csN := new(big.Int)
-			csN.SetString(currenStatetHash[56:], 16)
-			nsN := new(big.Int)
-			nsN.SetString(eventHash[56:], 16)
+			// csN := new(big.Int)
+			// csN.SetString(currenStatetHash[56:], 16)
+			// nsN := new(big.Int)
+			// nsN.SetString(eventHash[56:], 16)
 
-			if csN.Cmp(nsN) < 1 {
+			// if csN.Cmp(nsN) < 1 {
+			// 	isMoreRecent = true
+			// }
+			//}
+			if currenStatetHash < eventHash {
 				isMoreRecent = true
 			}
-			//}
+			if currenStatetHash > eventHash {
+				isMoreRecent = false
+			}
 		}
 	}
 	return isMoreRecent, markAsSynced

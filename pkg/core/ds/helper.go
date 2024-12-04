@@ -13,11 +13,11 @@ const (
 	SyncedBlockKey = "/syncedBlock"
 )
 func GetLastSyncedBlock(ctx *context.Context) (*big.Int, error) {
-	systemStore, ok := (*ctx).Value(constants.SystemStore).(*Datastore)
+	SystemStore, ok := (*ctx).Value(constants.SystemStore).(*Datastore)
 	if !ok {
-		return big.NewInt(0), fmt.Errorf("GetLastSyncBlock: unable to load systemStore from context")
+		return big.NewInt(0), fmt.Errorf("GetLastSyncBlock: unable to load SystemStore from context")
 	}
-	lastBlockByte, err := systemStore.Get(*ctx, Key(SyncedBlockKey))
+	lastBlockByte, err := SystemStore.Get(*ctx, Key(SyncedBlockKey))
 	if err != nil && err != datastore.ErrNotFound {
 		return big.NewInt(0), fmt.Errorf("GetLastSyncedBlock: %v", err)
 	}
@@ -25,9 +25,9 @@ func GetLastSyncedBlock(ctx *context.Context) (*big.Int, error) {
 }
 
 func SetLastSyncedBlock(ctx *context.Context, value *big.Int) (error) {
-	systemStore, ok := (*ctx).Value(constants.SystemStore).(*Datastore)
+	SystemStore, ok := (*ctx).Value(constants.SystemStore).(*Datastore)
 	if !ok {
-		return  fmt.Errorf("SetLastSyncedBlock: unable to load systemStore from context")
+		return  fmt.Errorf("SetLastSyncedBlock: unable to load SystemStore from context")
 	}
-	return systemStore.Set(*ctx, Key(SyncedBlockKey), value.Bytes(), true)
+	return SystemStore.Set(*ctx, Key(SyncedBlockKey), value.Bytes(), true)
 }

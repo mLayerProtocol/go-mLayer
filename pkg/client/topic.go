@@ -10,9 +10,9 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
 )
 
 // type TopicService struct {
@@ -81,12 +81,15 @@ func ValidateTopicPayload(payload entities.ClientPayload, authState *models.Auth
 	}
 	
 	if payload.EventType == uint16(constants.CreateTopicEvent) {
-		topic, _ := query.GetTopic(models.TopicState{
-			Topic: entities.Topic{Ref: payloadData.Ref, Subnet: payloadData.Subnet},
-		})
-		if topic != nil {
+		// topic, _ := query.GetTopic(models.TopicState{
+		// 	Topic: entities.Topic{Ref: payloadData.Ref, Subnet: payloadData.Subnet},
+		// })
+		refExists, err := dsquery.RefExists(entities.TopicModel, payloadData.Ref, payload.Subnet)
+		if err != nil {
+			return nil, nil, err
+		}
+		if refExists {
 			return nil, nil, apperror.BadRequest("Topic ref already exist")
-
 		}
 	}
 
@@ -115,3 +118,4 @@ func ValidateTopicPayload(payload entities.ClientPayload, authState *models.Auth
 	}
 	return assocPrevEvent, assocAuthEvent, nil
 }
+

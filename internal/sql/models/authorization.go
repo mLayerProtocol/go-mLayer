@@ -27,9 +27,10 @@ type AuthorizationState struct {
 func (AuthorizationState) TableName() string {
     return "authorization_states"
 }
+
 func (d *AuthorizationState) BeforeCreate(tx *gorm.DB) (err error) {
 	// UUID version 4
-	d.ID, err = entities.GetId(d)
+	d.ID, err = entities.GetId(*d)
 	if err != nil {
 		panic(err)
 	}

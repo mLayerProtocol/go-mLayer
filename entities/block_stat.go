@@ -1,20 +1,46 @@
 package entities
 
+import (
+	"fmt"
+
+	"github.com/mlayerprotocol/go-mlayer/common/constants"
+)
+
 // "math"
 
-type Stats struct {
+type BlockStats struct {
 	ID                 string `json:"id" gorm:"type:uuid;primaryKey;not null"`
 	BlockNumber        uint64 `json:"blk"`
 	EventCount         uint64 `json:"eC"`
 	MessageCount       uint64 `json:"mC"`
 	TopicCount         uint64 `json:"tC"`
 	AuthorizationCount uint64 `json:"authC"`
+	SubnetCount uint64 `json:"snetC"`
+	SubscriptionCount uint64 `json:"subC"`
 	Cycle uint64 `json:"cy"`
 	Epoch uint64 `json:"ep"`
 	MessageCost string `json:"mCo"`
+	Event string `json:"e"`
 	// Count              uint64 `json:"c" gorm:"default:1"`
 }
 
+
+func GetBlockStatsKeys(event *Event) []string {
+	keys := []string{}
+	keys = append(keys, "e")
+	logger.Infof("EventType %s, %d",  GetModelTypeFromEventType(constants.EventType(event.EventType)), event.EventType)
+	keys = append(keys, fmt.Sprintf("e/%s", GetModelTypeFromEventType(constants.EventType(event.EventType))))
+	keys = append(keys, fmt.Sprintf("b/%015d/%s", event.BlockNumber, GetModelTypeFromEventType(constants.EventType(event.EventType))))
+	keys = append(keys, fmt.Sprintf("b/%015d", event.BlockNumber))
+	keys = append(keys, fmt.Sprintf("e/%015d", event.Epoch))
+	keys = append(keys, fmt.Sprintf("c/%015d", event.Cycle))
+	keys = append(keys, RecentEventKey(event.Cycle))
+	return keys
+}
+
+func RecentEventKey(cycle uint64) string {
+	return fmt.Sprintf("c/%015d/e", cycle)
+}
 // func (chatStats Stats) ToString() string {
 // 	values := []string{}
 

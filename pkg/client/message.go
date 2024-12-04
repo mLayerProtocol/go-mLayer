@@ -9,9 +9,9 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
 	"github.com/mlayerprotocol/go-mlayer/pkg/log"
 	"gorm.io/gorm"
 )
@@ -37,16 +37,23 @@ type MessageService struct {
 // }
 
 func GetMessages(topicId string) (*[]models.MessageState, error) {
-	var messageStates []models.MessageState
-	order := map[string]query.Order{"created_at": query.OrderDec}
-	err := query.GetMany(models.MessageState{
-		Message: entities.Message{Topic: topicId},
-	}, &messageStates, &order)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
+	messageStates := []models.MessageState{}
+	// order := map[string]query.Order{"created_at": query.OrderDec}
+	// err := query.GetMany(models.MessageState{
+	// 	Message: entities.Message{Topic: topicId},
+	// }, &messageStates, &order)
+	// if err != nil {
+	// 	if err == gorm.ErrRecordNotFound {
+	// 		return nil, nil
+	// 	}
+	// 	return nil, err
+	// }
+	messages, err := dsquery.GetMessages(entities.Message{Topic: topicId}, dsquery.DefaultQueryLimit, nil)
+	if err != nil && !dsquery.IsErrorNotFound(err) {
+		return &messageStates, err
+	}
+	for _, msg :=  range messages {
+		messageStates = append(messageStates, models.MessageState{Message: *msg})
 	}
 	return &messageStates, nil
 }
@@ -101,7 +108,7 @@ func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *mo
 	}
 	payload.Data = payloadData
 
-	topicData, err := query.GetTopicById(payloadData.Topic)
+	topicData, err := dsquery.GetTopicById(payloadData.Topic)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,7 +124,7 @@ func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *mo
 	
 
 
-	subscription, err := service.ValidateMessageData(&payload, &topicData.Topic)
+	subscription, err := service.ValidateMessageData(&payload, topicData)
 	
 	
 	
@@ -140,15 +147,14 @@ func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *mo
 			if payload.Account == topicData.Account {
 				assocPrevEvent = &topicData.Event
 			} else {
-				var subnet models.SubnetState;
-				err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: topicData.Subnet}}, &subnet)
+				subState, err := dsquery.GetSubnetStateById(topicData.Subnet)
 				if err != nil {
-					if err == gorm.ErrRecordNotFound {
+					if err == gorm.ErrRecordNotFound  || dsquery.IsErrorNotFound(err){
 						return nil, nil, apperror.Forbidden("Invalid subnet id")
 					}
 					return nil, nil, apperror.Internal(err.Error())
 				}
-				assocPrevEvent = &subnet.Event
+				assocPrevEvent = &subState.Event
 			
 			}
 

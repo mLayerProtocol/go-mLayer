@@ -13,6 +13,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/encoder"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/quic-go/quic-go"
@@ -35,11 +36,16 @@ func  SendSecureQuicRequest(config *configs.MainConfiguration, maddr multiaddr.M
 			return nil, err
 		}
 			
-		certResponse, err := certPayload.SendRequestToAddress(config.PrivateKeyEDD, maddr, DataRequest)
+		certResponse, err := certPayload.SendP2pRequestToAddress(config.PrivateKeyEDD, maddr, DataRequest)
 		if err != nil {
 			return nil, err
 		}
-		
+		logger.Infof("ValidSignerBefore %s", validSigner)
+		validSigner, _ = chain.NetworkInfo.GetValidatorKeys(validSigner)
+		if len(validSigner) == 0 {
+			return nil, fmt.Errorf("invalid signer public key")
+		}
+		logger.Infof("ValidSignerAfter %s", validSigner)
 		if certResponse.IsValid(config.ChainId) && strings.EqualFold(hex.EncodeToString(certResponse.Signer), string(validSigner)) {
 			crd := CertResponseData{}
 			err := encoder.MsgPackUnpackStruct(certResponse.Data,&crd)
@@ -70,7 +76,7 @@ func  SendInsecureQuicRequest(addr string, message []byte) ([]byte, error) {
 	return sendQuicRequest(addr, message, true)
 }
 var ErrInvalidCert = fmt.Errorf("invalid certficate")
-func  sendQuicRequest(addr string, message []byte, insecure bool) ([]byte, error) {
+func  sendQuicRequest(addr string, message []byte, insecure bool, ) ([]byte, error) {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"mlayer-p2p"},

@@ -9,25 +9,26 @@ import (
 	"io"
 	"log"
 	"math/big"
-	"reflect"
+	"os"
+	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ipfs/go-datastore"
+	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/common/encoder"
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
+	"github.com/mlayerprotocol/go-mlayer/internal/channelpool"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto/schnorr"
-	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	"github.com/mlayerprotocol/go-mlayer/internal/sql/query"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
+	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/sql"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/quic-go/quic-go"
 	// rest "messagingprotocol/pkg/core/rest"
@@ -57,7 +58,7 @@ type CertResponseData struct {
 	QuicHost string          `json:"quic"`
 }
 
-var syncedBlockMutex sync.Mutex
+
 
 func publishChannelEventToNetwork(channelPool chan *entities.Event, pubsubChannel *entities.Channel, mainCtx *context.Context) {
 	_, cancel := context.WithCancel(context.Background())
@@ -130,7 +131,7 @@ func publishChannelEventToNetwork(channelPool chan *entities.Event, pubsubChanne
 
 }
 
-func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPubSubChannel *entities.Channel, mainCtx *context.Context, process func(event *entities.Event, ctx *context.Context)) {
+func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPubSubChannel *entities.Channel, mainCtx *context.Context) {
 	// time.Sleep(5 * time.Second)
 
 	_, cancel := context.WithCancel(context.Background())
@@ -149,75 +150,20 @@ func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPub
 			logger.Fatalf("Primary Message channel closed. Please restart server to try or adjust buffer size in config")
 			return
 		}
+		
 
 		event, errT := entities.UnpackEvent(message.Data, modelType)
-
+		logger.Debugf("ReceivedEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
 		if errT != nil {
 			logger.Errorf("Error receiving event  %v\n", errT)
 			continue
 		}
 
-		// TODO validate the event
-		// pv := models.AuthorizationEvent{
-		// 	Event: event,
-		// }
-		// auth := entities.Authorization{}
-		// err := encoder.MsgPackUnpackStruct(message.Data, &event)
-		// if err != nil {
-		// 	logger.Error(err)
-		// }
-		// logger.Debugf("Event 1 ----===> %v", event)
-		// authByte, _ := json.Marshal( pv.Event.Payload.(entities.AuthorizationPayload).ClientPayload.Data)
-		// _	= json.Unmarshal(authByte, &auth)
-		// // pv.Event.Payload  = payload
-		// pv.Event.ClientPayload.Data = payload.Data
-		// pv.Payload.ClientPayload = entities.AuthorizationPayload{
-		// 	ClientPayload: payload.ClientPayload,
-		// }
-
-		// authEvent := models.AuthorizationEvent{
-		// 	Event: entities.Event{
-		// 		Payload: payload,
-		// 	},
-		// 	Payload: entities.AuthorizationPayload{
-		// 		Data: payload.Data.
-		// 	},
-		// }
-		// logger.Debugf("ADEDEEDDD %v", pv.Event.Payload.(entities.AuthorizationPayload).ClientPayload)
-		// b, err := pv.EncodeBytes()
-		// logger.Debugf("ADEDEEDDD %v", b)
-		// logger.Debugf("Event Received ----===> %v", event.GetValidator())
-		// toGoChannel <- event
-		//
-		// check if event was signed by a valid provider
-		cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-		if !ok {
-			logger.Errorf("unable to get config from context")
-			return
-		}
-		if event.Validator != entities.PublicKeyString(hex.EncodeToString(cfg.PublicKeyEDD)) {
-			isValidator, err := chain.NetworkInfo.IsValidator(string(event.Validator))
-			if err != nil {
-				logger.Error(err)
-				return
-			}
-			if !isValidator {
-				logger.Error(fmt.Errorf("not signed by a validator"))
-				return
-			}
-		}
-		go func() {
-			syncedBlockMutex.Lock()
-			defer syncedBlockMutex.Unlock()
-			if chain.NetworkInfo.Synced {
-				lastSynced, err := ds.GetLastSyncedBlock(mainCtx)
-				eventBlock := new(big.Int).SetUint64(event.BlockNumber)
-				if err == nil && lastSynced.Cmp(eventBlock) == -1 {
-					ds.SetLastSyncedBlock(mainCtx, eventBlock)
-				}
-			}
-		}()
-		go process(event, mainCtx)
+	
+		logger.Debugf("ProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
+		// event.ID, _ = event.GetId()
+		channelpool.EventProcessorChannel <- event
+		// go process(event, mainCtx)
 	}
 	logger.Debugf("Done processing event: %s", modelType)
 	// for {
@@ -295,14 +241,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 
 	response = NewP2pPayload(config, P2pActionResponse, []byte{})
 	response.Id = payload.Id
-	claimedRewardStore, ok := (*ctx).Value(constants.ClaimedRewardStore).(*ds.Datastore)
-	if !ok {
-		response.ResponseCode = 500
-		response.Error = "Internal error"
-		logger.Debugf("CommitmentRequest: Error get claim reward store from context")
-		response.Sign(config.PrivateKeyEDD)
-		return response, err
-	}
+	logger.Infof("PAYLOAADDD: %d", payload.Action)
 	switch payload.Action {
 	case P2pActionGetEvent:
 		eventPath, err := entities.UnpackEventPath(payload.Data)
@@ -311,10 +250,10 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			response.Error = "Invalid payload data"
 			logger.Debugf("processP2pPayload: %v", err)
 		}
-		event, err := query.GetEventFromPath(eventPath)
+		event, err := dsquery.GetEventFromPath(eventPath)
 		if err != nil {
 			logger.Errorf("EventFromPathError: %v,%v", err, eventPath)
-			if err == query.ErrorNotFound {
+			if dsquery.IsErrorNotFound(err) {
 				response.ResponseCode = 404
 				response.Error = "Event not found"
 			} else {
@@ -322,23 +261,27 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 				response.Error = err.Error()
 			}
 		} else {
-			d := models.GetEventModelFromModelType(eventPath.Model)
-			result := []IState{}
+			logger.Infof("FOUND_EVENT %s", event.ID)
+			// d := models.GetStateModelFromModelType(eventPath.Model)
+			//result := []IState{}
 			states := []json.RawMessage{}
-			// states := query.GetMany(d, &result)
-			err = sql.SqlDb.Model(d).Where("event = ?", eventPath.ToString(), &result).Error
-
-			if err != nil {
-				logger.Errorf("EventReseponse: %v", err)
+			state, err := dsquery.GetStateBytesFromEventPath(eventPath)
+			if err != nil && !dsquery.IsErrorNotFound(err) {
+				logger.Errorf("GettingEventStateError: %v", err)
 			}
-			if err == nil {
-				for _, st := range result {
-					states = append(states, st.MsgPack())
-				}
+			if state != nil {
+				states = append(states, state)
+			}
+			
+			// if err == nil {
+			// 	for _, st := range result {
+			// 		states = append(states, st.MsgPack())
+			// 	}
+			
 				data := P2pEventResponse{Event: event.MsgPack(), States: states}
-				logger.Debugf("EventReseponse: %v", (&data).MsgPack())
-				response.Data = (&data).MsgPack()
-			}
+			// 	logger.Debugf("EventReseponse: %v", (&data).MsgPack())
+			 	response.Data = (&data).MsgPack()
+			// }
 		}
 	case P2pActionGetState:
 		ePath, err := entities.UnpackEntityPath(payload.Data)
@@ -347,9 +290,9 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			response.Error = "Invalid payload data"
 			logger.Debugf("processP2pPayload: %v", err)
 		}
-		state, err := query.GetStateFromPath(ePath)
+		state, err := dsquery.GetStateFromEntityPath(ePath)
 		if err != nil {
-			if err == query.ErrorNotFound {
+			if dsquery.IsErrorNotFound(err) {
 				response.ResponseCode = 404
 				response.Error = "Event not found"
 			} else {
@@ -357,14 +300,20 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 				response.Error = err.Error()
 			}
 		} else {
-			d := reflect.ValueOf(state).Elem()
-			eventPath := d.FieldByName("Event").Interface()
+			d, err := entities.UnpackSubnet(state)
+			if err != nil {
+				response.ResponseCode = 404
+				response.Error = "Event not found"
+				break
+			}
+			eventPath := d.Event
 			// := entities.EventPathFromString(eventPath)
-			path := eventPath.(entities.EventPath)
-			event, err := query.GetEventFromPath(&path)
+			//path := eventPath.(entities.EventPath)
+			// ev, err := dsquery.GetEventFromPath(&d.Event)
+			event, err := dsquery.GetEventFromPath(&eventPath)
 			if err == nil {
 				states := []json.RawMessage{}
-				states = append(states, state.(IState).MsgPack())
+				states = append(states, state)
 				data := P2pEventResponse{Event: event.MsgPack(), States: states}
 				response.Data = (&data).MsgPack()
 			} else {
@@ -373,7 +322,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			}
 
 		}
-	case P2pActionSyncBlock:
+	case P2pActionSyncCycle:
 
 		blocks := Range{}
 		encoder.MsgPackUnpackStruct(payload.Data, &blocks)
@@ -382,52 +331,123 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 
 		// fromBlock :=  new(big.Int).SetBytes(blocks.From)
 		// toBlock :=  new(big.Int).SetBytes(blocks.To)
-		var b []byte
 		// var where =  fmt.Sprintf("block_number >= %d AND block_number <= %d",  fromBlock.Uint64(), toBlock.Uint64())
-		 var where = "1=1"
-		fileName := ""
-		for _, m := range models.SyncModels {
-			switch m.(type) {
-			case models.SubnetEvent:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.SubnetEvent{}, where, fileName, config)
-			case models.SubnetState:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.SubnetState{}, where, fileName, config)
-			case models.AuthorizationEvent:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.AuthorizationEvent{}, where, fileName, config)
-			case models.AuthorizationState:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.AuthorizationState{}, where, fileName, config)
-			case models.TopicEvent:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.TopicEvent{}, where, fileName, config)
-			case models.TopicState:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.TopicState{}, where, fileName, config)
-			case models.SubscriptionEvent:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.SubscriptionEvent{}, where, fileName, config)
-			case models.SubscriptionState:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.SubscriptionState{}, where, fileName, config)
-			case models.MessageEvent:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.MessageEvent{}, where, fileName, config)
-			case models.MessageState:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.MessageState{}, where, fileName, config)
-			case models.EventCounter:
-				b, err = query.GenerateImportScript(sql.SqlDb, models.EventCounter{}, where, fileName, config)
-			default:
-				logger.Println("Unknown type or not a struct")
-			}
+		//  var where = "1=1"
+		
+		endBlock := new(big.Int).Sub(chain.NetworkInfo.CurrentBlock, big.NewInt(5))
+		from := new(big.Int).SetBytes(blocks.From)
+		if from.Cmp(endBlock) == 1 {
+				// Path does not exist
+				response.ResponseCode = apperror.BadRequestError
+				response.Error = "invalid from in range"
+				break
+		}
+		to := new(big.Int).SetBytes(blocks.To)
+		if to.Cmp(endBlock) == 1 {
+			to = endBlock
+		}
+		fromCycle, err := chain.DefaultProvider(cfg).GetCycle(from)
 			if err != nil {
-				logger.Error("SQLERROR", err)
-				response.ResponseCode = 404
-				response.Error = "Event not found"
+				response.ResponseCode = apperror.InternalError
+				response.Error = "could not get block cycle"
 				break
 			}
-			buffer.Write(b)
-			buffer.Write([]byte(":|"))
+			
+		toCycle, err := chain.DefaultProvider(cfg).GetCycle(to)
+			if err != nil {
+				response.ResponseCode = apperror.InternalError
+				response.Error = "could not get block cycle"
+				break
+			}
+
+		for i := fromCycle.Uint64(); i <= toCycle.Uint64(); i++ {
+			if i != 102 {
+				continue
+			}
+	 		cycleDir := filepath.Join(cfg.ArchiveDir, fmt.Sprint(i))
+			 _, err = os.Stat(cycleDir)
+			 if err != nil && !os.IsNotExist(err) {
+				response.ResponseCode = apperror.InternalError
+				response.Error = err.Error()
+				break
+			}
+			 files, err := utils.ListFilesInDir(cycleDir)
+			 if err != nil {
+				response.ResponseCode = 500
+				response.Error = err.Error()
+			 }
+			
+			 for _, file := range files {
+				if !strings.HasSuffix(file, ".dat") {
+					continue
+				}
+				data, err := os.ReadFile(filepath.Join(cycleDir, file))
+				if err != nil {
+					fmt.Println("Error reading file:", err)
+					response.ResponseCode = 500
+					response.Error = err.Error()
+				}
+				buffer.Write(data)
+			 }
+			 logger.Infof("SyncCycle: %d, %d, %v", i,  new(big.Int).SetBytes(blocks.To).Uint64(),buffer.Len())
+			if err != nil {
+					response.ResponseCode = 404
+					response.Error = "Event not found"
+					break
+			}
+			
 		}
-		response.Data, err = utils.CompressToGzip(buffer.Bytes())
-		if err != nil {
-			logger.Error("GZIP", err)
-			response.ResponseCode = 404
-			response.Error = err.Error()
-		}
+
+		// for i := from.Uint64(); i <= to.Uint64(); i++ {
+		
+		// 	cycle, err := chain.DefaultProvider(cfg).GetCycle(new(big.Int).SetUint64(i))
+		// 	if err != nil {
+		// 		response.ResponseCode = apperror.InternalError
+		// 		response.Error = "could not get block cycle"
+		// 		break
+		// 	}
+			
+		// 	 cycleDir := filepath.Join(cfg.ArchiveDir, cycle.String())
+		// 	 _, err = os.Stat(cycleDir)
+		// 	 if err != nil && !os.IsNotExist(err) {
+		// 		response.ResponseCode = apperror.InternalError
+		// 		response.Error = err.Error()
+		// 		break
+		// 	}
+		// 	 files, err := utils.ListFilesInDir(cycleDir)
+		// 	 if err != nil {
+		// 		response.ResponseCode = 500
+		// 		response.Error = err.Error()
+		// 	 }
+			
+		// 	 for _, file := range files {
+		// 		if !strings.HasSuffix(file, ".dat") {
+		// 			continue
+		// 		}
+		// 		data, err := os.ReadFile(filepath.Join(cycleDir, file))
+		// 		if err != nil {
+		// 			fmt.Println("Error reading file:", err)
+		// 			response.ResponseCode = 500
+		// 			response.Error = err.Error()
+		// 		}
+		// 		buffer.Write(data)
+				
+		// 	 }
+		// 	 logger.Infof("SyncBlock: %d, %d, %v", i,  new(big.Int).SetBytes(blocks.To).Uint64(), err)
+		// 	if err != nil {
+		// 			response.ResponseCode = 404
+		// 			response.Error = "Event not found"
+		// 			break
+		// 	}
+			
+		// }
+			
+		response.Data = buffer.Bytes()
+		// if err != nil {
+		// 	logger.Error("GZIP", err)
+		// 	response.ResponseCode = 404
+		// 	response.Error = err.Error()
+		// }
 
 	case P2pActionGetCommitment:
 
@@ -440,9 +460,11 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			response.Error = err.Error()
 		}
 		//  cycleKey :=  fmt.Sprintf("%s/%d", response.Signer, batch.Cycle)
-		subnetList := []models.EventCounter{}
+		// subnetList := []models.EventCounter{}
 		claimed := false
-		err = query.GetManyWithLimit(models.EventCounter{Cycle: &batch.Cycle, Validator: entities.PublicKeyString(hex.EncodeToString(payload.Signer)), Claimed: &claimed}, &subnetList, &map[string]query.Order{"count": query.OrderDec}, entities.MaxBatchSize, batch.Index*entities.MaxBatchSize)
+		subnetList, err := dsquery.GetCycleCounts( batch.Cycle,  entities.PublicKeyString(hex.EncodeToString(payload.Signer)),  &claimed, nil, &dsquery.QueryLimit{Limit: entities.MaxBatchSize, Offset: batch.Index*entities.MaxBatchSize} )
+		// err = query.GetManyWithLimit(models.EventCounter{Cycle: &batch.Cycle, Validator: entities.PublicKeyString(hex.EncodeToString(payload.Signer)), Claimed: &claimed}, &subnetList, &map[string]query.Order{"count": query.OrderDec}, entities.MaxBatchSize, batch.Index*entities.MaxBatchSize)
+		
 		if err != nil {
 			return nil, err
 		}
@@ -500,13 +522,13 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			response.Error = "Invalid batch hash"
 		}
 
-		validCommitmentKey := datastore.NewKey(fmt.Sprintf("commitment/%s", hex.EncodeToString(claimHash[:])))
+		validCommitmentKey := datastore.NewKey(fmt.Sprintf("commit/%s", hex.EncodeToString(claimHash[:])))
 		logger.Debugf("CommitmentKey1: %s", validCommitmentKey.String())
 
 		if response.ResponseCode == 0 {
 			pk, _ := btcec.PrivKeyFromBytes(config.PrivateKeySECP)
 			nonce, noncePublicKey := schnorr.ComputeNonce(pk, claimHash)
-			err = claimedRewardStore.Put(*ctx, validCommitmentKey, nonce.Bytes())
+			err = stores.ClaimedRewardStore.Put(*ctx, validCommitmentKey, nonce.Bytes())
 			if err != nil {
 				logger.Errorf("FailedStoringComittemnt: %v", err)
 				response.ResponseCode = 500
@@ -530,7 +552,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		validCommitmentKey := datastore.NewKey(fmt.Sprintf("commitment/%s", hex.EncodeToString(sigData.ProofHash)))
 		logger.Debugf("CommitmentKey2: %s", validCommitmentKey.String())
 
-		nonce, err := claimedRewardStore.Get(*ctx, validCommitmentKey)
+		nonce, err := stores.ClaimedRewardStore.Get(*ctx, validCommitmentKey)
 		if err != nil {
 			response.ResponseCode = 500
 			response.Error = "Internal error"
@@ -665,8 +687,14 @@ func extractQuicAddress(cfg *configs.MainConfiguration, maddrs []multiaddr.Multi
 	var idx int
 	var found bool
 	for i, addr := range maddrs {
-		if !isRemote(addr) {
-			continue
+		if len(cfg.SyncHost) > 0 {
+			if !strings.Contains(addr.String(), cfg.SyncHost) {
+				continue
+			}
+		} else {
+			if  !isRemote(addr) {
+				continue
+			}
 		}
 		if strings.Contains(addr.String(), "/quic-v1/") {
 			idx = i

@@ -147,7 +147,7 @@ func GetSignerECC(message *[]byte, signature *string) (string, error) {
 
 func VerifySignatureECC(signer string, message *[]byte, signature string) bool {
 	decodedSigner, err := GetSignerECC(message, &signature)
-	fmt.Printf("message decoded signer %s %s %s : %v === %s", message, decodedSigner, signer, (decodedSigner == signer), signature)
+	logger.Debugf("message decoded signer %s %s %s : %v === %s", message, decodedSigner, signer, (decodedSigner == signer), signature)
 	if err != nil {
 		return false
 	}
@@ -450,12 +450,12 @@ type CertData struct {
 }
 func GetOrGenerateCert(ctx *context.Context) *CertData {
 	cd := &CertData{}
-	systemStore, ok := (*ctx).Value(constants.SystemStore).(*mlds.Datastore)
+	SystemStore, ok := (*ctx).Value(constants.SystemStore).(*mlds.Datastore)
 	if !ok {
 		logger.Fatal("Unable to connect to counter data store")
 	}
 	certKey := datastore.NewKey("/cert")
-		certData, err := systemStore.Get(*ctx, certKey)
+		certData, err := SystemStore.Get(*ctx, certKey)
 		if err != nil  && err != datastore.ErrNotFound {
 			logger.Fatal("unable to load server certdata")
 		}
@@ -494,7 +494,7 @@ func GetOrGenerateCert(ctx *context.Context) *CertData {
 			if err != nil {
 				logger.Fatal(cd, err)
 			}
-			if err = systemStore.Set(*ctx, certKey, cdBytes, true); err != nil {
+			if err = SystemStore.Set(*ctx, certKey, cdBytes, true); err != nil {
 				logger.Fatal(err)
 			}
 		} else {

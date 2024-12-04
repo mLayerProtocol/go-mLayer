@@ -55,7 +55,7 @@ const (
 	P2pActionGetSentryProof P2pAction = 4
 	P2pActionGetTokenProof P2pAction = 5
 	P2pActionGetState P2pAction = 6
-	P2pActionSyncBlock P2pAction = 7
+	P2pActionSyncCycle P2pAction = 7
 	P2pActionGetCert P2pAction = 8
 	
 	
@@ -149,10 +149,10 @@ func (p *P2pPayload) SendDataRequest(receiverPublicKey string) (*P2pPayload, err
 		return nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
 	}
 	
-	return p.SendRequestToAddress(p.config.PrivateKeyEDD, address, DataRequest)
+	return p.SendRequestToAddress(p.config.PrivateKeyEDD, address, DataRequest, receiverPublicKey)
 }
 func (p *P2pPayload) SendSyncRequest(receiverPublicKey string) (*P2pPayload, error) {
-	p.Action = P2pActionSyncBlock
+	p.Action = P2pActionSyncCycle
 	// defer func() {
 	// 	if r := recover(); r != nil {
 	// 		logger.Errorf("Recovered from panic:", r)
@@ -163,11 +163,11 @@ func (p *P2pPayload) SendSyncRequest(receiverPublicKey string) (*P2pPayload, err
 		return nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
 	}
 	
-	return p.SendRequestToAddress(p.config.PrivateKeyEDD, address, SyncRequest)
+	return p.SendRequestToAddress(p.config.PrivateKeyEDD, address, SyncRequest, receiverPublicKey)
 }
 
 func (p *P2pPayload) SendQuicSyncRequest(hostAddress multiaddr.Multiaddr, validSigner entities.PublicKeyString) (*P2pPayload, error) {
-	p.Action = P2pActionSyncBlock
+	p.Action = P2pActionSyncCycle
 	p.Sign(p.config.PrivateKeyEDD)
 	// addr := "127.0.0.1:9533"
 	// logger.Debugf("Sending quic request to: %s", hostAddress)
@@ -188,8 +188,25 @@ func (p *P2pPayload) SendQuicSyncRequest(hostAddress multiaddr.Multiaddr, validS
 	return response, err
 }
 
+func (p *P2pPayload) SendRequestToAddress(privateKey []byte, address multiaddr.Multiaddr,  _type RequestType, validSigner string) (*P2pPayload, error) {
+		p.Sign(privateKey)
+		data, err := SendSecureQuicRequest(p.config, address, entities.PublicKeyString(validSigner), p.MsgPack())
+		if err != nil {
+			return nil, err
+		}
+		logger.Infof("Validatorrrr %s", validSigner)
+		resp, err := UnpackP2pPayload(data)
+		if err != nil {
+			logger.Debugf("UnpackQuicREadBYtes: %v", err)
+			return resp, err
+		}
+		if len(resp.Signer) > 0 && !resp.IsValid(p.ChainId) {
+			return nil, apperror.Unauthorized("response is invalid")
+		}
+		return resp, nil
+}
 
-func (p *P2pPayload) SendRequestToAddress(privateKey []byte, address multiaddr.Multiaddr, _type RequestType) (*P2pPayload, error) {
+func (p *P2pPayload) SendP2pRequestToAddress(privateKey []byte, address multiaddr.Multiaddr, _type RequestType) (*P2pPayload, error) {
 	p.Sign(privateKey)
 	peer,  dataStream, syncStream, err := connectToNode(address, *p.config.Context)
 	if err != nil {
@@ -276,7 +293,14 @@ func GetState(config *configs.MainConfiguration, path entities.EntityPath,  vali
 	if validator == nil {
 		validator = &path.Validator
 	}
-	resp, err := (&pl).SendDataRequest(string(*validator))
+	// resp, err := (&pl).SendDataRequest(string(*validator))
+	address, err := GetNodeAddress(pl.config.Context, string(*validator))
+	logger.Infof("NODEADDRESSS: %s", address)
+	if err != nil {
+		return nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
+	}
+	
+	resp, err :=  (&pl).SendRequestToAddress(pl.config.PrivateKeyEDD, address, DataRequest, string(*validator))
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +323,12 @@ func GetEvent(config *configs.MainConfiguration, eventPath entities.EventPath, v
 	if validator == nil {
 		validator = &eventPath.Validator
 	}
-	resp, err := (&pl).SendDataRequest(string(*validator))
+	address, err := GetNodeAddress(pl.config.Context, string(*validator))
+	logger.Infof("NODEADDRESSS: %s", address)
+	if err != nil {
+		return nil, nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
+	}
+	resp, err :=  (&pl).SendRequestToAddress(pl.config.PrivateKeyEDD, address, DataRequest, string(*validator))
 	if err != nil {
 		return nil, nil, err
 	}

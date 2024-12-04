@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	// "math"
 	"strings"
@@ -124,8 +125,8 @@ type Message struct {
 	Receiver DIDString   `json:"r,omitempty"`
 	Data     string          `json:"d"`
 	DataType     constants.DataType      `json:"dTy"`
-	Actions  []MessageAction `json:"a" gorm:"json;"`
-	Sender  DIDString `json:"s"`
+	Actions  []MessageAction `json:"a,omitempty" gorm:"json;"`
+	Sender  DIDString `json:"s,omitempty"`
 	// Length int `json:"len"`
 	
 	Nonce uint64 `json:"nonce,omitempty" binding:"required"`
@@ -137,21 +138,25 @@ type Message struct {
 	Hash        string              `json:"h"`
 	// Attachments []MessageAttachment `json:"atts" gorm:"json;"`
 	// Subject     string              `json:"s"`
-	Signature string `json:"sig"`
+	Signature string `json:"sig,omitempty"`
 	// Origin      string              `json:"o"`
-	DataHash string `json:"dH"`
-	Url      string `json:"url"`
-	BlockNumber uint64          `json:"blk"`
-	Cycle   	uint64			`json:"cy"`
-	Epoch		uint64			`json:"ep"`
-
+	DataHash string `json:"dH,omitempty"`
+	Url      string `json:"url,omitempty"`
+	BlockNumber uint64          `json:"blk,omitempty"`
+	Cycle   	uint64			`json:"cy,omitempty"`
+	Epoch		uint64			`json:"ep,omitempty"`
+	Subnet		string			`json:"snet,omitempty" gorm:"-"`
+	EventSignature  string    `json:"csig,omitempty"`
+	EventTimestamp uint64 		`json:"ets,omitempty"`
 	// DEPRECATED COLUMNS
 	// TopicId string        `json:"-" gorm:"-" msgpack:"-"`
 	// Attachments  string `json:"-" gorm:"-" msgpack:"-"`
-	
 }
 
-func (chatMessage Message) ToString() string {
+func (d Message) GetSignature() (string) {
+	return d.EventSignature
+}
+func (chatMessage Message) ToString() (string, error) {
 	values := []string{}
 
 	values = append(values, string(chatMessage.Receiver))
@@ -180,7 +185,7 @@ func (chatMessage Message) ToString() string {
 
 	values = append(values, fmt.Sprintf("%s", _action))
 
-	return strings.Join(values, "")
+	return strings.Join(values, ""), nil
 }
 
 func (msg Message) GetHash() ([]byte, error) {
@@ -193,6 +198,69 @@ func (msg Message) GetHash() ([]byte, error) {
 	}
 	return cryptoEth.Keccak256Hash(b).Bytes(), nil
 }
+
+func (item *Message) DataKey() string {
+	return fmt.Sprintf(DataKey, GetModel(item), item.Event.Hash )
+}
+
+
+func (g *Message) GetKeys() (keys []string)  {
+	
+	if g.EventTimestamp == 0 {
+		g.EventTimestamp = uint64(time.Now().UnixMilli())
+	}
+	keys = append(keys, g.Key())
+	keys = append(keys, g.DataKey())
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageReceiverKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)), g.Event.Hash ))
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageSenderKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.Hash))
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageSenderReceiverKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.Hash))
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.TopicMessageKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.Hash))
+	keys = append(keys, g.UniqueId())
+	
+	// keys = append(keys, g.GetEventStateKey())
+	// keys = append(keys, fmt.Sprintf("%s/%d/%s", AuthModel, g.Cycle, g.ID))
+	return keys;
+}
+func (g Message) TopicMessageKey() (string) {
+   return fmt.Sprintf("top/%s", g.Topic )
+}
+
+func (msg *Message) Key() string {
+	if msg.ID == "" {
+		msg.ID, _ = GetId(msg)
+	}
+	return fmt.Sprintf("id/%s",  msg.ID)
+}
+
+func (msg *Message) UniqueId() string {
+	return msg.Hash[0:32]
+}
+
+
+func (g *Message) MessageSenderKey() (string) {
+	if (g.Topic != "") {
+		return fmt.Sprintf("s/%s/%s", g.Sender, g.Topic)
+	} else {
+		return fmt.Sprintf("s/%s", g.Sender)
+	}
+}
+
+func (g *Message) MessageReceiverKey() (string) {
+	if (g.Topic != "") {
+		return fmt.Sprintf("%s/s/%s/%s", MessageModel, g.Receiver, g.Topic)
+	} else {
+		return fmt.Sprintf("%s/s/%s", MessageModel, g.Receiver)
+	}
+}
+
+func (g *Message) MessageSenderReceiverKey() (string) {
+	if (g.Topic != "") {
+		return fmt.Sprintf("%s/s/%s/%s/%s", MessageModel, g.Sender, g.Receiver, g.Topic)
+	} else {
+		return fmt.Sprintf("%s/s/%s/%s", MessageModel, g.Receiver, g.Receiver)
+	}
+}
+
 
 func (msg Message) EncodeBytes() ([]byte, error) {
 	// var attachments []byte

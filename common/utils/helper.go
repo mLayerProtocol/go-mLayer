@@ -13,6 +13,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -104,7 +105,57 @@ func CopyStructValues(src, dst interface{}) error {
 
 	return nil
 }
+func UpdateStruct(src, dst interface{}) {
+	srcVal := reflect.ValueOf(src).Elem()
+	dstVal := reflect.ValueOf(dst).Elem()
 
+	for i := 0; i < srcVal.NumField(); i++ {
+		srcField := srcVal.Field(i)
+		dstField := dstVal.Field(i)
+
+		// Skip if srcField is zero
+		if IsZero(srcField) {
+			continue
+		}
+
+		// Handle pointers: only set if non-nil
+		if srcField.Kind() == reflect.Ptr {
+			if !srcField.IsNil() {
+				// If dstField is a pointer but nil, initialize it to avoid panic
+				if dstField.IsNil() {
+					dstField.Set(reflect.New(dstField.Type().Elem()))
+				}
+				dstField.Elem().Set(srcField.Elem())
+			}
+		} else {
+			// For non-pointer fields, copy directly
+			dstField.Set(srcField)
+		}
+	}
+}
+
+func IsZero(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Ptr:
+		return v.IsNil()
+	case reflect.Slice, reflect.Map, reflect.Array:
+		return v.Len() == 0
+	case reflect.Struct:
+		// Check each field in the struct for "zero" status
+		for i := 0; i < v.NumField(); i++ {
+			if !IsZero(v.Field(i)) {
+				return false
+			}
+		}
+		return true
+	default:
+		// Check if the type is comparable before using Interface comparison
+		if v.Type().Comparable() {
+			return v.Interface() == reflect.Zero(v.Type()).Interface()
+		}
+	}
+	return false
+}
 func StructToMap(input interface{}) map[string]interface{} {
 	output := make(map[string]interface{})
 
@@ -187,9 +238,26 @@ func Lcg(seed uint64)  (*big.Int) {
     return new(big.Int).SetBytes(b)
 }
 
+func BoolPtr(b bool) *bool {
+    return &b
+}
+func TruePtr() *bool {
+	var b = true
+    return &b
+}
+
+
+func FalsePtr() *bool {
+	var b = false
+    return &b
+}
 
 func UuidToBytes(uuid string) ([]byte) {
-	b, _ :=  hex.DecodeString(strings.ReplaceAll(uuid, "-", ""))
+	hexStr := strings.ReplaceAll(uuid, "-", "")
+	if len(hexStr) == 0 {
+		return []byte{}
+	}
+	b, _ :=  hex.DecodeString(hexStr)
 	return b
 }
 
@@ -299,7 +367,6 @@ func ToStringSlice(slice []interface{}) []string {
 }
 func ParseQueryString(c *gin.Context) (*[]byte, error) {
 	rawQuery := c.Request.URL.Query()
-	logger.Debug("rawQuery:: ", rawQuery)
 	var query map[string]any = map[string]any{}
 	for key, v := range rawQuery {
 		if len(v) > 0 {
@@ -307,7 +374,6 @@ func ParseQueryString(c *gin.Context) (*[]byte, error) {
 		}
 
 	}
-	logger.Debug("query:: ", query)
 	b, requestErr := json.Marshal(query)
 	if requestErr != nil {
 		return nil, requestErr
@@ -451,4 +517,41 @@ func MatchUrlPath(pattern, path string) (exist bool, params map[string]string) {
 		return false, nil
 	}
 	return true, params
+}
+
+func IntMilliToTimestampString( milliseconds int64) string {
+    // Convert microseconds to nanoseconds
+    nanoseconds := milliseconds * 1_000_000
+    timestamp := time.Unix(0, nanoseconds)
+    return  timestamp.Format("20060102150405000") // No dot bef
+}
+
+func ListFilesInDir(directory string) ([]string, error) {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".") || !strings.HasSuffix(entry.Name(), ".dat") {
+			continue
+		}
+		files = append(files, entry.Name())
+	}
+
+	// Sort alphabetically
+	sort.Strings(files)
+	return files, nil
+}
+
+func WriteBytesToFile(filePath string, data []byte) error {
+	// Open the file in append mode, create if it doesn't exist
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.Write(data)
+	return err
 }

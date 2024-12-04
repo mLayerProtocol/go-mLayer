@@ -53,7 +53,7 @@ type TopicEvent struct {
 // 		}
 // 		return authState, apperror.Internal(err.Error())
 // 	}
-// 	if  authState.Priviledge < constants.StandardPriviledge {
+// 	if  authState.Priviledge < constants.MemberPriviledge {
 // 		return authState, apperror.Forbidden("Agent does not have enough permission to create topics")
 // 	}
 	
