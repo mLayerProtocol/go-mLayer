@@ -81,7 +81,7 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 	if err != nil {
 		return nil, err
 	}
-	action :=  "Subnet"
+	action :=  "write_subnet"
 	switch subnet.SignatureData.Type {
 	case entities.EthereumPubKey:
 		authMsg := fmt.Sprintf(constants.SignatureMessageString, action, chainID, subnet.Ref, encoder.ToBase64Padded(msg))
