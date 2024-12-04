@@ -85,7 +85,7 @@ const (
 	CategoryFileSharing   SubnetCategory = 11
 )
 
-const SignatureMessageString string = `{"action":"%s","network":"%s","identifier":"%s","hash":"%s"}`
+const SignatureMessageString string = `{"action":"%s","identifier":"%s","network":"%s","hash":"%s"}`
 
 
 const MAX_SYNC_FILE_SIZE  = 100 * 1024 * 1024 // 100 MB
