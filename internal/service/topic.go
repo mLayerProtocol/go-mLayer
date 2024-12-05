@@ -160,13 +160,13 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 		if err != nil {
 			// update error and mark as synced
 			// notify validator of error
-			saveTopicEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced: utils.TruePtr()}, nil, tx)
+			saveTopicEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced: utils.TruePtr()}, &txn, nil)
 			
 		} else {
 			// TODO if event is older than our state, just save it and mark it as synced
-			_, err := saveTopicEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, nil, tx)
+			_, err := saveTopicEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
 			stateSaved := false
-			eventSaved := false
+			eventSaved := err == nil
 			if err == nil && eventIsMoreRecent {
 				logger.Debug("ISMORERECENT", eventIsMoreRecent)
 				// update state
@@ -177,21 +177,27 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 						// TODO worker that will retry processing unSynced valid events with error
 						_, err = saveTopicEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
 						eventSaved = err == nil
+						logger.Infof("COMMITING_EVENT 1 %v, %v", eventSaved, err)
 					}
 				} else {
 					_, err = dsquery.CreateTopicState(&data, &stateTxn)
 					stateSaved = err == nil
+					logger.Infof("COMMITING_EVENT Topic %v", err)
 					if err != nil {
 						stateTxn.Discard(context.Background())
 						// TODO worker that will retry processing unSynced valid events with error
 						_, err = saveTopicEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
 						eventSaved = err == nil
+						logger.Infof("COMMITING_EVENT 2 %v, %v", eventSaved, err)
 					}
 				}
+				
 				if stateSaved {
 					err = stateTxn.Commit(context.Background())
 				}
+				
 				if eventSaved && err == nil {
+					
 					err = txn.Commit(context.Background())
 					// ev, _ := dsquery.GetEventById(event.ID, entities.TopicModel)
 					// logger.Infof("EVENTIDCOMMITEDUPDATE: %s, %v, %v", ev.ID, err, ev.Synced)
@@ -207,7 +213,7 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 					}, &event.ID)
 				}()
 			} else {
-				logger.Errorf("save event error %v", err)
+				logger.Errorf("save event error: %v", err)
 				return err
 			}
 

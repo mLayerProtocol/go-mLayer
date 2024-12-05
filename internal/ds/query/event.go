@@ -199,7 +199,7 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 		} else {
 			count = new(big.Int).Add(new(big.Int).SetBytes(value), big.NewInt(1))
 		}
-		logger.Infof("IncrementingCounterForSubnet: %s", key)
+		logger.Infof("IncrementingCounterForSubnet: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
 		err = txn.Put(context.Background(), key, count.Bytes())
 		if err != nil {
 			return err

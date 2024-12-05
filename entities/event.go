@@ -592,7 +592,7 @@ func CycleCounterKey(cycle uint64, validator *PublicKeyString, claimed *bool, su
 
 func NetworkCounterKey(subnet *string) string {
 	if subnet == nil {
-		return "net"
+		return "net/"
 	}
 	return fmt.Sprintf("net/%s", *subnet)
 }
