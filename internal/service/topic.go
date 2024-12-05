@@ -150,11 +150,11 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 	}
 	err = dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, &txn)
 	if err != nil { 
+		logger.Errorf("ErorrIncrementingCounters: %v", err)
 		return err
 	}
+	logger.Infof("SuccessfullyIncrementingCounters")
 	if previousEventUptoDate && authEventUptoDate {
-		
-		logger.Infof("AUTHOSTTES: %v", authState)
 		_, err = ValidateTopicData(&data, authState)
 		
 		if err != nil {
