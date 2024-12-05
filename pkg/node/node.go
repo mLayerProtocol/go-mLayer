@@ -192,18 +192,10 @@ func Start(mainCtx *context.Context) {
 							return
 						}
 					}
-					go func() {
-						syncedBlockMutex.Lock()
-						defer syncedBlockMutex.Unlock()
-						if chain.NetworkInfo.Synced {
-							lastSynced, err := ds.GetLastSyncedBlock(mainCtx)
-							eventBlock := new(big.Int).SetUint64(event.BlockNumber)
-							if err == nil && lastSynced.Cmp(eventBlock) == -1 {
-								ds.SetLastSyncedBlock(mainCtx, eventBlock)
-							}
-						}
-					}()
+					
 					modelType := event.GetDataModelType()
+					event.Broadcasted = true
+					service.SaveEvent(modelType, entities.Event{}, event, nil, nil)
 					switch modelType {
 					case entities.SubnetModel:
 						service.HandleNewPubSubSubnetEvent(event, &ctx)
@@ -216,6 +208,17 @@ func Start(mainCtx *context.Context) {
 					case entities.MessageModel:
 						service.HandleNewPubSubMessageEvent(event, &ctx)
 					}
+					go func() {
+						syncedBlockMutex.Lock()
+						defer syncedBlockMutex.Unlock()
+						if chain.NetworkInfo.Synced {
+							lastSynced, err := ds.GetLastSyncedBlock(mainCtx)
+							eventBlock := new(big.Int).SetUint64(event.BlockNumber)
+							if err == nil && lastSynced.Cmp(eventBlock) == -1 {
+								ds.SetLastSyncedBlock(mainCtx, eventBlock)
+							}
+						}
+					}()
 				}()
 
 			}
