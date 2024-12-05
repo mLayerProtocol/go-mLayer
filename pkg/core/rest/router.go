@@ -555,7 +555,6 @@ func (p *RestService) Initialize() *gin.Engine {
 
 	router.GET("/api/main-stats", func(c *gin.Context) {
 		mainStats, err := client.GetMainStats(p.Cfg)
-
 		if err != nil {
 			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))

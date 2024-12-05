@@ -149,26 +149,25 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 	// var mainStat []entities.MainStat
 	var accountCount uint64
 	var agentCount uint64
-	
-
 	// err := query.GetTx().Model(&models.AuthorizationState{}).Group("account").Count(&accountCount).Error
 	totalEventsCount, err := dsquery.GetNetworkCounts(nil, dsquery.DefaultQueryLimit)
 	if err != nil {
 		if dsquery.IsErrorNotFound(err) {
-			return nil, nil
+			return &entities.MainStat{}, nil
 		}
-		return nil, err
+		return &entities.MainStat{}, err
 	}
 
-	logger.Infof("TotalsCount: %v", totalEventsCount)
+
 
 	agentCounBytes, err  := stores.StateStore.Get(context.Background(), datastore.NewKey(entities.AgentCountKey()))
+	
 	if err != nil && !dsquery.IsErrorNotFound(err) {
-		return nil, err
+		return  &entities.MainStat{}, err
 	}
 	if len(agentCounBytes) > 0 {
 		if agentCountInt, err := strconv.Atoi(string(agentCounBytes)); err != nil {
-			return nil, err
+			return  &entities.MainStat{}, err
 		} else {
 			agentCount  = uint64(agentCountInt)
 		}
@@ -203,14 +202,20 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 	if err != nil {
 		panic(err)
 	}
-	msgCount := totalEventsCount[0].Count
+	
+	
+	msgCount := uint64(0)
+	if len(totalEventsCount) > 0 {
+		msgCount = *(totalEventsCount[0].Count)
+	} 
+	
 	accountCount, _ =  dsquery.GetNumAccounts()
 	return &entities.MainStat{
 		Accounts:  accountCount,
 		MessageCost:  msgCost.String(),
 		TotalValueLocked: subnetBal.String(),
-		EventCount: uint64(*msgCount),
-		TotalEventsValue: big.NewInt(1).Mul(msgCost, new(big.Int).SetUint64(*msgCount)).String(),
+		EventCount: msgCount,
+		TotalEventsValue: big.NewInt(1).Mul(msgCost, new(big.Int).SetUint64(msgCount)).String(),
 		AgentCount: agentCount,
 	}, nil
 }
