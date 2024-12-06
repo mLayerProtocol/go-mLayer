@@ -4,13 +4,13 @@ import (
 	"encoding/hex"
 	"os"
 
-	"github.com/ipfs/go-datastore"
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
+	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
@@ -71,7 +71,7 @@ func ValidateClientPayload(
 	ds *ds.Datastore,
 	payload *entities.ClientPayload,
 	strictAuth bool,
-	chainId configs.ChainId,
+	cfg *configs.MainConfiguration,
 ) (*models.AuthorizationState, *entities.DeviceString, error) {
 	
 	// _, err := payload.EncodeBytes()
@@ -84,7 +84,7 @@ func ValidateClientPayload(
 	if payload.Subnet == ""  {
 		return nil, nil, apperror.Forbidden("Subnet Id is required")
 	}
-	if string(payload.ChainId) != string(chainId) {
+	if string(payload.ChainId) != string(cfg.ChainId) {
 		return nil, nil, apperror.Forbidden("Invalid chain Id")
 	}
 	// payload.ChainId = chainId
@@ -100,13 +100,18 @@ func ValidateClientPayload(
 	// logger.Debugf("AGENTTTT %s", agent)
 	// subnet := models.SubnetState{}
 	// err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: payload.Subnet}}, &subnet)
-	subnet, err := dsquery.GetSubnetStateById(payload.Subnet)
+	 subnet , err := dsquery.GetSubnetStateById(payload.Subnet)
 	if err != nil {
 		// if err == gorm.ErrRecordNotFound {
-		if err == datastore.ErrNotFound {
-			return nil,  nil, apperror.Forbidden("Invalid subnet id")
+		if dsquery.IsErrorNotFound(err){
+			logger.Infof("GettingSubnetFrom %s", payload.Subnet )
+			subnet, err = service.UpdateSubnetFromPeer(payload.Subnet, cfg, "" )
+			if err != nil || subnet == nil || subnet.ID == "" {
+				return nil,  nil, apperror.Forbidden("Invalid subnet id")
+			}
+		} else {
+			return nil, nil, apperror.Internal(err.Error())
 		}
-		return nil, nil, apperror.Internal(err.Error())
 	}
 	if *subnet.Status ==  0 {
 		return nil, nil, apperror.Forbidden("Subnet is disabled")

@@ -22,7 +22,7 @@ import (
 var ValidCerts  = map[string]string{}
 
 func  SendSecureQuicRequest(config *configs.MainConfiguration, maddr multiaddr.Multiaddr, validSigner entities.PublicKeyString,  message []byte) ([]byte, error) {
-	ip, _, err := extractQuicAddress(config, []multiaddr.Multiaddr{maddr})
+	ip, _, err := parseQuicAddress(config, []multiaddr.Multiaddr{maddr})
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func  SendSecureQuicRequest(config *configs.MainConfiguration, maddr multiaddr.M
 		if err != nil {
 			return nil, err
 		}
-			
+		logger.Infof("SendingP2PRequestTo %s", maddr)
 		certResponse, err := certPayload.SendP2pRequestToAddress(config.PrivateKeyEDD, maddr, DataRequest)
 		if err != nil {
 			return nil, err
@@ -63,7 +63,7 @@ func  SendSecureQuicRequest(config *configs.MainConfiguration, maddr multiaddr.M
 	} else {
 		addr = ValidCerts[fmt.Sprintf("%s/addr", ip)]
 	}
-	
+logger.Infof("SendingQuicRequestTo %s", addr)
 	b, err := sendQuicRequest(addr, message, false)
 	
 	if err == ErrInvalidCert {

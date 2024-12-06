@@ -241,7 +241,6 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 
 	response = NewP2pPayload(config, P2pActionResponse, []byte{})
 	response.Id = payload.Id
-	logger.Infof("PAYLOAADDD: %d", payload.Action)
 	switch payload.Action {
 	case P2pActionGetEvent:
 		eventPath, err := entities.UnpackEventPath(payload.Data)
@@ -292,24 +291,32 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		}
 		state, err := dsquery.GetStateFromEntityPath(ePath)
 		if err != nil {
+			logger.Errorf("P2pActionGetState: %v", err)
 			if dsquery.IsErrorNotFound(err) {
 				response.ResponseCode = 404
-				response.Error = "Event not found"
+				response.Error = "State not found"
 			} else {
 				response.ResponseCode = 500
 				response.Error = err.Error()
 			}
 		} else {
-			d, err := entities.UnpackSubnet(state)
+			mapp := map[string]interface{}{}
+			err := encoder.MsgPackUnpackStruct(state, &mapp)
 			if err != nil {
 				response.ResponseCode = 404
-				response.Error = "Event not found"
+				response.Error = "State not found"
 				break
 			}
-			eventPath := d.Event
+			pathMap := mapp["e"]
+			logger.Infof("TopicEvent::: %v", pathMap)
 			// := entities.EventPathFromString(eventPath)
 			//path := eventPath.(entities.EventPath)
 			// ev, err := dsquery.GetEventFromPath(&d.Event)
+			eventPath := entities.EventPath{EntityPath: entities.EntityPath{
+				Hash: string(pathMap.(map[string]string)["h"]),
+				Model:  entities.EntityModel(string(pathMap.(map[string]string)["mod"])),
+				Validator: entities.PublicKeyString(string(pathMap.(map[string]string)["mod"])),
+			}}
 			event, err := dsquery.GetEventFromPath(&eventPath)
 			if err == nil {
 				states := []json.RawMessage{}
@@ -683,7 +690,7 @@ func HandleQuicConnection(ctx *context.Context, cfg *configs.MainConfiguration, 
 	}
 }
 
-func extractQuicAddress(cfg *configs.MainConfiguration, maddrs []multiaddr.Multiaddr) (string, multiaddr.Multiaddr, error) {
+func parseQuicAddress(cfg *configs.MainConfiguration, maddrs []multiaddr.Multiaddr) (string, multiaddr.Multiaddr, error) {
 	var idx int
 	var found bool
 	for i, addr := range maddrs {

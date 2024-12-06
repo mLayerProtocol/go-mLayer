@@ -28,10 +28,13 @@ func GetSubnetStateById(did string) (*entities.Subnet, error) {
 
 func CreateSubnetState(newState *entities.Subnet, tx *datastore.Txn) (sub *entities.Subnet, err error) {
 	ds := stores.StateStore
-	newState.ID, err = entities.GetId(newState)
+	if newState.ID == "" {
+		newState.ID, err = entities.GetId(newState)
+	}
 	if err != nil {
 		return nil, err
 	}
+	logger.Infof("CreatingSubnet... %s", newState.ID)
 	stateBytes := newState.MsgPack()
 	keys := newState.GetKeys()
 	txn, err := InitTx(ds, tx)

@@ -33,7 +33,7 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 		return nil, nil, apperror.BadRequest("Authorization duration exceeded")
 	}
 	logger.Debugf("CurrentStateEE")
-	currentState, grantorAuthState, _, err := service.ValidateAuthPayloadData(&payload, cfg.ChainId)
+	currentState, grantorAuthState, _, err := service.ValidateAuthPayloadData(&payload, cfg)
 	
 	// TODO If error is because the subnet was not found, check the dht for the subnet
 	if err != nil {

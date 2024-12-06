@@ -17,6 +17,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
+	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
@@ -37,8 +38,8 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 	var agent *entities.DeviceString
 	excludedEvents := []constants.EventType{constants.CreateSubnetEvent, constants.UpdateSubnetEvent, constants.DeleteSubnetEvent, constants.AuthorizationEvent}
 	if !slices.Contains(excludedEvents, constants.EventType(payload.EventType)) {
-		logger.Infof("ISEXLUCDED: %d",  payload.EventType)
-		authState, agent, err = ValidateClientPayload(stateDS, &payload, true, cfg.ChainId)
+		logger.Infof("ISNOTEXLUCDED: %d",  payload.EventType)
+		authState, agent, err = ValidateClientPayload(stateDS, &payload, true, cfg)
 		
 		// logger.Debugf("New Event for Agent/Device2 %s", (*agent))
 		if err != nil && err != gorm.ErrRecordNotFound && !dsquery.IsErrorNotFound(err)  {
@@ -65,7 +66,16 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		// query.GetOneState(entities.Subnet{ID: payload.Subnet}, &subnetState)
 		snet, _ := dsquery.GetSubnetStateById(payload.Subnet)
 		if err != nil {
-			return nil, err
+			if  dsquery.IsErrorNotFound(err) {
+				snet, err = service.UpdateSubnetFromPeer(payload.Subnet, cfg, "")
+				if err != nil {
+					logger.Errorf("CreateEventError: %v", err)
+					return nil, err
+				}
+			} else {
+				logger.Errorf("CreateEvent/GetSubnetError: %v", err)
+				return nil, err
+			}
 		}
 		subnetState.Subnet = *snet
 	}
@@ -143,7 +153,8 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 			return nil, apperror.Forbidden("Agent not authorized to perform this action")
 		}
 		
-		assocPrevEvent, assocAuthEvent, err = ValidateSubscriptionPayload(payload, authState)
+		logger.Infof("ValidatingTopic...")
+		assocPrevEvent, assocAuthEvent, err = ValidateSubscriptionPayload(payload, authState, cfg)
 		
 		if err != nil {
 			logger.Debugf("SubscriptionError: %+v", err)

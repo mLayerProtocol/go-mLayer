@@ -11,6 +11,8 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain/api"
+	"github.com/multiformats/go-multiaddr"
+	"golang.org/x/exp/rand"
 )
 var syncMu sync.Mutex
 type NetworkParams struct {
@@ -21,6 +23,7 @@ type NetworkParams struct {
 	ActiveValidatorLicenseCount uint64 `json:"active_validator_license_count"`
 	ActiveSentryLicenseCount uint64 `json:"active_sentry_license_count"`
 	Validators map[string]string `json:"-"`
+	SyncedValidators map[string]multiaddr.Multiaddr `json:"-"`
 	Sentries map[string]uint64 `json:"-"`
 	Config *configs.MainConfiguration `json:"-"`
 	Synced bool `json:"synced"`
@@ -38,6 +41,16 @@ func (n *NetworkParams) GetValidatorKeys(key entities.PublicKeyString) (edd enti
 		} 
 	}
 	return edd, secp
+}
+
+func (n *NetworkParams) GetRandomSyncedNode() string {
+		rand.Seed(rand.Uint64())
+		keys := make([]string, 0, len(n.SyncedValidators))
+		for key := range n.SyncedValidators {
+			keys = append(keys, key)
+		}
+		randomKey := keys[rand.Intn(len(keys))]
+		return randomKey
 }
 
 func (n *NetworkParams) IsValidator(key string) (bool, error) {
@@ -100,6 +113,7 @@ func (n *NetworkParams) Sync(ctx *context.Context, syncFunc func () bool) {
 }
 var networkInfo NetworkParams 
 var NetworkInfo = &networkInfo
+
 var APIs map[configs.ChainId]*api.IChainAPI = map[configs.ChainId]*api.IChainAPI{}
 
 func DefaultProvider(cfg *configs.MainConfiguration) api.IChainAPI {

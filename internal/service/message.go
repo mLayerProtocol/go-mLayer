@@ -160,54 +160,6 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 	data.Sender = event.Payload.Account
 	var subnet = event.Payload.Subnet
 	
-	// var localState models.MessageState
-	// err := query.GetOne(&models.TopicState{Topic: entities.Topic{ID: id}}, &localTopicState)
-
-	// err = sql.SqlDb.Where(&models.MessageState{Message: entities.Message{ ID: id, Agent: entities.AddressFromString(string(data.Agent)).ToDeviceString()}}).Take(&localState).Error
-	// if err != nil {
-	// 	logger.Error(err)
-	// }
-	// msg, err := dsquery.GetMessageByEventHash(event.Hash)
-	// if err != nil && !dsquery.IsErrorNotFound(err) {
-	// 	logger.Error("Internal Db Error")
-	// 	return 
-	// }
-	// if msg != nil {
-	// 	logger.Info("message with event already exists")
-	// 	// TODO check the state of the event and ensure that it is synced
-	// 	return
-	// }
-	
-	// var localDataState *LocalDataState
-	// if localState.ID != "" {
-	// 	localDataState = &LocalDataState{
-	// 		ID: localState.ID,
-	// 		Hash: localState.Hash,
-	// 		Event: &localState.Event,
-	// 		Timestamp: uint64(event.Payload.Timestamp),
-	// 	}
-	// }
-	// // localDataState := utils.IfThenElse(localTopicState != nil, &LocalDataState{
-	// // 	ID: localTopicState.ID,
-	// // 	Hash: localTopicState.Hash,
-	// // 	Event: &localTopicState.Event,
-	// // 	Timestamp: localTopicState.Timestamp,
-	// // }, nil)
-	// var stateEvent *entities.Event
-	// if localState.ID != "" {
-	// 	stateEvent, err = query.GetEventFromPath(&localState.Event)
-	// 	if err != nil && err != query.ErrorNotFound {
-	// 		logger.Debug(err)
-	// 	}
-	// }
-	// var localDataStateEvent *LocalDataStateEvent
-	// if stateEvent != nil {
-	// 	localDataStateEvent = &LocalDataStateEvent{
-	// 		ID: stateEvent.ID,
-	// 		Hash: stateEvent.Hash,
-	// 		Timestamp: stateEvent.Timestamp,
-	// 	}
-	// }
 
 	eventData := PayloadData{Subnet: subnet, localDataState: nil, localDataStateEvent:  nil}
 	tx := sql.SqlDb

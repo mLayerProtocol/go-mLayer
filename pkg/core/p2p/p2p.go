@@ -890,7 +890,8 @@ func storeAddress(ctx *context.Context, h *host.Host) {
 		} else {
 			logger.Debugf("Successfully saved chain key to DHT: %s", keySecP)
 		}
-		break
+		time.Sleep(5 * time.Minute)
+		// break
 		// time.Sleep(1 * time.Hour)
 		// else {
 		// 	time.Sleep(2 * time.Second)
@@ -907,8 +908,10 @@ func storeAddress(ctx *context.Context, h *host.Host) {
 func GetNodeMultiAddressData(ctx *context.Context, key string) (*NodeMultiAddressData, error) {
 	
 		key = "/ml/val/" + key
+		
 		data, err := idht.GetValue(*ctx, key)
 		if err != nil {
+			logger.Errorf("Unable to get value for dht key: %s. Error: %v", key, err)
 			return  nil, err
 		}
 		mad, err := UnpackNodeMultiAddressData(data)
@@ -941,12 +944,14 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 	// raw, _ := hostPubKey.Raw()
 	// logger.Debugf("HOSTPUBKEY2 %s ", hex.EncodeToString(pubk))
 
-	_, quicmad, err :=  extractQuicAddress(cfg, pairAddr.Addrs)
+	_, quicmad, err :=  parseQuicAddress(cfg, pairAddr.Addrs)
 	if err != nil {
 		logger.Debugf("No quic address found %v, %v", err, pairAddr.Addrs)
 		disconnect(pairAddr.ID)
 		return
 	}
+
+	
 	if !strings.Contains(quicmad.String(), "/p2p/") {
 		quicmad, _ = multiaddr.NewMultiaddr(fmt.Sprintf("%s/p2p/%s", quicmad.String(), pairAddr.ID.String()))
 	}
@@ -981,33 +986,44 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 		lastSync, err := ds.GetLastSyncedBlock(MainContext)
 		
 		if err == nil {
-			if handshake.NodeType == constants.ValidatorNodeType && new(big.Int).SetBytes(handshake.LastSyncedBlock).Cmp(lastSync) == 1 {
-				isBootStrap := false
-				for _, p := range cfg.BootstrapPeers {
-					if strings.Contains(p, pairAddr.ID.String()) {
-						isBootStrap = true
-						break
-					}
+			if handshake.NodeType == constants.ValidatorNodeType {
+				if new(big.Int).SetBytes(handshake.LastSyncedBlock).Uint64() > chain.NetworkInfo.CurrentBlock.Uint64() - 5 {
+					addr := ExtractQuicMultiAddress(ToMultiAddressStrings(pairAddr.ID, pairAddr.Addrs))
+					logger.Infof("SyncedValidators: %s, %s, %v", hex.EncodeToString(handshake.Signer), addr.String(), true)
+					chain.NetworkInfo.SyncedValidators[hex.EncodeToString(handshake.Signer)] = addr
+				} else {
+					logger.Infof("SyncedValidators: %s, %v", hex.EncodeToString(handshake.Signer), false)
+					// chain.NetworkInfo.SyncedValidators[hex.EncodeToString(handshake.Signer)] = false
 				}
-				if !isBootStrap {
-					return
-				}
-				
-				syncMutex.Lock()
-				defer syncMutex.Unlock()
-				
-				if !chain.NetworkInfo.Synced  {
-					// hostIP, err := extractIP((stream).Conn().RemoteMultiaddr())
-					//if err == nil {
-					err :=	SyncNode(cfg, new(big.Int).SetBytes(handshake.LastSyncedBlock), quicmad, hex.EncodeToString(handshake.PubKeyEDD))	
-					if err == nil  {
-						lastSync, _ := ds.GetLastSyncedBlock(MainContext)
-						if lastSync.Cmp(new(big.Int).Sub(chain.NetworkInfo.CurrentBlock, big.NewInt(50))) >= 0 {
-							chain.NetworkInfo.Synced = true
+				if new(big.Int).SetBytes(handshake.LastSyncedBlock).Cmp(lastSync) == 1 {
+					isBootStrap := false
+					for _, p := range cfg.BootstrapPeers {
+						if strings.Contains(p, pairAddr.ID.String()) {
+							isBootStrap = true
+							break
 						}
-					} else {
-						logger.Errorf("Failed to sync with peer: %v", err)
-						// wait for another node
+					}
+					if !isBootStrap {
+						return
+					}
+					
+					syncMutex.Lock()
+					defer syncMutex.Unlock()
+					
+					if !chain.NetworkInfo.Synced  {
+						
+						// hostIP, err := extractIP((stream).Conn().RemoteMultiaddr())
+						//if err == nil {
+						err :=	SyncNode(cfg, new(big.Int).SetBytes(handshake.LastSyncedBlock), quicmad, hex.EncodeToString(handshake.PubKeyEDD))	
+						if err == nil  {
+							lastSync, _ := ds.GetLastSyncedBlock(MainContext)
+							if lastSync.Cmp(new(big.Int).Sub(chain.NetworkInfo.CurrentBlock, big.NewInt(50))) >= 0 {
+								chain.NetworkInfo.Synced = true
+							}
+						} else {
+							logger.Errorf("Failed to sync with peer: %v", err)
+							// wait for another node
+						}
 					}
 				}
 			}
@@ -1186,17 +1202,21 @@ func connectToNode(targetAddr multiaddr.Multiaddr, ctx context.Context) (pid *pe
 }
 
 func GetMultiAddresses(h host.Host) []string {
+	return ToMultiAddressStrings(h.ID(), h.Addrs())
+}
+
+func ToMultiAddressStrings(id peer.ID, addr []multiaddr.Multiaddr) []string {
 	m := []string{}
-	addrs := h.Addrs()
+	addrs := addr
 	for _, addr := range addrs {
 		if !isRemote(addr) {
 			continue
 		}
-		m = append(m, fmt.Sprintf("%s/p2p/%s", addr.String(), h.ID().String()))
+		m = append(m, fmt.Sprintf("%s/p2p/%s", addr.String(), id.String()))
 	}
 	if len(m) == 0 {
 		for _, addr := range addrs {
-			m = append(m, fmt.Sprintf("%s/p2p/%s", addr, h.ID().String()))
+			m = append(m, fmt.Sprintf("%s/p2p/%s", addr, id.String()))
 		}
 	}
 	return m
@@ -1337,20 +1357,24 @@ func GetNodeAddress(ctx *context.Context, pubKey string) (multiaddr.Multiaddr, e
 		logger.Error("KDHT_GET_ERROR: ", err)
 		return nil, err
 	}
-	addr, found := utils.Find(mad.Addresses, func (ma string) bool  {
+	return ExtractQuicMultiAddress(mad.Addresses), nil
+}
+
+func ExtractQuicMultiAddress(addresses []string) multiaddr.Multiaddr {
+	
+	addr, found := utils.Find(addresses, func (ma string) bool  {
 		return strings.Contains(ma, "/quic") && !strings.Contains(ma, "/webtransport")
 	}) 
 	if !found {
-		addr, found = utils.Find(mad.Addresses, func (ma string) bool  {
+		addr, found = utils.Find(addresses, func (ma string) bool  {
 			return strings.Contains(ma, "/webtransport")
 		}) 
 	}
 	if !found {
-		addr = mad.Addresses[0]
+		addr = addresses[0]
 	}
-	return multiaddr.StringCast(addr), nil
+	return multiaddr.StringCast(addr)
 }
-
 
 func PublishEvent(event entities.Event) *models.EventInterface {
 	eventPayloadType := entities.GetModelTypeFromEventType(constants.EventType(event.EventType))

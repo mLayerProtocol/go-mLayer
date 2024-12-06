@@ -15,6 +15,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/sirupsen/logrus"
@@ -294,10 +295,14 @@ func GetState(config *configs.MainConfiguration, path entities.EntityPath,  vali
 		validator = &path.Validator
 	}
 	// resp, err := (&pl).SendDataRequest(string(*validator))
-	address, err := GetNodeAddress(pl.config.Context, string(*validator))
-	logger.Infof("NODEADDRESSS: %s", address)
-	if err != nil {
-		return nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
+	var err error
+	
+	address := chain.NetworkInfo.SyncedValidators[string(*validator)]
+	if address == nil {
+		address, err = GetNodeAddress(config.Context, string(*validator))
+		if err != nil || address == nil {
+			return nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
+		}
 	}
 	
 	resp, err :=  (&pl).SendRequestToAddress(pl.config.PrivateKeyEDD, address, DataRequest, string(*validator))
@@ -309,11 +314,13 @@ func GetState(config *configs.MainConfiguration, path entities.EntityPath,  vali
 	}
 	data, err := UnpackP2pEventResponse(resp.Data)
 	if err != nil {
+		logger.Errorf("ErrorUnpackingResponse %v", resp.Data)
 		return nil, err
 	}
 	if len(data.States) == 0 {
-		return nil, apperror.NotFound("subnet not found")
+		return nil, apperror.NotFound("state not found")
 	}
+	logger.Infof("TopicData: %v", data.States[0])
 	return &data, encoder.MsgPackUnpackStruct(data.States[0], &result)
 }
 
@@ -323,10 +330,13 @@ func GetEvent(config *configs.MainConfiguration, eventPath entities.EventPath, v
 	if validator == nil {
 		validator = &eventPath.Validator
 	}
-	address, err := GetNodeAddress(pl.config.Context, string(*validator))
-	logger.Infof("NODEADDRESSS: %s", address)
-	if err != nil {
-		return nil, nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
+	var err error
+	address := chain.NetworkInfo.SyncedValidators[string(*validator)]
+	if address == nil {
+		address, err = GetNodeAddress(config.Context, string(*validator))
+		if err != nil || address == nil {
+			return nil, nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
+		}
 	}
 	resp, err :=  (&pl).SendRequestToAddress(pl.config.PrivateKeyEDD, address, DataRequest, string(*validator))
 	if err != nil {
@@ -342,7 +352,7 @@ func GetEvent(config *configs.MainConfiguration, eventPath entities.EventPath, v
 		return nil, nil, err
 	}
 	if len(data.Event) == 0 {
-		return nil, nil, apperror.NotFound("subnet not found")
+		return nil, nil, apperror.NotFound("event not found")
 	}
 	event := entities.GetEventEntityFromModel(eventPath.Model)
 	logger.Debugf("EventMODELEData: %v", eventPath.Model)

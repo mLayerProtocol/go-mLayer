@@ -154,7 +154,7 @@ func ProcessEvent(event *entities.Event, data PayloadData, validAgentRequired bo
 				logger.Errorf("UnpackError: %v", err)
 				return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to unpack subnetdata")
 			}
-			err = dsquery.CreateEvent(subnetEvent, nil)
+			err = dsquery.CreateEvent(subnetEvent, txn)
 			if err != nil {
 				return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to save subne event")
 			}
@@ -271,7 +271,7 @@ func ProcessEvent(event *entities.Event, data PayloadData, validAgentRequired bo
 			}
 			if previousEvent.Synced != nil && *previousEvent.Synced {
 				// save event
-				err = dsquery.CreateEvent(previousEvent, nil)
+				err = dsquery.CreateEvent(previousEvent, txn)
 				if err != nil {
 					logger.Errorf("Create previous event error %v", err)
 				} else {
@@ -326,7 +326,7 @@ func ProcessEvent(event *entities.Event, data PayloadData, validAgentRequired bo
 					if len(payload.States) == 0 {
 						return previousEventUptoDate, false, nil, eventIsMoreRecent, nil
 					}
-					err = dsquery.CreateEvent(authEv, nil)
+					err = dsquery.CreateEvent(authEv, txn)
 					if err != nil {
 						return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to save auth event")
 					}
@@ -511,6 +511,7 @@ func getEventFromP2p(cfg *configs.MainConfiguration, event entities.EventPath, v
 		}
 		return evt, payload, err
 }
+
 
 
 

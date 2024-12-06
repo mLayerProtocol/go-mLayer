@@ -13,17 +13,19 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 
 	//query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
+
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/sql"
 	"gorm.io/gorm"
 )
 
-func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, chainId configs.ChainId) (prevAuthState *models.AuthorizationState, grantorAuthState *models.AuthorizationState, subnet *models.SubnetState, err error) {
+func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs.MainConfiguration) (prevAuthState *models.AuthorizationState, grantorAuthState *models.AuthorizationState, subnet *models.SubnetState, err error) {
 	auth := clientPayload.Data.(entities.Authorization)
 	// if err != nil {
 	// 	return nil, nil, nil, err
@@ -40,9 +42,14 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, chainId conf
 	_subnet, err := dsquery.GetSubnetStateById(auth.Subnet)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
-			return nil, nil, nil, apperror.NotFound("subnet not found")
+			_subnet, err = UpdateSubnetFromPeer(auth.Subnet, cfg, "")
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			
+		} else {
+			return nil, nil, nil, err
 		}
-		return nil, nil, nil, apperror.Internal(err.Error())
 	}
 	subnet = &models.SubnetState{Subnet: *_subnet}
 
@@ -65,7 +72,7 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, chainId conf
 	}
 	/////
 
-	if err = VerifyAuthDataSignature(auth, msg, chainId); err != nil {
+	if err = VerifyAuthDataSignature(auth, msg, cfg.ChainId); err != nil {
 		return nil, nil, subnet, apperror.Unauthorized("Invalid authorization data signature")
 	}
 	if auth.Grantor != auth.Account {
@@ -261,7 +268,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 			logger.Debugf("IncrementError: %+v", err)
 			return err
 		}
-		_, _, _, err = ValidateAuthPayloadData(&event.Payload, cfg.ChainId)
+		_, _, _, err = ValidateAuthPayloadData(&event.Payload, cfg)
 		if err != nil {
 			logger.Infof("ErrorValidatingAuth %v", err)
 			saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced: utils.TruePtr()}, &txn, nil)
@@ -328,5 +335,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 	}
 	return nil
 }
+
+
 
 // {"action":"AuthorizeAgent","network":"84532","identifier":"0xD466f0C2506b69e091b4356cd55b55f6DF00491b","hash":"kXTFkj7NkzQt5VQKvTcxXq6RHd5KvhO7eEDxtcsy+Ec="}

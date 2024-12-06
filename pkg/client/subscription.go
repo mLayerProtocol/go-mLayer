@@ -8,6 +8,7 @@ import (
 
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
+	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
@@ -105,7 +106,7 @@ func GetAccountSubscriptionsV2(payload entities.Subscription) (*[]models.Subscri
 
 // }
 
-func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *models.AuthorizationState) (
+func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *models.AuthorizationState, cfg *configs.MainConfiguration) (
 	assocPrevEvent *entities.EventPath,
 	assocAuthEvent *entities.EventPath,
 	err error,
@@ -132,7 +133,13 @@ func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *mode
 	_topic, err := dsquery.GetTopicById(payloadData.Topic)
 	
 	if dsquery.IsErrorNotFound(err) || _topic == nil {
-		return nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in subnet %s", _topic.ID, payload.Subnet))
+		logger.Infof("ValidatingTopic 2... %v", err)
+		resp, err := service.UpdateStateFromPeer(payloadData.ID, entities.TopicModel, cfg, "")
+		logger.Infof("ValidatingTopic 3... %v, %v", err, resp)
+		if err != nil || resp == nil {
+			return nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in subnet %s", payloadData.Topic, payload.Subnet))
+		}
+		_topic = resp.(*entities.Topic)
 	}
 
 	currentState, err := service.ValidateSubscriptionData(&payload, _topic)
