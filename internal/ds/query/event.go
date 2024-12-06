@@ -30,7 +30,6 @@ func IsErrorNotFound(e error) bool {
 
 func GetEventById(id string, modelType entities.EntityModel) (*entities.Event, error) {
 	key := (&entities.Event{ID: id}).Key()
-	logger.Debugf("EventIdKey: %s", key)
 	value, err := stores.EventStore.Get(context.Background(), datastore.NewKey(key))
 	if err != nil {
 		return nil, err
@@ -46,7 +45,7 @@ func GetEventByIdTxn(id string, modelType entities.EntityModel, txn *datastore.T
 		return GetEventById(id, modelType)
 	}
 	key := (&entities.Event{ID: id}).Key()
-	logger.Debugf("EventIdKey: %s", key)
+	
 	
 	value, err := (*txn).Get(context.Background(), datastore.NewKey(key))
 	if err != nil {

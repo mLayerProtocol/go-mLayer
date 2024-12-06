@@ -293,7 +293,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		logger.Errorf("ReceivedGetState Request... %v", ePath)
 		state, err := dsquery.GetStateFromEntityPath(ePath)
 		
-		if err != nil {
+		if err != nil || len(state) == 0 {
 			logger.Errorf("P2pActionGetState: %v", err)
 			if dsquery.IsErrorNotFound(err) {
 				response.ResponseCode = 404

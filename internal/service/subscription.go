@@ -17,7 +17,6 @@ import (
 
 	// query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/sql"
 	"gorm.io/gorm"
 )
 
@@ -109,13 +108,19 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	data.Hash = hex.EncodeToString(hash)
 	var subnet = data.Subnet
 
-	var localState models.SubscriptionState
+	localState := models.SubscriptionState{}
 	// err := query.GetOne(&models.TopicState{Topic: entities.Topic{ID: id}}, &localTopicState)
-	err = sql.SqlDb.Where(&models.SubscriptionState{Subscription: entities.Subscription{Subnet: subnet, Topic: data.Topic, Subscriber: entities.AddressFromString(string(data.Subscriber)).ToDIDString()}}).Take(&localState).Error
-	if err != nil {
-		logger.Error(err)
-	}
+	// err = sql.SqlDb.Where(&models.SubscriptionState{Subscription: entities.Subscription{Subnet: subnet, Topic: data.Topic, Subscriber: entities.AddressFromString(string(data.Subscriber)).ToDIDString()}}).Take(&localState).Error
+	// if err != nil {
+	// 	logger.Error(err)
+	// }
 	
+	subs, err := dsquery.GetSubscriptions(entities.Subscription{Subnet: subnet, Topic: data.Topic, Subscriber: entities.AddressFromString(string(data.Subscriber)).ToDIDString()}, nil, nil)
+	if err == nil && subs != nil && len(subs) > 0 {
+		localState = models.SubscriptionState{
+			Subscription: *subs[0],
+		}
+	}
 
 	var localDataState *LocalDataState
 	if localState.ID != "" {

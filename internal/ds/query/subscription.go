@@ -64,20 +64,13 @@ func GetSubscriptions( filter entities.Subscription, limits *QueryLimit, txn *da
 			Offset: limits.Offset,
 		})
 	}
-
-	
-	
 	if err != nil {
 		return nil, err
 	}
-	logger.Debugf("SubscriptionKey: %s", key)
-	// logger.Debugf("Getting Authorizations...: %s", auth.AccountAuthorizationsKey())
 	entries, _ := rsl.Rest()
-	logger.Debugf("Getting Subscription Entries...: %d,", len(entries))
+	
 	for _, entry := range entries { 
 		
-		//keyString := strings.Split(entry.Key, "/")
-		logger.Debugf("Getting Subscription Entries ID...: %s,",string(entry.Key))
 		value, qerr := GetSubscriptionByEvent(entities.EventPath{EntityPath: entities.EntityPath{ Hash: string(entry.Value)}})
 		if qerr != nil {
 			continue
@@ -103,6 +96,7 @@ func GetSubscriptions( filter entities.Subscription, limits *QueryLimit, txn *da
 	}
 	// logger.Debugf("Getting Authorizations Entries...: %d, %v", len(entries), err)
 	if err != nil {
+		logger.Errorf("SubscriptionError: Agent not subscribed")
 		return nil, err
 	}
 	return data, err
@@ -123,7 +117,10 @@ func CreateSubscriptionState(newState *entities.Subscription, tx *datastore.Txn)
 	_refKey := newState.RefKey()
 	refKey := &_refKey
 	logger.Infof("CreatingSubscriptionState: %v", err)
-	id, err :=  entities.GetId(newState)
+	id := newState.ID
+	if len(id) == 0 {
+		id, err =  entities.GetId(newState, newState.ID)
+	}
 	newState.ID = id
 	if err != nil {
 		logger.Errorf("ERRORRRRR: %v", err)

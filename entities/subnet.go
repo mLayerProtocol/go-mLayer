@@ -75,7 +75,7 @@ func (d Subnet) GetSignature() (string) {
 
 func (g *Subnet) GetKeys() (keys []string)  {
 	if g.ID == "" {
-		g.ID, _ = GetId(g)
+		g.ID, _ = GetId(g, "")
 	}
 	keys = append(keys, fmt.Sprintf("%s/%s/%s", g.AccountSubnetsKey(), utils.IntMilliToTimestampString(int64(g.Timestamp)), g.ID))
 	keys = append(keys, g.Key())
@@ -102,7 +102,7 @@ func (item *Subnet) ArchiveKey() string {
 
 func (g *Subnet) Key() string {
 	if g.ID == "" {
-		g.ID, _ = GetId(g)
+		g.ID, _ = GetId(g, "")
 	}
 	return fmt.Sprintf("%s/id/%s", GetModel(g), g.ID)
 }

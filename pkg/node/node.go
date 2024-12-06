@@ -31,7 +31,6 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/channelpool"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
-	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	p2p "github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/rest"
@@ -158,64 +157,68 @@ func Start(mainCtx *context.Context) {
 		_, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		defer wg.Done()
+		subnetManager := NewSubnetManager(&ctx)
 		chain.NetworkInfo.SyncedValidators = map[string]multiaddr.Multiaddr{}
-		for eventPtr := range channelpool.EventProcessorChannel {
-			// if !ok {
-			// 	logger.Errorf("Incoming event channel closed. Please restart server to try or adjust buffer size in config")
-			// 	wg.Done()
-			// 	panic("cannot read events from EventProcessorChannel channel")
+		// ticker := time.NewTicker(500 * time.Millisecond)
+		// defer ticker.Stop()
+			// for range ticker.C {
+				// go func() {
+					for eventPtr := range channelpool.EventProcessorChannel {
+						event := eventPtr
+						//modelType := event.GetDataModelType()
 
-			// }
-			event := eventPtr
-			modelType := event.GetDataModelType()
-			go func() {
-				logger.Debugf("StartedProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
-				cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-				if !ok {
-					logger.Errorf("unable to get config from context")
-					return
-				}
-				if event.Validator != entities.PublicKeyString(hex.EncodeToString(cfg.PublicKeyEDD)) {
-					isValidator, err := chain.NetworkInfo.IsValidator(string(event.Validator))
-					if err != nil {
-						logger.Error(err)
-						return
-					}
-					if !isValidator {
-						logger.Error(fmt.Errorf("not signed by a validator"))
-						return
-					}
-					event.Broadcasted = true
-					service.SaveEvent(modelType, entities.Event{}, event, nil, nil)
-				}
-
-				// service.SaveEvent(modelType, entities.Event{}, event, nil, nil)
-				switch modelType {
-					case entities.SubnetModel:
-						service.HandleNewPubSubSubnetEvent(event, &ctx)
-					case entities.AuthModel:
-						service.HandleNewPubSubAuthEvent(event, &ctx)
-					case entities.TopicModel:
-						service.HandleNewPubSubTopicEvent(event, &ctx)
-					case entities.SubscriptionModel:
-						service.HandleNewPubSubSubscriptionEvent(event, &ctx)
-					case entities.MessageModel:
-						service.HandleNewPubSubMessageEvent(event, &ctx)
-				}
-				go func() {
-					syncedBlockMutex.Lock()
-					defer syncedBlockMutex.Unlock()
-					if chain.NetworkInfo.Synced {
-						lastSynced, err := ds.GetLastSyncedBlock(mainCtx)
-						eventBlock := new(big.Int).SetUint64(event.BlockNumber)
-						if err == nil && lastSynced.Cmp(eventBlock) == -1 {
-							ds.SetLastSyncedBlock(mainCtx, eventBlock)
-						}
-					}
-				}()
-			}()
-
-		}
+						subnetManager.HandleEvent(event)
+						
+					// 		logger.Debugf("StartedProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
+					// 		cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
+					// 		if !ok {
+					// 			logger.Errorf("unable to get config from context")
+					// 			return
+					// 		}
+					// 		if event.Validator != entities.PublicKeyString(hex.EncodeToString(cfg.PublicKeyEDD)) {
+					// 			isValidator, err := chain.NetworkInfo.IsValidator(string(event.Validator))
+					// 			if err != nil {
+					// 				logger.Error(err)
+					// 				return
+					// 			}
+					// 			if !isValidator {
+					// 				logger.Error(fmt.Errorf("not signed by a validator"))
+					// 				return
+					// 			}
+					// 			event.Broadcasted = true
+					// 			service.SaveEvent(modelType, entities.Event{}, event, nil, nil)
+					// 		}
+			
+					// 		// service.SaveEvent(modelType, entities.Event{}, event, nil, nil)
+					// 		switch modelType {
+					// 			case entities.SubnetModel:
+					// 				service.HandleNewPubSubSubnetEvent(event, &ctx)
+					// 			case entities.AuthModel:
+					// 				service.HandleNewPubSubAuthEvent(event, &ctx)
+					// 			case entities.TopicModel:
+					// 				service.HandleNewPubSubTopicEvent(event, &ctx)
+					// 			case entities.SubscriptionModel:
+					// 				service.HandleNewPubSubSubscriptionEvent(event, &ctx)
+					// 			case entities.MessageModel:
+					// 				service.HandleNewPubSubMessageEvent(event, &ctx)
+					// 		}
+					// 		go func() {
+					// 			syncedBlockMutex.Lock()
+					// 			defer syncedBlockMutex.Unlock()
+					// 			if chain.NetworkInfo.Synced {
+					// 				lastSynced, err := ds.GetLastSyncedBlock(mainCtx)
+					// 				eventBlock := new(big.Int).SetUint64(event.BlockNumber)
+					// 				if err == nil && lastSynced.Cmp(eventBlock) == -1 {
+					// 					ds.SetLastSyncedBlock(mainCtx, eventBlock)
+					// 				}
+					// 			}
+					// 		}()
+						
+			
+					// }
+				// }()
+			 }
+		
 	}()
 
 	// load network params

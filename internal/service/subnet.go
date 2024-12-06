@@ -164,7 +164,7 @@ func HandleNewPubSubSubnetEvent(event *entities.Event, ctx *context.Context, ) e
 	logger.Debugf("HandlingNewEvent: %s in subnet %s", data.ID, event.Payload.Subnet )
 	var id string
 	if len(data.ID) == 0 {
-		id, _ = entities.GetId(data)
+		id, _ = entities.GetId(data, data.ID)
 	} else {
 		id = data.ID
 	}
@@ -322,12 +322,14 @@ return nil
 }
 func UpdateStateFromPeer(id string , modelType  entities.EntityModel,  cfg *configs.MainConfiguration,  validator string, ) (any, error) {
 	state := entities.GetStateModelFromEntityType(modelType)
+	
 	if validator == "" {
 		validator = chain.NetworkInfo.GetRandomSyncedNode()
 	}
 	if len(validator) == 0 {
 		return nil, apperror.NotFound(string(modelType) + " state not found")
 	}
+	logger.Infof("GettingTopic 1:::")
 	subPath := entities.NewEntityPath(entities.PublicKeyString(validator), modelType, id)
 	var pp *p2p.P2pEventResponse
 	var err error
@@ -335,22 +337,28 @@ func UpdateStateFromPeer(id string , modelType  entities.EntityModel,  cfg *conf
 	case entities.SubnetModel:
 		newState := state.(entities.Authorization)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
+		state = newState
 	case entities.AuthModel:
 		newState := state.(entities.Authorization)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
+		state = newState
 	case entities.TopicModel:
 		logger.Infof("GettingTopic:::")
 		newState := state.(entities.Topic)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
+		state = newState
 	case entities.SubscriptionModel:
 		newState := state.(entities.Subscription)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
+		state = newState
 	case entities.MessageModel:
 		newState := state.(entities.Message)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
+		state = newState
 	default:
 
 	}
+	logger.Infof("NEWSTATE %v", state, )
 	if err != nil {
 		return nil, err
 	}
@@ -369,18 +377,24 @@ func UpdateStateFromPeer(id string , modelType  entities.EntityModel,  cfg *conf
 	switch(modelType) {
 	case entities.SubnetModel:
 		newState := state.(entities.Subnet)
+		newState.ID = id
 		_, err = dsquery.CreateSubnetState(&newState, nil);
 	case entities.AuthModel:
 		newState := state.(entities.Authorization)
+		newState.ID = id
 		_, err = dsquery.CreateAuthorizationState(&newState, nil);
 	case entities.TopicModel:
 		newState := state.(entities.Topic)
+		newState.ID = id
+		logger.Infof("TopicState: %v", newState)
 		_, err = dsquery.CreateTopicState(&newState, nil);
 	case entities.SubscriptionModel:
 		newState := state.(entities.Subscription)
+		newState.ID = id
 		_, err = dsquery.CreateSubscriptionState(&newState, nil);
 	case entities.MessageModel:
 		newState := state.(entities.Message)
+		newState.ID = id
 		_, err = dsquery.CreateMessageState(&newState, nil);
 	default:
 		

@@ -40,7 +40,7 @@ func TrackReward(ctx *context.Context) {
 	if !chain.NetworkInfo.Synced {
 		return
 	}
-	logger.Debug("Tracking Reward Batches...")
+	
 	
 	
 	// validator := (*cfg).PublicKey  
@@ -73,6 +73,9 @@ func TrackReward(ctx *context.Context) {
 		}
 	if lastClaimedCycle >= currentCycle.Uint64() {
 		return
+	}
+	if lastClaimedCycle + 1 < currentCycle.Uint64() {
+		logger.Debug("Tracking Reward Batches...")
 	}
 	for i := lastClaimedCycle+1; i < currentCycle.Uint64(); i++ {
 		// TODO loop through index till no data
@@ -372,7 +375,7 @@ func ProcessPendingClaims(ctx *context.Context) {
 	// if !chain.NetworkInfo.Synced {
 	// 	return
 	// }
-	logger.Debug("Processing pending claims...")
+	
 	
 	pendingClaimsKey :=  datastore.NewKey("validClaim/")
 

@@ -32,10 +32,13 @@ func (g ClientPayload) GetSignature()  string {
 }
 
 func (g ClientPayload) GetId()  (string, error) {
-	return GetId(g)
+	return GetId(g, "")
 }
 
-func GetId(d Payload) (string, error) {
+func GetId(d Payload, id string) (string, error) {
+	if len(id) > 0 {
+		return id, nil
+	}
 	sig := d.GetSignature()
 	if len(sig) == 0 {
 		return "", fmt.Errorf("payload has no signature")

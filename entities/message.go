@@ -227,7 +227,7 @@ func (g Message) TopicMessageKey() (string) {
 
 func (msg *Message) Key() string {
 	if msg.ID == "" {
-		msg.ID, _ = GetId(msg)
+		msg.ID, _ = GetId(msg, "")
 	}
 	return fmt.Sprintf("id/%s",  msg.ID)
 }

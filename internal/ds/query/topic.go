@@ -74,8 +74,11 @@ func CreateTopicState(newState *entities.Topic, tx *datastore.Txn) (sub *entitie
 	if len(newState.Ref) == 0 {
 		refKey = ""
 	}
-	logger.Infof("CreatingTopicState: %v", err)
-	id, err :=  entities.GetId(newState)
+	logger.Infof("CreatingTopicState: %v",  newState)
+	id := newState.ID
+	if id == "" {
+		id, err =  entities.GetId(newState, newState.ID)
+	}
 	if err != nil {
 		logger.Errorf("ERRORRRRR: %v", err)
 		return nil, err

@@ -63,7 +63,7 @@ func (item *Topic) MsgPack() []byte {
 
 func (item *Topic) Key() string {
 	if item.ID == "" {
-		item.ID, _ = GetId(item)
+		item.ID, _ = GetId(item, "")
 	}
 	return fmt.Sprintf("%s/id/%s", GetModel(item), item.ID)
 }

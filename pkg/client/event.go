@@ -184,14 +184,14 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 	chainInfo, err := chain.DefaultProvider(cfg).GetChainInfo()
 	// bNum, err := chain.DefaultProvider(cfg).GetCurrentBlockNumber()
 	// cycle, err := chain.DefaultProvider(cfg).GetCycle(bNum)
-	logger.Debugf("UPDATINGSUBNET2: %v, sig: %s", chainInfo.ChainId, payload.Signature)
+	
 	if err != nil {
 		return nil, err
 	}
 	
 	subnet := payload.Subnet
 	if payload.EventType == uint16(constants.CreateSubnetEvent) {
-		subnet, err = entities.GetId(payload.Data.(entities.Subnet))
+		subnet, err = entities.GetId(payload.Data.(entities.Subnet), "")
 		if err != nil {
 			logger.Debugf("Subnet error: %v", err)
 			return nil, err
@@ -204,7 +204,7 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 	if payload.EventType == uint16(constants.AuthorizationEvent) {
 		subnet = payload.Data.(entities.Authorization).Subnet
 	}
-	logger.Info("UPDATINGSUBNET2")
+	
 	event := entities.Event{
 		Payload:           payload,
 		Timestamp:         uint64(time.Now().UnixMilli()),
@@ -221,7 +221,7 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		Validator:         entities.PublicKeyString(cfg.PublicKeyEDDHex),
 		Subnet: subnet,
 	}
-	logger.Info("UPDATINGSUBNET3")
+	
 	logger.Debugf("NewEvent: %v", event)
 	b, err := event.EncodeBytes()
 	if err != nil {

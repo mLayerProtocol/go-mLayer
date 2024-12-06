@@ -987,7 +987,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 		
 		if err == nil {
 			if handshake.NodeType == constants.ValidatorNodeType {
-				if new(big.Int).SetBytes(handshake.LastSyncedBlock).Uint64() > chain.NetworkInfo.CurrentBlock.Uint64() - 5 {
+				if new(big.Int).SetBytes(handshake.LastSyncedBlock).Uint64() > chain.NetworkInfo.CurrentBlock.Uint64() - 60 {
 					addr := ExtractQuicMultiAddress(ToMultiAddressStrings(pairAddr.ID, pairAddr.Addrs))
 					logger.Infof("SyncedValidators: %s, %s, %v", hex.EncodeToString(handshake.Signer), addr.String(), true)
 					chain.NetworkInfo.SyncedValidators[hex.EncodeToString(handshake.Signer)] = addr

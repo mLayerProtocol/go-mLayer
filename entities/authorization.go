@@ -76,7 +76,7 @@ func (g Authorization) ToString() (string, error) {
 
 func (g *Authorization) GetKeys() (keys []string)  {
 	if g.ID == "" {
-		g.ID, _ = GetId(g)
+		g.ID, _ = GetId(g, "")
 	}
 	 // keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Agent, g.ID))
 	 keys = append(keys, fmt.Sprintf("%s/%s",  g.AuthorizedAgentStateKey(), utils.IntMilliToTimestampString(int64(*g.Timestamp))))

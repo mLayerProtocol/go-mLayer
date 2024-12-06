@@ -62,7 +62,7 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 
 	var id = data.ID
 	if len(data.ID) == 0 {
-		id, _ = entities.GetId(data)
+		id, _ = entities.GetId(data, data.ID)
 	} else {
 		id = data.ID
 	}

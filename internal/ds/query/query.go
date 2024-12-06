@@ -122,12 +122,14 @@ func CreateState(newState CreateStateParam, tx *datastore.Txn) (err error) {
 		logger.Infof("NewStateKey: %v, %v", key, newState.EventHash)
 		if strings.EqualFold(key, newState.DataKey) {
 			if err := txn.Put(context.Background(), datastore.NewKey(key), stateBytes); err != nil {
+				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, err)
 				return err
 			}
 			continue
 		}
 		if strings.EqualFold(key, newState.IDKey) {
 			if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.EventHash)); err != nil {
+				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, err)
 				return err
 			}
 			continue
@@ -139,10 +141,12 @@ func CreateState(newState CreateStateParam, tx *datastore.Txn) (err error) {
 				return err
 			}
 			if len(val) > 0 {
-				logger.Debugf("VALLLL: %s", string(val))
+	
+				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, fmt.Errorf("\"%s\" ref already exists", newState.ModelType))
 				return fmt.Errorf("\"%s\" ref already exists", newState.ModelType)
 			}
 			if err := txn.Put(context.Background(), datastore.NewKey(*newState.RefKey), []byte(newState.ID)); err != nil {
+				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, err)
 				logger.Errorf("error updateing subnet ref: %v", err)
 				return err
 			}

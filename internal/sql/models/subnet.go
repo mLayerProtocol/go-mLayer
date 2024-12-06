@@ -13,7 +13,7 @@ type SubnetState struct {
 
 func (d *SubnetState) BeforeCreate(tx *gorm.DB) (err error) {
 	if d.ID == "" {
-		hash, err := entities.GetId(*d)
+		hash, err := entities.GetId(*d, d.ID)
 		if err != nil {
 			panic(err)
 		}

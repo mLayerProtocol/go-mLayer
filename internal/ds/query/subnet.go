@@ -29,7 +29,7 @@ func GetSubnetStateById(did string) (*entities.Subnet, error) {
 func CreateSubnetState(newState *entities.Subnet, tx *datastore.Txn) (sub *entities.Subnet, err error) {
 	ds := stores.StateStore
 	if newState.ID == "" {
-		newState.ID, err = entities.GetId(newState)
+		newState.ID, err = entities.GetId(newState, newState.ID)
 	}
 	if err != nil {
 		return nil, err

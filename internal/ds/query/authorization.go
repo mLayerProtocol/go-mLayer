@@ -76,7 +76,9 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 		return nil, fmt.Errorf("new state must include acc, snet and agent fields")
 	}
 	ds := stores.StateStore
-	newState.ID, err = entities.GetId(newState)
+	
+	newState.ID, err = entities.GetId(newState, newState.ID)
+	
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +137,7 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 		txn.Delete(context.Background(), datastore.NewKey(entry.Key))
 	}
 
-	id, err :=  entities.GetId(newState)
+	id, err :=  entities.GetId(newState, newState.ID)
 	if err != nil {
 		logger.Errorf("ERRORRRRR: %v", err)
 		return nil, err

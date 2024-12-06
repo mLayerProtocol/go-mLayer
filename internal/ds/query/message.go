@@ -93,7 +93,7 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 	}
 	
 	
-	newState.ID, err = entities.GetId(newState)
+	newState.ID, err = entities.GetId(newState, newState.ID)
 	if err != nil {
 		logger.Infof("CREATINGMESSAGE_ERROR: %+v", err)
 		return nil, err
@@ -116,7 +116,7 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 		return nil, fmt.Errorf("duplicate message")
 	}
 	
-	id, err :=  entities.GetId(newState)
+	id, err :=  entities.GetId(newState, newState.ID)
 	if err != nil {
 		logger.Errorf("ERRORRRRR: %v", err)
 		return nil, err

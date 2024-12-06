@@ -66,6 +66,9 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 		}, dsquery.DefaultQueryLimit, nil)
 		
 		if _err != nil {
+			if dsquery.IsErrorNotFound(err) {
+				
+			}
 			return nil, _err
 		}
 		
@@ -112,7 +115,7 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 				Agent: payload.Agent, Account: payload.Account, Subnet: payload.Subnet,
 			}, nil, nil)
 			if err != nil {
-				return nil, apperror.Unauthorized("Invalid subnet")
+				return nil, apperror.Unauthorized("Invalid authorization")
 			}
 			
 			if len(auth) == 0 || *auth[0].Priviledge  < constants.MemberPriviledge {
@@ -182,13 +185,13 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 	defer txn.Discard(context.Background())
 
 	
-	
-	previousEventUptoDate,  authEventUpToDate, _, eventIsMoreRecent, err := ProcessEvent(event,  eventData, true, saveMessageEvent, &txn, nil, ctx)
+	logger.Debugf("Processing 1...: %s", event.ID)
+	previousEventUptoDate,  authEventUpToDate, _, _, err := ProcessEvent(event,  eventData, true, saveMessageEvent, &txn, nil, ctx)
 	if err != nil {
 		logger.Errorf("Processing Error...: %v", err)
 		return err
 	}
-	logger.Debugf("Processing 2...: %v,  %v", previousEventUptoDate, authEventUpToDate)
+	logger.Debugf("Processing 2...: %v,  %v, %s", previousEventUptoDate, authEventUpToDate, event.ID)
 	// get the topic, if not found retrieve it
 
 
@@ -244,12 +247,14 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 			// update error and mark as synced
 			// notify validator of error
 			logger.Errorf("MessageDataError: %v", err)
+			
 			saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()}, &txn, nil )
+		
 			
 		} else {
 			// TODO if event is older than our state, just save it and mark it as synced
 			savedEvent, err := saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, tx );
-			if eventIsMoreRecent && err == nil {
+			if  err == nil {
 				// update state
 				logger.Debugf("CreateMessageData: %+v", data)
 				_, err = dsquery.CreateMessageState(&data, &stateTxn)
@@ -264,10 +269,10 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 						logger.Errorf("SaveStateError %v", err)
 						return err
 					}
+				
 				} else {
 					err = stateTxn.Commit(context.Background())
 				}
-				
 			}
 			
 			if err == nil {
@@ -281,7 +286,7 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 					Message: data,
 				},  &savedEvent.Payload.Subnet)
 				}()
-			}
+			} 
 			
 			
 			if string(event.Validator) != cfg.PublicKeyEDDHex {

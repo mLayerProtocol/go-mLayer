@@ -36,7 +36,7 @@ func (d Wallet) GetSignature() (string) {
 }
 func (d *Wallet) BeforeCreate(tx *gorm.DB) (err error) {
 	if d.ID == "" {
-		uuid, err := GetId(*d)
+		uuid, err := GetId(*d, "")
 		if err != nil {
 			logger.Error(err)
 			panic(err)

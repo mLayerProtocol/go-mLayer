@@ -30,7 +30,7 @@ func (AuthorizationState) TableName() string {
 
 func (d *AuthorizationState) BeforeCreate(tx *gorm.DB) (err error) {
 	// UUID version 4
-	d.ID, err = entities.GetId(*d)
+	d.ID, err = entities.GetId(*d, d.ID)
 	if err != nil {
 		panic(err)
 	}
