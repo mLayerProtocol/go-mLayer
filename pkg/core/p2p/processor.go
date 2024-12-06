@@ -283,13 +283,16 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			// }
 		}
 	case P2pActionGetState:
+		logger.Error("ReceivedGetState Request...")
 		ePath, err := entities.UnpackEntityPath(payload.Data)
 		if err != nil {
 			response.ResponseCode = 500
 			response.Error = "Invalid payload data"
 			logger.Debugf("processP2pPayload: %v", err)
 		}
+		logger.Errorf("ReceivedGetState Request... %v", ePath)
 		state, err := dsquery.GetStateFromEntityPath(ePath)
+		
 		if err != nil {
 			logger.Errorf("P2pActionGetState: %v", err)
 			if dsquery.IsErrorNotFound(err) {
@@ -300,6 +303,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 				response.Error = err.Error()
 			}
 		} else {
+			logger.Errorf("FoundRequestedState.. %v", ePath)
 			mapp := map[string]interface{}{}
 			err := encoder.MsgPackUnpackStruct(state, &mapp)
 			if err != nil {

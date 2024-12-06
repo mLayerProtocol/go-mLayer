@@ -339,6 +339,7 @@ func UpdateStateFromPeer(id string , modelType  entities.EntityModel,  cfg *conf
 		newState := state.(entities.Authorization)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
 	case entities.TopicModel:
+		logger.Infof("GettingTopic:::")
 		newState := state.(entities.Topic)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
 	case entities.SubscriptionModel:
