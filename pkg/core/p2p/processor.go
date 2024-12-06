@@ -303,10 +303,11 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 				response.Error = err.Error()
 			}
 		} else {
-			logger.Errorf("FoundRequestedState.. %v", ePath)
+			logger.Errorf("FoundRequestedState.. %v", state)
 			mapp := map[string]interface{}{}
 			err := encoder.MsgPackUnpackStruct(state, &mapp)
 			if err != nil {
+				logger.Errorf("FoundRequestedStateError.. %v", err)
 				response.ResponseCode = 404
 				response.Error = "State not found"
 				break
