@@ -312,15 +312,15 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 				response.Error = "State not found"
 				break
 			}
-			pathMap := mapp["e"]
+			pathMap := mapp["e"].(map[string]interface{})
 			logger.Infof("TopicEvent::: %v", pathMap)
 			// := entities.EventPathFromString(eventPath)
 			//path := eventPath.(entities.EventPath)
 			// ev, err := dsquery.GetEventFromPath(&d.Event)
 			eventPath := entities.EventPath{EntityPath: entities.EntityPath{
-				Hash: string(pathMap.(map[string]string)["h"]),
-				Model:  entities.EntityModel(string(pathMap.(map[string]string)["mod"])),
-				Validator: entities.PublicKeyString(string(pathMap.(map[string]string)["mod"])),
+				Hash: fmt.Sprint(pathMap["h"]),
+				Model:  entities.EntityModel(fmt.Sprint(pathMap["mod"])),
+				Validator: entities.PublicKeyString(fmt.Sprint(pathMap["val"])),
 			}}
 			event, err := dsquery.GetEventFromPath(&eventPath)
 			if err == nil {

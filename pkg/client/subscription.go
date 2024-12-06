@@ -134,7 +134,7 @@ func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *mode
 	
 	if dsquery.IsErrorNotFound(err) || _topic == nil {
 		logger.Infof("ValidatingTopic 2... %v", err)
-		resp, err := service.UpdateStateFromPeer(payloadData.ID, entities.TopicModel, cfg, "")
+		resp, err := service.UpdateStateFromPeer(payloadData.Topic, entities.TopicModel, cfg, "")
 		logger.Infof("ValidatingTopic 3... %v, %v", err, resp)
 		if err != nil || resp == nil {
 			return nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in subnet %s", payloadData.Topic, payload.Subnet))
