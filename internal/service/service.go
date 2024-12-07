@@ -98,8 +98,8 @@ func ProcessEvent(event *entities.Event, data PayloadData, validAgentRequired bo
 	// updateState := false
 	// var eventError string
 	// // hash, _ := event.GetHash()
-	logger.Debugf("ProcessingEvent.. %s", event.ID)
-	if validAgentRequired && uint64(event.Payload.Timestamp) > uint64(event.Timestamp)+15000 || uint64(event.Payload.Timestamp) < uint64(event.Timestamp)-15000 {
+	logger.Debugf("ProcessingEvent.. %s, %d", event.ID, event.Payload.Timestamp)
+	if validAgentRequired && event.Payload.Timestamp > 0 && (uint64(event.Payload.Timestamp) > uint64(event.Timestamp)+15000 || uint64(event.Payload.Timestamp) < uint64(event.Timestamp)-15000) {
 		return false, false, nil, false, errors.New("event timestamp exceeds payload timestamp")
 	}
 
