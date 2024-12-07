@@ -113,7 +113,7 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 	uniqId := newState.UniqueId()
 	_, checkError := txn.Get(context.Background(), datastore.NewKey(uniqId))
 	if checkError == nil {
-		return nil, fmt.Errorf("duplicate message")
+		return nil, fmt.Errorf("duplicate message: %s", uniqId)
 	}
 	
 	id, err :=  entities.GetId(newState, newState.ID)

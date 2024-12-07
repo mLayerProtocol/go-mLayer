@@ -266,7 +266,7 @@ func (d *Event) BeforeCreate(tx *gorm.DB) (err error) {
 		d.ID, err = d.GetId()
 		return err
 	}
-	if d.Payload.Nonce > 0 {
+	if d.Nonce == "" && d.Payload.Nonce > 0 {
 		d.Nonce = fmt.Sprintf("%s:%d", string(d.Payload.Account), d.Payload.Nonce)
 	}
 	return nil

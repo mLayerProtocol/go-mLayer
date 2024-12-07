@@ -20,6 +20,7 @@ type NetworkParams struct {
 	StartBlock *big.Int `json:"start_block"`
 	CurrentCycle *big.Int `json:"current_cycle"`
 	CurrentBlock *big.Int `json:"current_block"`
+	CurrentEpoch *big.Int `json:"current_epoch"`
 	ActiveValidatorLicenseCount uint64 `json:"active_validator_license_count"`
 	ActiveSentryLicenseCount uint64 `json:"active_sentry_license_count"`
 	Validators map[string]string `json:"-"`

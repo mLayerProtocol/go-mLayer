@@ -227,14 +227,15 @@ func Start(mainCtx *context.Context) {
 		_, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		defer wg.Done()
-		time.Sleep(1 * time.Minute)
+		// time.Sleep(1 * time.Minute)
 		for {
 			if err := loadChainInfo(cfg); err != nil {
 				logger.Error(err)
-				time.Sleep(10 * time.Second)
-				continue
+				// time.Sleep(1 * time.Second)
+				panic(err)
+				// continue
 			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}()
 
@@ -531,7 +532,7 @@ func loadChainInfo(cfg *configs.MainConfiguration) error {
 	chain.NetworkInfo.StartTime = info.StartTime
 	chain.NetworkInfo.CurrentCycle = info.CurrentCycle
 	chain.NetworkInfo.CurrentBlock = info.CurrentBlock
-	// chain.NetworkInfo.CurrentEpoch = info.CurrentEpoch
+ 	chain.NetworkInfo.CurrentEpoch = info.CurrentEpoch
 	chain.NetworkInfo.ActiveValidatorLicenseCount = info.ValidatorActiveLicenseCount.Uint64()
 	chain.NetworkInfo.ActiveSentryLicenseCount = info.SentryActiveLicenseCount.Uint64()
 

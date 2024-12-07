@@ -181,7 +181,8 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		logger.Errorf("UPDATINGSUBNET2 %v", err)
 	}
 	logger.Debugf("UPDATINGSUBNE_HASH: %v",payloadHash)
-	chainInfo, err := chain.DefaultProvider(cfg).GetChainInfo()
+	// chainInfo, err := chain.DefaultProvider(cfg).GetChainInfo()
+	//chainInfo := chain.NetworkInfo
 	// bNum, err := chain.DefaultProvider(cfg).GetCurrentBlockNumber()
 	// cycle, err := chain.DefaultProvider(cfg).GetCycle(bNum)
 	
@@ -215,9 +216,9 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		Synced:            utils.FalsePtr(),
 		PayloadHash:       hex.EncodeToString(payloadHash),
 		Broadcasted:       false,
-		BlockNumber:       chainInfo.CurrentBlock.Uint64(),
-		Cycle: 				chainInfo.CurrentCycle.Uint64(),
-		Epoch: 				chainInfo.CurrentEpoch.Uint64(),		
+		BlockNumber:       chain.NetworkInfo.CurrentBlock.Uint64(),
+		Cycle: 				chain.NetworkInfo.CurrentCycle.Uint64(),
+		Epoch: 				chain.NetworkInfo.CurrentEpoch.Uint64(),		
 		Validator:         entities.PublicKeyString(cfg.PublicKeyEDDHex),
 		Subnet: subnet,
 	}
