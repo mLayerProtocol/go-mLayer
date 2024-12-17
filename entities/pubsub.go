@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mlayerprotocol/go-mlayer/common/constants"
+	"github.com/mlayerprotocol/go-mlayer/configs"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
@@ -27,6 +29,7 @@ type Channel struct {
 	ChannelName string
 	ID          peer.ID
 	Wallet      string
+	config *configs.MainConfiguration
 }
 
 func JoinChannel(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, walletAddress string, channelName string, channelBufferSize uint) (*Channel, error) {
@@ -54,7 +57,7 @@ func JoinChannel(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, walletA
 		ChannelName: channelName,
 		Messages:    make(chan PubSubMessage, channelBufferSize),
 	}
-
+	cr.config = ctx.Value(constants.ConfigKey).(*configs.MainConfiguration)
 	// start reading messages from the subscription in a loop
 	go cr.readLoop()
 	return cr, nil
@@ -62,7 +65,10 @@ func JoinChannel(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, walletA
 
 // Publish sends a message to the pubsub topic.
 func (cr *Channel) Publish(m PubSubMessage) error {
-	return cr.Topic.Publish(cr.Ctx, m.MsgPack())
+	
+	b := m.MsgPack();
+	
+	return cr.Topic.Publish(cr.Ctx, b)
 }
 
 func (cr *Channel) ListPeers() []peer.ID {
@@ -78,9 +84,9 @@ func (cr *Channel) readLoop() {
 			panic(err)
 		}
 		// only forward messages delivered by others
-		// if msg.ReceivedFrom == cr.ID {
-		// 	continue
-		// }
+		if msg.ReceivedFrom == cr.ID {
+			continue
+		}
 		pmsg, err := UnpackPubSubMessage(msg.Data)
 		
 		if err != nil {

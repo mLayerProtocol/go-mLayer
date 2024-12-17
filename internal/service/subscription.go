@@ -12,11 +12,10 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
-	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 
 	// query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
+
 	"gorm.io/gorm"
 )
 
@@ -87,6 +86,8 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 		panic("Unable to load config from context")
 	}
 	data := event.Payload.Data.(entities.Subscription)
+	dataStates := dsquery.NewDataStates(cfg)
+	dataStates.AddEvent(*event)
 	// var id = data.ID
 	// if len(data.ID) == 0 {
 	// 	id, _ = entities.GetId(data)
@@ -107,6 +108,22 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	}
 	data.Hash = hex.EncodeToString(hash)
 	var subnet = data.Subnet
+	var validator = ""
+	if event.Validator != entities.PublicKeyString(cfg.PublicKeyEDDHex) {
+		validator = string(event.Validator)
+	}
+	defer func () {
+		stateUpdateError := dataStates.Commit(nil, nil, nil)
+		if stateUpdateError != nil {
+			
+			panic(stateUpdateError)
+		} else {
+			go  OnFinishProcessingEvent(ctx, event,  &data)
+			
+			
+			// go utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("newMessage" + "\n"))
+		}	
+	}()
 
 	localState := models.SubscriptionState{}
 	// err := query.GetOne(&models.TopicState{Topic: entities.Topic{ID: id}}, &localTopicState)
@@ -132,16 +149,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 		}
 	}
 
-	stateTxn, err := stores.StateStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
-	if err != nil {
-		// either subnet does not exist or you are not uptodate
-	}
-	txn, err := stores.EventStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
-	if err != nil {
-		// either subnet does not exist or you are not uptodate
-	}
-	defer stateTxn.Discard(context.Background())
-	defer txn.Discard(context.Background())
+	
 	// localDataState := utils.IfThenElse(localTopicState != nil, &LocalDataState{
 	// 	ID: localTopicState.ID,
 	// 	Hash: localTopicState.Hash,
@@ -175,7 +183,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	// }()
 	
 	
-	previousEventUptoDate,  authEventUpToDate, _, eventIsMoreRecent, err := ProcessEvent(event,  eventData, true, saveSubscriptionEvent, &txn, nil, ctx)
+	previousEventUptoDate,  authEventUpToDate, _, eventIsMoreRecent, err := ProcessEvent(event,  eventData, true, saveSubscriptionEvent, nil, nil, ctx, dataStates)
 	if err != nil {
 		logger.Debugf("Processing Error...: %v", err)
 		return err
@@ -185,87 +193,32 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	
 	if previousEventUptoDate  && authEventUpToDate {
 
-		_topic, err := dsquery.GetTopicById(data.Topic)
-		if _topic != nil {
-			topic.Topic = *_topic
-		}
-		if topic.ID == "" ||  dsquery.IsErrorNotFound(err) {
-			// get topic like we got subnet
-			topicPath := entities.NewEntityPath(event.Validator, entities.TopicModel, data.Topic)
-				pp, err := p2p.GetState(cfg, *topicPath, &event.Validator, &topic)
-				if err != nil {
-					logger.Error(err)
-					
-				}
-				
-				topicEvent, err := entities.UnpackEvent(pp.Event, entities.TopicModel)
-				if err != nil {
-					logger.Error(err)
-					
-				}
-				if topicEvent != nil {
-					err = HandleNewPubSubTopicEvent(topicEvent, ctx)
-					if err != nil {
-						return err
-					}
-				}
-
-				
-		}
-
-		err = dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, &txn)
-		if err != nil { 
+		_topic := &entities.Topic{}
+		_, err = SyncTypedStateById(data.Topic, _topic, cfg, validator)
+		if err != nil {
+			logger.Error("HandleNewPubSubSubscriptionEvent/SyncTypedStateById", err)
 			return err
 		}
-		_, err = ValidateSubscriptionData(&event.Payload, &topic.Topic)
+		
+
+		if !event.IsLocal(cfg) {
+			_, err = ValidateSubscriptionData(&event.Payload, &topic.Topic)
+		}
 		if err != nil {
 			// update error and mark as synced
 			// notify validator of error
-			saveSubscriptionEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()}, &txn, nil )
+			dataStates.AddEvent(entities.Event{ID: event.ID, Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()})
+
 		} else {
 			// TODO if event is older than our state, just save it and mark it as synced
-			savedEvent, err := saveSubscriptionEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, nil );
-			if eventIsMoreRecent && err == nil {
+			logger.Infof("SAVINGSUBSCRIPITONS: %v, %v", event.ID, eventIsMoreRecent)
+			dataStates.AddEvent(entities.Event{ID: event.ID, IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()})
+			data.ID, _ = entities.GetId(data, data.ID)
+			if eventIsMoreRecent {
 				// update state
-				
-				_, err = dsquery.CreateSubscriptionState(&data, &stateTxn)
-					if err != nil {
-						stateTxn.Discard(context.Background())
-						// TODO worker that will retry processing unSynced valid events with error
-						_, err = saveSubscriptionEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, nil)
-					} else {
-						err = stateTxn.Commit(context.Background())
-					}
-				if err != nil {
-					// tx.Rollback()
-					logger.Errorf("SaveStateError %v", err)
-					return err
-				}
-				// err = stateTxn.Commit(context.Background())
-				if err == nil {
-					err = txn.Commit(context.Background())
-				}
-				
-			}
-			if err == nil {
-				go func ()  {
-					dsquery.IncrementStats(event, nil)
-					dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
-					OnFinishProcessingEvent(ctx, event, &models.SubscriptionState{
-						Subscription: data,
-					}, &savedEvent.Payload.Subnet)
-				}()
-			}
-			if string(event.Validator) != cfg.PublicKeyEDDHex {
-				go func () {
-				dependent, err := dsquery.GetDependentEvents(event)
-				if err != nil {
-					logger.Debug("Unable to get dependent events", err)
-				}
-				for _, dep := range *dependent {
-					HandleNewPubSubEvent(dep, ctx)
-				}
-				}()
+					dataStates.AddCurrentState(entities.SubscriptionModel, data.DataKey(), data)	
+			} else {
+				dataStates.AddHistoricState(entities.SubscriptionModel, data.DataKey(), data.MsgPack())
 			}
 			
 		}

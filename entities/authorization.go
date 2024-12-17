@@ -115,6 +115,21 @@ func (g *Authorization) AccountAuthorizationsKey() (string) {
 	}
 }
 
+func AccountAuthorizationsKeyToAuthorization(key string) (*Authorization, error) {
+	parts := strings.Split(key, "/")
+	if len(parts) > 3 {
+		return nil, fmt.Errorf("auth key too long")
+	}
+	auth := &Authorization{Account: DIDFromString(parts[0]).ToDIDString(), Subnet: parts[1]}
+	if len(parts) > 2 {
+		auth.Agent = DIDFromString(parts[2]).ToDeviceString()
+	}
+	return auth, nil
+}
+func (item *Authorization) ToAccountAuthKey() string {
+	return fmt.Sprintf("%s/%s/%s", item.Subnet, item)
+}
+
 func (item *Authorization) Key() string {
 	// if item.ID == "" {
 	// 	item.ID, _ = GetId(item)

@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
+
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -61,12 +63,13 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 func (p *RestService) Initialize() *gin.Engine {
-	router := gin.New()
+	router := gin.Default()
 	if p.Cfg.LogLevel == "info" || p.Cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
+	// router.Use(gin.Logger(), gin.Recovery())
 	requestProcessor := client.NewClientRequestProcess(p.Ctx)
 	// router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
     //     logger.Infof("[GIN]: %s - [%s] \"%s %s %s %d %s \"%s\" \"%s\"\n",
@@ -83,7 +86,7 @@ func (p *RestService) Initialize() *gin.Engine {
     //     return ""
     // }))
 	
-
+	
 	router.Use(CORSMiddleware())
 	
 
@@ -430,12 +433,14 @@ func (p *RestService) Initialize() *gin.Engine {
 
 
 	router.POST("/api/topics/messages", func(c *gin.Context) {
+		defer utils.TrackExecutionTime(time.Now(), "POST:CreateEvent")
+		logger.Debugf("NewRequeset:::::: %v")
 		var payload entities.ClientPayload
 		if err := c.BindJSON(&payload); err != nil {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-		logger.Debugf("Payload:::::: %v", payload.Data)
+		// logger.Debugf("Payload:::::: %v", payload.Data)
 		message := entities.Message{}
 		d, _ := json.Marshal(payload.Data)
 		e := json.Unmarshal(d, &message)
@@ -454,6 +459,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		}
 
 		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: event}))
+		// c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: entities.Event{}}))
 
 	})
 
@@ -464,24 +470,17 @@ func (p *RestService) Initialize() *gin.Engine {
 			return
 		}
 		logger.Debugf("Payload %v", payload.Data)
-		subscription := entities.Subscription{}
-		d, _ := json.Marshal(payload.Data)
-		e := json.Unmarshal(d, &subscription)
-		if e != nil {
-			logger.Errorf("UnmarshalError %v", e)
-			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: e.Error()}))
-			return
-		}
-		// subscription.ID = id
-		payload.Data = subscription
-		event, err := client.CreateEvent(payload, p.Ctx)
-
+		event, err := requestProcessor.Process(client.WriteSubscriptionRequest, nil, payload)
 		if err != nil {
+			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
 
-		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: event}))
+		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: map[string]any{
+			"event": event,
+		}}))
+		
 	})
 
 	router.GET("/api/subscription/account", func(c *gin.Context) {
@@ -554,6 +553,7 @@ func (p *RestService) Initialize() *gin.Engine {
 	})
 
 	router.GET("/api/main-stats", func(c *gin.Context) {
+		
 		mainStats, err := client.GetMainStats(p.Cfg)
 		if err != nil {
 			logger.Error(err)

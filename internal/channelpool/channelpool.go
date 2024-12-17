@@ -3,7 +3,7 @@ package channelpool
 import (
 	"github.com/mlayerprotocol/go-mlayer/entities"
 )
-const CHANNEL_SIZE = 1024
+const CHANNEL_SIZE = 50
 // channels for moving events received from other nodes through the pubsub channels
 var AuthorizationEvent_SubscriptionC = make(chan *entities.Event, CHANNEL_SIZE)
 var IncomingTopicEventSubscriptionC = make(chan *entities.Event, CHANNEL_SIZE)
@@ -18,6 +18,7 @@ var MessageEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
 var UnSubscribeEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
 var ApproveSubscribeEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
 var EventProcessorChannel = make(chan *entities.Event, CHANNEL_SIZE)
+var EventCounterChannel = make(chan *entities.Event, CHANNEL_SIZE)
 
 // CLEANUP
 // most of these will be deleted

@@ -19,8 +19,10 @@ import (
 	// "net/rpc/jsonrpc"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ipfs/go-datastore"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	dsstores "github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/quic-go/quic-go"
@@ -28,6 +30,7 @@ import (
 	// "github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
+	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/channelpool"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
@@ -91,6 +94,7 @@ func Start(mainCtx *context.Context) {
 	ctx = context.WithValue(ctx, constants.ConnectedSubscribersMap, connectedSubscribers)
 
 	ctx = context.WithValue(ctx, constants.WSClientLogId, &wsClients)
+	eventProcessor := NewEventProcessor(&ctx)
 
 	// defer func () {
 	// 	if chain.NetworkInfo.Synced && SystemStore != nil && !SystemStore.DB.IsClosed() {
@@ -151,13 +155,83 @@ func Start(mainCtx *context.Context) {
 
 	// 	}
 	// }()
+	wg.Add(1)
+	go func() {
+		_, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		defer wg.Done()
+		var countDuration = 1 * time.Second
+		ticker := time.NewTicker(countDuration)
+		defer ticker.Stop()
+		
+		for range ticker.C {
+				readDone := make(chan bool)
+				count := map[string]uint64{}
+				cyleEvent := map[string]string{}
+				// count[entities.NetworkCounterKey(nil)] = 0
+				
+				go func() {
+					for {
+						select {
+						case event := <-channelpool.EventCounterChannel:
+							// fmt.Println("Received event:", event)
+							count[entities.NetworkCounterKey(nil)] ++
+							
+							count[entities.CycleCounterKey(event.Cycle, &event.Validator, utils.FalsePtr(), nil)] ++
+							subnet := event.Subnet
+							if len(subnet) == 0 {
+								subnet = event.Payload.Subnet
+							}
+							if len(subnet) > 0 {
+								// keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), &subnet)))
+								count[entities.NetworkCounterKey(&subnet)] ++
+							} else {
+								count[entities.CycleSubnetKey(event.Cycle, subnet)] ++ 
+							}
+							for _, keyString := range entities.GetBlockStatsKeys(event) {
+								if keyString == entities.RecentEventKey(event.Cycle) {
+									cyleEvent[keyString] = event.ID
+									continue
+								}
+								count[keyString] ++
+							}
+
+						case <-time.After(countDuration): // Exit the reader after 1s
+							
+							if len(count) > 0 || len(cyleEvent) > 0  {
+								txn, err := dsquery.InitTx(dsstores.NetworkStatsStore, nil)
+								if err != nil {
+									logger.Error("NetworkStateStoreError: %v", err)
+								}
+								for k, v := range count {
+									if v > 0 {
+										dsquery.IncrementCounterByKey(k, v, &txn)
+									}
+								}
+								for k, v := range cyleEvent {
+									txn.Put(context.Background(), datastore.NewKey(k), []byte(v))
+								}
+								err = txn.Commit(context.Background())
+								if err != nil {
+									logger.Errorf("CounterCommitError %v", err)
+								}
+							}
+							
+							readDone <- true
+							return
+						}
+					}
+				}()
+				<-readDone
+		}
+	}()
 
 	wg.Add(1)
 	go func() {
 		_, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		defer wg.Done()
-		subnetManager := NewSubnetManager(&ctx)
+		
 		chain.NetworkInfo.SyncedValidators = map[string]multiaddr.Multiaddr{}
 		// ticker := time.NewTicker(500 * time.Millisecond)
 		// defer ticker.Stop()
@@ -166,8 +240,9 @@ func Start(mainCtx *context.Context) {
 					for eventPtr := range channelpool.EventProcessorChannel {
 						event := eventPtr
 						//modelType := event.GetDataModelType()
+						
+						eventProcessor.HandleEvent(event)
 
-						subnetManager.HandleEvent(event)
 						
 					// 		logger.Debugf("StartedProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
 					// 		cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)

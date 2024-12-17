@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/mlayerprotocol/go-mlayer/cmd"
 )
@@ -27,5 +28,6 @@ func main() {
 	if err != nil {
 		fmt.Println("Error setting release date:", err)
 	}
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	cmd.Execute(version, releaseDate)
 }

@@ -4,9 +4,11 @@ import (
 	// "errors"
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
+	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
@@ -99,7 +101,7 @@ func NewMessageService(mainCtx *context.Context) *MessageService {
 // }
 
 func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *models.AuthorizationState) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, err error) {
-
+	defer utils.TrackExecutionTime(time.Now(), "ValidateMessagePayload")
 	payloadData := entities.Message{}
 	d, _ := json.Marshal(payload.Data)
 	e := json.Unmarshal(d, &payloadData)

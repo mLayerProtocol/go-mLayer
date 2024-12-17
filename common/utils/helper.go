@@ -105,6 +105,12 @@ func CopyStructValues(src, dst interface{}) error {
 
 	return nil
 }
+
+func TrackExecutionTime(start time.Time, functionName string) {
+	elapsed := time.Since(start)
+	fmt.Printf("Function %s ran for %v\n", functionName, elapsed)
+}
+
 func UpdateStruct(src, dst interface{}) {
 	srcVal := reflect.ValueOf(src).Elem()
 	dstVal := reflect.ValueOf(dst).Elem()

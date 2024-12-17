@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dgraph-io/badger/v4"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/configs"
@@ -26,6 +27,7 @@ func New(mainCtx *context.Context, keyStore string) (*Datastore) {
 	}
 	
 	dir := filepath.Join(cfg.DataDir, "store", "kv", keyStore)
+	valueLogDir := filepath.Join(cfg.DataDir, "store", "kv", "logs", keyStore)
 	if !strings.HasPrefix(dir, "./") && !strings.HasPrefix(dir, "../") && !filepath.IsAbs(dir) {
 		dir = "./" + dir
 		if strings.HasPrefix(cfg.DataDir, "../") {
@@ -36,7 +38,42 @@ func New(mainCtx *context.Context, keyStore string) (*Datastore) {
 	if err != nil {
 		panic(err)
 	}
-	ds, err := NewDatastore(dir, &DefaultOptions)
+	err = os.MkdirAll(valueLogDir, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+
+	opts := badger.DefaultOptions(dir).
+        WithValueDir(valueLogDir).
+        WithMemTableSize(1 << 30 / 5).
+        WithValueLogFileSize(1 << 30).
+        WithNumMemtables(10).
+
+		
+        WithNumLevelZeroTables(12).
+        WithNumLevelZeroTablesStall(20).
+        WithValueLogMaxEntries(1000000).
+        WithNumCompactors(8).
+        WithSyncWrites(false).
+        WithLogger(nil). // Disable info logging
+     
+        WithDetectConflicts(false).
+        WithBlockCacheSize(1 << 30 / 2). // 1GB block cache
+        WithIndexCacheSize(1 << 30 / 2)  // 1GB index cache
+
+
+    opts.WithLevelSizeMultiplier(100)       // More aggressive level sizing
+    opts.WithBaseTableSize(10 << 20 * 100)       // 10MB
+    opts.WithValueThreshold(1024)          // Store values > 1KB in value log
+    opts.WithNumVersionsToKeep(1)          // Keep only latest version
+    opts.WithBloomFalsePositive(0.01)    
+	opts.WithLoggingLevel(badger.INFO)
+
+	opt := DefaultOptions
+	opt.Options = opts
+	
+	
+	ds, err := NewDatastore(dir, &opt)
 	if err != nil {
 		panic(err)
 	}

@@ -74,7 +74,7 @@ func publishChannelEventToNetwork(channelPool chan *entities.Event, pubsubChanne
 			continue
 		}
 		event, ok := <-channelPool
-
+		
 		if !ok {
 			logger.Fatalf("Channel pool closed. %v", &channelPool)
 			panic("Channel pool closed")
@@ -118,7 +118,7 @@ func publishChannelEventToNetwork(channelPool chan *entities.Event, pubsubChanne
 			// 		logger.Errorf("Failed to ENCODE %v", err)
 			// 		continue
 			// 	}
-
+			
 			err := pubsubChannel.Publish(entities.NewPubSubMessage(pack))
 
 			if err != nil {
@@ -144,8 +144,9 @@ func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPub
 			continue
 		}
 		logger.Infof("Listening for broadcasted \"%s\" events...", modelType)
-
+		
 		message, ok := <-fromPubSubChannel.Messages
+		// utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("newMessage" + "\n"))
 		if !ok {
 			logger.Fatalf("Primary Message channel closed. Please restart server to try or adjust buffer size in config")
 			return
@@ -153,15 +154,18 @@ func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPub
 		
 
 		event, errT := entities.UnpackEvent(message.Data, modelType)
+		
 		logger.Debugf("ReceivedEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
 		if errT != nil {
 			logger.Errorf("Error receiving event  %v\n", errT)
-			continue
+			panic(errT)
+			// continue
 		}
 
 	
 		logger.Debugf("ProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
 		// event.ID, _ = event.GetId()
+	
 		channelpool.EventProcessorChannel <- event
 		// go process(event, mainCtx)
 	}
@@ -291,6 +295,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			logger.Debugf("processP2pPayload: %v", err)
 		}
 		logger.Errorf("ReceivedGetState Request... %v", ePath)
+		
 		state, err := dsquery.GetStateFromEntityPath(ePath)
 		
 		if err != nil || len(state) == 0 {

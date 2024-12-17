@@ -26,6 +26,8 @@ func GetSubnetStateById(did string) (*entities.Subnet, error) {
 	return &data, err
 }
 
+
+
 func CreateSubnetState(newState *entities.Subnet, tx *datastore.Txn) (sub *entities.Subnet, err error) {
 	ds := stores.StateStore
 	if newState.ID == "" {
@@ -77,7 +79,7 @@ func CreateSubnetState(newState *entities.Subnet, tx *datastore.Txn) (sub *entit
 	return newState, nil
 }
 
-func UpdateSubnetState(id string, newState *entities.Subnet, tx *datastore.Txn) (*entities.Subnet, error) {
+func UpdateSubnetState(id string, newState *entities.Subnet, tx *datastore.Txn, create bool) (*entities.Subnet, error) {
 	ds := stores.StateStore
 	txn, err := InitTx(ds, tx)
 	if err != nil {
@@ -96,6 +98,9 @@ func UpdateSubnetState(id string, newState *entities.Subnet, tx *datastore.Txn) 
 	oldState, err := GetSubnetStateById(id)
 
 	if err != nil {
+		if IsErrorNotFound(err) && create {
+			return CreateSubnetState(newState, tx)
+		}
 		return nil, err
 	}
 

@@ -145,11 +145,21 @@ func CreateTopicState(newState *entities.Topic, tx *datastore.Txn) (sub *entitie
 	// return newState, nil
 }
 
-func UpdateTopicState(id string, newState *entities.Topic, tx *datastore.Txn) (*entities.Topic, error) {
-	oldTopic, err :=  GetTopicById(id)
+func UpdateTopicState(id string, newState *entities.Topic, tx *datastore.Txn, create bool) (*entities.Topic, error) {
+	id, err := entities.GetId(*newState, id)
 	if err != nil {
 		return nil, err
 	}
+	oldTopic, err :=  GetTopicById(id)
+	if err != nil {
+		if  IsErrorNotFound(err) {
+			return nil, err
+		}
+		if create {
+			return CreateTopicState(newState, tx)
+		}
+	}
+	
 	err = UpdateState(id, NewStateParam{
 		OldIDKey:  fmt.Sprintf("%s/id/%s", entities.TopicModel, id),
 		DataKey: newState.DataKey(),

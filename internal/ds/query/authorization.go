@@ -38,7 +38,7 @@ func GetAccountAuthorizations( auth entities.Authorization, limits *QueryLimit, 
 			Offset: limits.Offset,
 		})
 	} else {
-		rsl,  err = ds.Query(context.Background(), query.Query{
+		rsl,  err = (*ds).Query(context.Background(), query.Query{
 			Prefix: auth.AccountAuthorizationsKey(),
 			Limit:  limits.Limit,
 			Offset: limits.Offset,

@@ -689,7 +689,9 @@ func syncBlocks(cfg *configs.MainConfiguration, hostQuicAddress multiaddr.Multia
 					return err
 				}
 				logger.Infof("SyncEvent: %+v", event.ID)
+				
 				channelpool.EventProcessorChannel <- event
+				
 			// b := dsquery.ExportData{}
 			// err := encoder.MsgPackUnpackStruct(part, &b)
 			// if err != nil {

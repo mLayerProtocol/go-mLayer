@@ -13,13 +13,10 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
-	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
-	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
 	"gorm.io/gorm"
 	// query "github.com/mlayerprotocol/go-mlayer/internal/sql/query"
 )
@@ -117,7 +114,7 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 	if !valid {
 		return nil, apperror.Unauthorized("Invalid subnet data signature")
 	}
-	
+
 	if subnet.ID != "" {
 		// var  curSt  models.SubnetState
 		// query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: subnet.ID}}, &curSt)
@@ -149,6 +146,8 @@ func HandleNewPubSubSubnetEvent(event *entities.Event, ctx *context.Context, ) e
 		panic("Unable to load config from context")
 	}
 	
+	dataStates := dsquery.NewDataStates(cfg)
+	dataStates.AddEvent(*event)
 	
 	data := event.Payload.Data.(entities.Subnet)
 	data.Event = *event.GetPath()
@@ -168,6 +167,19 @@ func HandleNewPubSubSubnetEvent(event *entities.Event, ctx *context.Context, ) e
 	} else {
 		id = data.ID
 	}
+
+	defer func () {
+		stateUpdateError := dataStates.Commit(nil, nil, nil)
+		if stateUpdateError != nil {
+			
+			panic(stateUpdateError)
+		} else {
+			go  OnFinishProcessingEvent(ctx, event,  &data)
+			
+			
+			// go utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("newMessage" + "\n"))
+		}	
+	}()
 	
 	var localState models.SubnetState
 	
@@ -225,242 +237,120 @@ func HandleNewPubSubSubnetEvent(event *entities.Event, ctx *context.Context, ) e
 	// 		tx.Commit()
 	// 	}
 	// }()
-	txn, err := stores.EventStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
-	if err != nil {
-		// either subnet does not exist or you are not uptodate
-	}
-	defer txn.Discard(context.Background())  
-	previousEventUptoDate,  _, _, eventIsMoreRecent, err := ProcessEvent(event,  eventData, false, saveSubnetEvent, &txn, nil, ctx)
+	// txn, err := stores.EventStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
+	// if err != nil {
+	// 	// either subnet does not exist or you are not uptodate
+	// }
+	// defer txn.Discard(context.Background())  
+	previousEventUptoDate,  _, _, eventIsMoreRecent, err := ProcessEvent(event,  eventData, false, saveSubnetEvent, nil, nil, ctx, dataStates)
 	if err != nil {
 		logger.Debugf("Processing Error...: %v", err)
 		return err
 	}
 	
 		event.Subnet = id
-		err = dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, &txn)
-		if err != nil { 
-			return err
-		}
+		// err = dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, &txn)
+		// if err != nil { 
+		// 	return err
+		// }
 	
 	logger.Debugf("Processing 2...: %v", previousEventUptoDate)
 	if previousEventUptoDate {
-		_, err = ValidateSubnetData(&event.Payload, cfg.ChainId)
-		
+
+		if event.Validator != entities.PublicKeyString(cfg.PublicKeyEDDHex) {
+			_, err = ValidateSubnetData(&event.Payload, cfg.ChainId)
+		}
 		
 		if err != nil {
 			// update error and mark as synced
 			// notify validator of error
-			logger.Infof("InvalidSubnetData: %v",  err)
-			saveSubnetEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()}, &txn, nil )
+			dataStates.AddEvent(entities.Event{ID: event.ID, Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()})
 			
 		} else {
 			// TODO if event is older than our state, just save it and mark it as synced
+			dataStates.AddEvent(entities.Event{ID: event.ID, IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()})
+		
+			// savedEvent, err := saveSubnetEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid:  utils.TruePtr(), Subnet: event.Subnet, Synced:  utils.TruePtr()}, &txn, nil );
+			// data.ID, _ = entities.GetId(data, id)
 			
-			savedEvent, err := saveSubnetEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid:  utils.TruePtr(), Subnet: event.Subnet, Synced:  utils.TruePtr()}, &txn, nil );
-			if eventIsMoreRecent && err == nil {
+			if eventIsMoreRecent {
 				// update state
-				if data.ID != "" {
-					logger.Debug("DataID", data.ID)
-					_, err = dsquery.UpdateSubnetState(id, &data, nil)
-					if err != nil {
-						// TODO worker that will retry processing unSynced valid events with error
-						_, err = saveSubnetEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, nil )
-						
-					}
-				} else {
-					//err = tx.Create(&models.SubnetState{Subnet: data}).Error
-					logger.Infof("UpdateSubnetState: %s", data.ID)
-					_, err = dsquery.CreateSubnetState(&data, nil)
-					if err != nil {
-						// TODO worker that will retry processing unSynced valid events with error
-						_, err =  saveSubnetEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid:  utils.FalsePtr(), Synced:  utils.TruePtr()}, &txn, nil )
-					}
-				}
-				if err != nil {
-					// tx.Rollback()
-					logger.Errorf("SaveStateError %v", err)
-					return err
-				} else {
-					_, err = saveSubnetEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid: utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, nil )
-				}
+					dataStates.AddCurrentState(entities.SubnetModel, id, data)
 				
+				// if err != nil {
+				// 	// tx.Rollback()
+				// 	logger.Errorf("SaveStateError %v", err)
+				// 	return err
+				// } else {
+				// 	_, err = saveSubnetEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid: utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, nil )
+				// }
+			} else {
+				dataStates.AddHistoricState(entities.SubnetModel, data.ID, data.MsgPack())
 			}
-			if err == nil {
-				if err = txn.Commit(context.Background()); err != nil {
-					logger.Errorf("ErorrSavingEvent: %v", err)
-					return err
-				}
-				go func ()  {
-					dsquery.UpdateAccountCounter(data.Account.ToString())
-					//event.Subnet = savedEvent.ID
-					dsquery.IncrementStats(event, nil)
+			// if err == nil {
+			// 	if err = txn.Commit(context.Background()); err != nil {
+			// 		logger.Errorf("ErorrSavingEvent: %v", err)
+			// 		return err
+			// 	}
+			// 	go func ()  {
+			// 		dsquery.UpdateAccountCounter(data.Account.ToString())
+			// 		//event.Subnet = savedEvent.ID
+			// 		dsquery.IncrementStats(event, nil)
 
-					OnFinishProcessingEvent(ctx, event, &models.SubnetState{
-							Subnet: data,
-						}, &savedEvent.ID)
-				}()
+			// 		OnFinishProcessingEvent(ctx, event, &models.SubnetState{
+			// 				Subnet: data,
+			// 			}, &savedEvent.ID)
+			// 	}()
 				
-			}
+			// }
 			
 			
-			if string(event.Validator) != cfg.PublicKeyEDDHex {
-				go func () {
-				dependent, err := dsquery.GetDependentEvents(event)
-				if err != nil {
-					logger.Debug("Unable to get dependent events", err)
-				}
-				for _, dep := range *dependent {
-					HandleNewPubSubEvent(dep, ctx)
-				}
-				}()
-			}
 			
 		}
 
 }
 return nil
 }
-func UpdateStateFromPeer(id string , modelType  entities.EntityModel,  cfg *configs.MainConfiguration,  validator string, ) (any, error) {
-	state := entities.GetStateModelFromEntityType(modelType)
-	
-	if validator == "" {
-		validator = chain.NetworkInfo.GetRandomSyncedNode()
-	}
-	if len(validator) == 0 {
-		return nil, apperror.NotFound(string(modelType) + " state not found")
-	}
-	logger.Infof("GettingTopic 1:::")
-	subPath := entities.NewEntityPath(entities.PublicKeyString(validator), modelType, id)
-	var pp *p2p.P2pEventResponse
-	var err error
-	switch(modelType) {
-	case entities.SubnetModel:
-		newState := state.(entities.Authorization)
-		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
-		state = newState
-	case entities.AuthModel:
-		newState := state.(entities.Authorization)
-		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
-		state = newState
-	case entities.TopicModel:
-		logger.Infof("GettingTopic:::")
-		newState := state.(entities.Topic)
-		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
-		state = newState
-	case entities.SubscriptionModel:
-		newState := state.(entities.Subscription)
-		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
-		state = newState
-	case entities.MessageModel:
-		newState := state.(entities.Message)
-		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
-		state = newState
-	default:
 
-	}
-	logger.Infof("NEWSTATE %v", state, )
-	if err != nil {
-		return nil, err
-	}
-	if len(pp.Event) < 2 {
-		return nil, apperror.NotFound(string(modelType) + " state not found")
-	}
-	event, err := entities.UnpackEvent(pp.Event, modelType)
-	if err != nil {
-		logger.Errorf("UnpackError: %v", err)
-		return  nil, err
-	}
-	err = dsquery.CreateEvent(event, nil)
-	if err != nil {
-		return nil, err
-	}
-	switch(modelType) {
-	case entities.SubnetModel:
-		newState := state.(entities.Subnet)
-		newState.ID = id
-		_, err = dsquery.CreateSubnetState(&newState, nil);
-	case entities.AuthModel:
-		newState := state.(entities.Authorization)
-		newState.ID = id
-		_, err = dsquery.CreateAuthorizationState(&newState, nil);
-	case entities.TopicModel:
-		newState := state.(entities.Topic)
-		newState.ID = id
-		logger.Infof("TopicState: %v", newState)
-		_, err = dsquery.CreateTopicState(&newState, nil);
-	case entities.SubscriptionModel:
-		newState := state.(entities.Subscription)
-		newState.ID = id
-		_, err = dsquery.CreateSubscriptionState(&newState, nil);
-	case entities.MessageModel:
-		newState := state.(entities.Message)
-		newState.ID = id
-		_, err = dsquery.CreateMessageState(&newState, nil);
-	default:
+// func UpdateSubnetFromPeer(subnetId string , cfg *configs.MainConfiguration, validator string) (*entities.Subnet, error) {
+// 	_subnet := &entities.Subnet{}
+// 	if validator == "" {
+// 		validator = chain.NetworkInfo.GetRandomSyncedNode()
+// 	}
+// 	if len(validator) == 0 {
+// 		return nil, apperror.NotFound("subnet not found")
+// 	}
+// 	subPath := entities.NewEntityPath(entities.PublicKeyString(validator), entities.SubnetModel, subnetId)
+// 	pp, err := p2p.GetState(cfg, *subPath, nil, _subnet)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if len(pp.Event) < 2 {
+// 		return nil, apperror.NotFound("subnet not found")
+// 	}
+// 	subnetEvent, err := entities.UnpackEvent(pp.Event, entities.SubnetModel)
+// 	if err != nil {
+// 		logger.Errorf("UnpackError: %v", err)
+// 		return  nil, err
+// 	}
+// 	err = dsquery.CreateEvent(subnetEvent, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	for _, snetData := range pp.States {
+// 		_subnet, err := entities.UnpackSubnet(snetData)
+// 		logger.Infof("FoundSubnet %v", _subnet)
+// 		if err != nil {
+// 			return  nil, apperror.NotFound("unable to retrieve subnet")
+// 		}
+// 			s, err := dsquery.CreateSubnetState(&_subnet, nil)
+// 			logger.Infof("FoundSubnet 2 %v", _subnet)
+// 			if err != nil {
+// 				return  nil, apperror.NotFound("subnet not saved")
+// 			}
+// 			_subnet = *s;
 		
-
-
-
-	}
-	if err != nil {
-		return nil, err
-	}
-	// for _, data := range pp.States {
-	// 	state, err := entities.UnpackSubnet(snetData)
-	// 	logger.Infof("FoundSubnet %v", _subnet)
-	// 	if err != nil {
-	// 		return  nil, apperror.NotFound("unable to retrieve subnet")
-	// 	}
-	// 		s, err := dsquery.CreateSubnetState(&_subnet, nil)
-	// 		logger.Infof("FoundSubnet 2 %v", _subnet)
-	// 		if err != nil {
-	// 			return  nil, apperror.NotFound("subnet not saved")
-	// 		}
-	// 		_subnet = *s;
-		
-	// }
-	return state, nil
-
-}
-func UpdateSubnetFromPeer(subnetId string , cfg *configs.MainConfiguration, validator string) (*entities.Subnet, error) {
-	_subnet := &entities.Subnet{}
-	if validator == "" {
-		validator = chain.NetworkInfo.GetRandomSyncedNode()
-	}
-	if len(validator) == 0 {
-		return nil, apperror.NotFound("subnet not found")
-	}
-	subPath := entities.NewEntityPath(entities.PublicKeyString(validator), entities.SubnetModel, subnetId)
-	pp, err := p2p.GetState(cfg, *subPath, nil, _subnet)
-	if err != nil {
-		return nil, err
-	}
-	if len(pp.Event) < 2 {
-		return nil, apperror.NotFound("subnet not found")
-	}
-	subnetEvent, err := entities.UnpackEvent(pp.Event, entities.SubnetModel)
-	if err != nil {
-		logger.Errorf("UnpackError: %v", err)
-		return  nil, err
-	}
-	err = dsquery.CreateEvent(subnetEvent, nil)
-	if err != nil {
-		return nil, err
-	}
-	for _, snetData := range pp.States {
-		_subnet, err := entities.UnpackSubnet(snetData)
-		logger.Infof("FoundSubnet %v", _subnet)
-		if err != nil {
-			return  nil, apperror.NotFound("unable to retrieve subnet")
-		}
-			s, err := dsquery.CreateSubnetState(&_subnet, nil)
-			logger.Infof("FoundSubnet 2 %v", _subnet)
-			if err != nil {
-				return  nil, apperror.NotFound("subnet not saved")
-			}
-			_subnet = *s;
-		
-	}
-	return _subnet, nil
-}
+// 	}
+// 	return _subnet, nil
+// }
 

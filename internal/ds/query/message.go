@@ -99,8 +99,7 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 		return nil, err
 	}
 	stateBytes := newState.MsgPack()
-	keys := newState.GetKeys()
-	logger.Infof("CREATINGMESSAGE: %+v", keys)
+	
 	ds := stores.MessageStore
 	txn, err := InitTx(ds, tx)
 	if err != nil {
@@ -111,9 +110,13 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 	}
 	
 	uniqId := newState.UniqueId()
-	_, checkError := txn.Get(context.Background(), datastore.NewKey(uniqId))
-	if checkError == nil {
-		return nil, fmt.Errorf("duplicate message: %s", uniqId)
+	stateByte, checkError := txn.Get(context.Background(), datastore.NewKey(uniqId))
+	if checkError == nil  && len(stateByte) > 0 {
+		m, err := entities.UnpackMessage(stateByte)
+		if err != nil {
+			return nil, err
+		}
+		return &m, err
 	}
 	
 	id, err :=  entities.GetId(newState, newState.ID)

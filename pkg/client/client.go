@@ -2,7 +2,9 @@ package client
 
 import (
 	"encoding/hex"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
@@ -100,18 +102,26 @@ func ValidateClientPayload(
 	// logger.Debugf("AGENTTTT %s", agent)
 	// subnet := models.SubnetState{}
 	// err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: payload.Subnet}}, &subnet)
-	 subnet , err := dsquery.GetSubnetStateById(payload.Subnet)
+	// subnet , err := dsquery.GetSubnetStateById(payload.Subnet)
+	subnet := &entities.Subnet{}
+	_, err = service.SyncTypedStateById(payload.Subnet, subnet, cfg, "")
+	// if err != nil {
+	// 	// if err == gorm.ErrRecordNotFound {
+	// 	if dsquery.IsErrorNotFound(err){
+	// 		logger.Infof("GettingSubnetFrom %s", payload.Subnet )
+	// 		subnet, err = service.UpdateSubnetFromPeer(payload.Subnet, cfg, "" )
+	// 		if err != nil || subnet == nil || subnet.ID == "" {
+	// 			return nil,  nil, apperror.Forbidden("Invalid subnet id")
+	// 		}
+	// 	} else {
+	// 		return nil, nil, apperror.Internal(err.Error())
+	// 	}
+	// }
 	if err != nil {
-		// if err == gorm.ErrRecordNotFound {
-		if dsquery.IsErrorNotFound(err){
-			logger.Infof("GettingSubnetFrom %s", payload.Subnet )
-			subnet, err = service.UpdateSubnetFromPeer(payload.Subnet, cfg, "" )
-			if err != nil || subnet == nil || subnet.ID == "" {
-				return nil,  nil, apperror.Forbidden("Invalid subnet id")
-			}
-		} else {
-			return nil, nil, apperror.Internal(err.Error())
-		}
+		return nil, nil, err
+	}
+	if subnet == nil {
+		return nil, nil, apperror.Forbidden("Invalid subnet")
 	}
 	if *subnet.Status ==  0 {
 		return nil, nil, apperror.Forbidden("Subnet is disabled")
@@ -151,9 +161,13 @@ func ValidateClientPayload(
 				for _, a := range authDatas {
 					logger.Debugf("AuthStatesss::: %s", a.Event.Hash)
 				}
-				logger.Debugf("New Event for Agent/Device %+v", authDatas)
+				
 				authData = models.AuthorizationState{Authorization: *authDatas[0]};
-				return &authData, &agent,  nil
+				logger.Debugf("New Event for Agent/Device %+v, %d, %d", authData, *authData.Duration , *authData.Timestamp)
+				if *authData.Duration != 0 && (*authData.Duration + *authData.Timestamp) < uint64(time.Now().UnixMilli()) {
+					return nil, &agent,  fmt.Errorf("invalid authdata")
+				}
+				return &authData, &agent, err
 			}
 		} else {
 			return nil, &agent,  nil

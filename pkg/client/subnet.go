@@ -199,8 +199,9 @@ func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.Aut
 		return nil, nil, apperror.BadRequest("Invalid event timestamp")
 	}
 	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-	logger.Infof("BeforeValidate 1: %s", payload.Signature)
+
 	currentState, err2 := service.ValidateSubnetData(&payload, cfg.ChainId)
+	logger.Infof("IVLAIDERR %v", err2)
 	if err2 != nil {
 		return nil, nil, err2
 	}
@@ -215,6 +216,7 @@ func ValidateSubnetPayload(payload entities.ClientPayload, authState *models.Aut
 		// var found []models.SubnetState
 		// query.GetMany(&models.SubnetState{Subnet: entities.Subnet{Ref: payloadData.Ref}}, &found, nil)
 		refExists, err := dsquery.RefExists(entities.SubnetModel, payloadData.Ref, "")
+		logger.Debugf("DATATATAA: %v", refExists)
 		if err != nil {
 			return nil, nil, err
 		}

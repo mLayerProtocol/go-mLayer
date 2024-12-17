@@ -43,7 +43,6 @@ func GetId(d Payload, id string) (string, error) {
 	if len(sig) == 0 {
 		return "", fmt.Errorf("payload has no signature")
 	}
-	logger.Info("SIGNATUIRE", sig)
 	b, err := hex.DecodeString(strings.ReplaceAll(sig, "0x","")[:32])
 	if err != nil {
 		return "", err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/ipfs/go-datastore"
@@ -29,13 +30,16 @@ func IsErrorNotFound(e error) bool {
 }
 
 func GetEventById(id string, modelType entities.EntityModel) (*entities.Event, error) {
-	key := (&entities.Event{ID: id}).Key()
+	key := (&entities.Event{ID: id}).DataKey()
+	
 	value, err := stores.EventStore.Get(context.Background(), datastore.NewKey(key))
+	
 	if err != nil {
 		return nil, err
 	}
 	event, err := entities.UnpackEvent(value, modelType)
 	if err != nil {
+		logger.Errorf("GetEventByIdError: %v", err)
 		return nil, err
 	}
 	return event, err
@@ -44,7 +48,7 @@ func GetEventByIdTxn(id string, modelType entities.EntityModel, txn *datastore.T
 	if txn == nil {
 		return GetEventById(id, modelType)
 	}
-	key := (&entities.Event{ID: id}).Key()
+	key := (&entities.Event{ID: id}).DataKey()
 	
 	
 	value, err := (*txn).Get(context.Background(), datastore.NewKey(key))
@@ -58,20 +62,22 @@ func GetEventByIdTxn(id string, modelType entities.EntityModel, txn *datastore.T
 	return event, err
 }
 
-func CreateEvent(event *entities.Event, tx *datastore.Txn) (err error) {
+func createEvent(event *entities.Event, tx *datastore.Txn) (err error) {
+	defer utils.TrackExecutionTime(time.Now(), "DSQUERY::CreateEvent::")
 	ds := stores.EventStore
 	event.ID, err = event.GetId()
 	if err != nil {
 		return err
 	}
+	
 	eventBytes := event.MsgPack()
 	keys := event.GetKeys()
-	logger.Debugf("Creating Event: %+v", event)
+	// logger.Debugf("Creating Event: %+v", event)
 	txn, err := InitTx(ds, tx)
 	if tx == nil {
 		defer txn.Discard(context.Background())
 	}
-	// return txn.Set(key.Bytes(), value)
+	
 	for _, key := range keys {
 		logger.Debugf("SavingEventWithKey: %s, %v", key, event.ID)
 		if strings.EqualFold(key, event.BlockKey()) {
@@ -83,7 +89,7 @@ func CreateEvent(event *entities.Event, tx *datastore.Txn) (err error) {
 			}
 			continue
 		}
-		if strings.EqualFold(key, event.Key()) {
+		if strings.EqualFold(key, event.DataKey()) {
 			logger.Debugf("SavingEventId: %s, %v", key, event.ID)
 			if err := txn.Put(context.Background(), datastore.NewKey(key), eventBytes); err != nil {
 				return err
@@ -104,7 +110,7 @@ func CreateEvent(event *entities.Event, tx *datastore.Txn) (err error) {
 
 }
 
-func UpdateEvent(event *entities.Event, tx *datastore.Txn) error {
+func UpdateEvent(event *entities.Event, tx *datastore.Txn, create bool) error {
 	txn, err := InitTx(stores.EventStore, tx)
 	if err != nil {
 		return err
@@ -112,9 +118,20 @@ func UpdateEvent(event *entities.Event, tx *datastore.Txn) error {
 	if tx == nil {
 		defer txn.Discard(context.Background())
 	}
-
+	_, err = txn.Get(context.Background(), datastore.NewKey(event.BlockKey()))
+	logger.Infof("ERRORGETINGEVENT: %v, %s", err, event.BlockKey())
+	if create {
+	  if IsErrorNotFound(err) {
+		return createEvent(event, tx)
+	  } 
+	}  else {
+		if IsErrorNotFound(err) {
+			return fmt.Errorf("event does not exist")
+		  } 
+	}
 	eventBytes := event.MsgPack()
-	if err := txn.Put(context.Background(), datastore.NewKey(event.Key()), eventBytes); err != nil {
+	if err := txn.Put(context.Background(), datastore.NewKey(event.DataKey()), eventBytes); err != nil {
+		logger.Infof("PUTEVENT %v", err)
 		return err
 	}
 
@@ -125,12 +142,13 @@ func UpdateEvent(event *entities.Event, tx *datastore.Txn) error {
 		_, getError := txn.Get(context.Background(), blockKey)
 		if getError != nil {
 			if IsErrorNotFound(getError) {
-				logger.Infof("UPDATINGEVENT: %s", blockKey.String())
+				// logger.Infof("CREATING: %s", blockKey.String())
 				err := txn.Put(context.Background(), blockKey, []byte{})
 				if err != nil {
 					return err
 				}
 			} else {
+				logger.Infof("GetPUTEVENT %v", getError)
 				return getError
 			}
 		}
@@ -166,15 +184,43 @@ func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 	}
 	return event, nil
 }
+func  IncrementCounterByKey(key string, delta uint64, tx *datastore.Txn) error {
+	ds := stores.NetworkStatsStore
+	txn, err := InitTx(ds, tx)
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		defer txn.Discard(context.Background())
+	}
+	count := new(big.Int).SetUint64(delta)
+	if value, err := txn.Get(context.Background(), datastore.NewKey(key)); err != nil {
+		if !IsErrorNotFound(err) {
+			return err
+		}
+	} else {
+		count = new(big.Int).Add(new(big.Int).SetBytes(value), new(big.Int).SetUint64(delta))
+	}
+	// logger.Infof("IncrementingCounterForSubnet: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
+	err = txn.Put(context.Background(), datastore.NewKey( key), count.Bytes())
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		return txn.Commit(context.Background())
+	}
+	return nil
+}
+
 
 func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet string, tx *datastore.Txn) (err error) {
-	ds := stores.EventStore
+	ds := stores.NetworkStatsStore
 	txn, err := InitTx(ds, tx)
 	if tx == nil {
 		defer txn.Discard(context.Background())
 	}
 	var count *big.Int
-
+ 	delta := int64(1);
 	keys := []datastore.Key{
 		// datastore.NewKey(entities.CycleCounterKey(cycle, nil, nil, nil)),
 		datastore.NewKey(entities.NetworkCounterKey(nil)),
@@ -194,11 +240,11 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 			if !IsErrorNotFound(err) {
 				return err
 			}
-			count = big.NewInt(1)
+			count = big.NewInt(int64(delta))
 		} else {
-			count = new(big.Int).Add(new(big.Int).SetBytes(value), big.NewInt(1))
+			count = new(big.Int).Add(new(big.Int).SetBytes(value), big.NewInt(delta))
 		}
-		logger.Infof("IncrementingCounterForSubnet: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
+		// logger.Infof("IncrementingCounterForSubnet: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
 		err = txn.Put(context.Background(), key, count.Bytes())
 		if err != nil {
 			return err
@@ -211,7 +257,7 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 }
 
 func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *bool, subnet *string, limit *QueryLimit) ([]models.EventCounter, error) {
-	rsl, err := stores.EventStore.Query(context.Background(), query.Query{
+	rsl, err := stores.NetworkStatsStore.Query(context.Background(), query.Query{
 		Prefix: entities.CycleCounterKey(cycle, &validator, claimed, subnet),
 		Limit:  limit.Limit,
 		Offset: limit.Offset,
@@ -244,7 +290,7 @@ func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *b
 func GetNetworkCounts(subnet *string, limit *QueryLimit) ([]models.EventCounter, error) {
 	counts := []models.EventCounter{}
 	if subnet == nil {
-		rsl, err := stores.EventStore.Get(context.Background(), datastore.NewKey(entities.NetworkCounterKey(subnet)))
+		rsl, err := stores.NetworkStatsStore.Get(context.Background(), datastore.NewKey(entities.NetworkCounterKey(subnet)))
 		if err != nil && !IsErrorNotFound(err) {
 			return counts, err
 		}

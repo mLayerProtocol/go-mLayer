@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
+	"time"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
@@ -12,10 +12,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
-	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/sql"
 	"gorm.io/gorm"
 )
 
@@ -23,6 +20,8 @@ import (
 Validate an agent authorization
 */
 func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic) (currentSubscription *models.SubscriptionState, err error) {
+	defer utils.TrackExecutionTime(time.Now(), "ValidateMessageData::")
+
 	// check fields of message
 	// var currentState *models.MessageState
 
@@ -36,6 +35,7 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 	// 		return nil, err
 	// 	}
 	// }
+	
 	message := payload.Data.(entities.Message)
 	var subscription *entities.Subscription
 	// err = query.GetOne(models.SubscriptionState{
@@ -97,7 +97,7 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 		if payload.Account != topic.Account && *subscription.Role < constants.TopicWriterRole {
 			return  nil, apperror.Unauthorized("Not allowed to post to this topic")
 		}
-		logger.Debugf("Found Subscribers: %v", subscription)
+		
 		return &models.SubscriptionState{Subscription: *subscription}, nil
 	} else {
 		// check if the sender is a subnet admin
@@ -135,25 +135,31 @@ func saveMessageEvent(where entities.Event, createData *entities.Event, updateDa
 	return SaveEvent(entities.MessageModel, where, createData, updateData, txn)
 
 }
-func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) error {
+func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) (err error) {
 	cfg, ok := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 	if !ok {
 		panic("Unable to load config from context")
 	}
+	dataStates := dsquery.DataStates{
+		Events: make(map[string]entities.Event),
+		CurrentStates: make(map[entities.EntityPath]interface{}),
+		HistoricState: make(map[entities.EntityPath][]byte),
+		Config: cfg,
+	}
+	dataStates.AddEvent(*event)
+
+	validator := utils.IfThenElse(event.IsLocal(cfg),  "",  string(event.Validator))
+	
 	data := event.Payload.Data.(entities.Message)
-	// var id = data.ID
-	// if len(data.ID) == 0 {
-	// 	id, _ = entities.GetId(data)
-	// } else {
-	// 	id = data.ID
-	// }
-	var topic =  models.TopicState{}
+	// var topic =  models.TopicState{}
 	data.BlockNumber = event.BlockNumber
 	data.Cycle = event.Cycle
 	data.Epoch = event.Epoch
 	data.Event = *event.GetPath()
 	data.EventSignature = event.Signature
 	data.EventTimestamp = event.Timestamp
+	var id = data.ID
+	id, _ = entities.GetId(data, data.ID)
 	hash, err := data.GetHash()
 	if err != nil {
 		return err
@@ -162,10 +168,27 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 	data.Agent = event.Payload.Agent
 	data.Sender = event.Payload.Account
 	var subnet = event.Payload.Subnet
+
+	defer func () {
+	
+			if err != nil {
+					return
+			}
+			stateUpdateError := dataStates.Commit(nil, nil, nil)
+			if err != nil {
+				logger.Error(err)
+				panic(stateUpdateError)
+			} else {
+				go OnFinishProcessingEvent(ctx, event,  &data)
+				
+				// go utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("newMessage" + "\n"))
+			}
+		
+	}()
 	
 
 	eventData := PayloadData{Subnet: subnet, localDataState: nil, localDataStateEvent:  nil}
-	tx := sql.SqlDb
+	// tx := sql.SqlDb
 	// defer func () {
 	// 	if tx.Error != nil {
 	// 		tx.Rollback()
@@ -173,20 +196,22 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 	// 		tx.Commit()
 	// 	}
 	// }()
-	stateTxn, err := stores.MessageStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
-	if err != nil {
-		// either subnet does not exist or you are not uptodate
-	}
-	txn, err := stores.EventStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
-	if err != nil {
-		// either subnet does not exist or you are not uptodate
-	}
-	defer stateTxn.Discard(context.Background())
-	defer txn.Discard(context.Background())
+	// stateTxn, err := stores.MessageStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
+	// if err != nil {
+	// 	// either subnet does not exist or you are not uptodate
+	// }
+	// txn, err := stores.EventStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
+	// if err != nil {
+	// 	// either subnet does not exist or you are not uptodate
+	// }
+	// defer stateTxn.Discard(context.Background())
+	// defer txn.Discard(context.Background())
 
 	
 	logger.Debugf("Processing 1...: %s", event.ID)
-	previousEventUptoDate,  authEventUpToDate, _, _, err := ProcessEvent(event,  eventData, true, saveMessageEvent, &txn, nil, ctx)
+	
+	
+	previousEventUptoDate,  authEventUpToDate, _, _, err := ProcessEvent(event,  eventData, true, saveMessageEvent, nil, nil, ctx, &dataStates)
 	if err != nil {
 		logger.Errorf("Processing Error...: %v", err)
 		return err
@@ -197,109 +222,102 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) er
 
 	
 	if previousEventUptoDate  && authEventUpToDate {
-		_topic, err := dsquery.GetTopicById( data.Topic)
+		// _topic, err := dsquery.GetTopicById( data.Topic)
+		_topic := &entities.Topic{}
+		_, err := SyncTypedStateById(data.Topic, _topic, cfg, validator)
 
-		if (err != nil && dsquery.IsErrorNotFound(err) || _topic == nil  ) {
-			// get topic like we got subnet
-			topicPath := entities.NewEntityPath(event.Validator, entities.TopicModel, data.Topic)
-				pp, err := p2p.GetState(cfg, *topicPath, &event.Validator, &topic)
-				if err != nil {
-					logger.Error(err)
-					return err
-				}
-				if len(pp.Event) < 2 {
-					return  fmt.Errorf("invalid event data")
-				}
-				topicEvent, err := entities.UnpackEvent(pp.Event, entities.TopicModel)
-				if err != nil {
-					logger.Error(err)
-					return  err
-				}
-				if topicEvent != nil  && *topicEvent.Synced && len(pp.States) > 0 {
-					// return HandleNewPubSubTopicEvent(topicEvent, ctx)
-					
-					topic, err := entities.UnpackTopic(pp.States[0])
-					if err != nil {
-						return err
-					}
-					err = dsquery.CreateEvent(topicEvent, &txn)
-					if err == nil {
-						_, err = dsquery.CreateTopicState(&topic, nil)
-					}
-					if err != nil {
-						return err
-					}
-					
-				}
-		}
-		if _topic != nil {
-			topic = models.TopicState{Topic: *_topic}
-		}
-		
-		
-		err = dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, &txn)
-		if err != nil { 
-			logger.Errorf("CounterError %v", err)
+		if (err != nil || _topic == nil  ) {
 			return err
 		}
-		 _, err = ValidateMessageData(&event.Payload, _topic)
+		
+		
+		// if _topic != nil {
+		// 	topic = models.TopicState{Topic: *_topic}
+		// }
+		
+		
+		// errC := dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, nil)
+		// if errC != nil { 
+		// 	logger.Errorf("CounterError %v", err)
+			
+		// 	// return err
+		// }
+		if event.Validator != entities.PublicKeyString(cfg.PublicKeyEDDHex) {
+		 	_, err = ValidateMessageData(&event.Payload, _topic)
+		}
 		if err != nil {
 			// update error and mark as synced
 			// notify validator of error
 			logger.Errorf("MessageDataError: %v", err)
-			
-			saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()}, &txn, nil )
-		
-			
+			// utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("err:"))
+			// utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte(event.ID))
+			// utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("\n"))
+			//utils.UpdateStruct(entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()}, dataStates.Events[])
+			dataStates.AddEvent(entities.Event{ID: event.ID, Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()})
+			// saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()}, &txn, nil )
+			// return(err)
 		} else {
 			// TODO if event is older than our state, just save it and mark it as synced
-			savedEvent, err := saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, tx );
-			if  err == nil {
+			
+			// savedEvent, err := saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, tx );
+			dataStates.AddEvent(entities.Event{ID: event.ID, IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()})
+			dataStates.AddCurrentState(entities.MessageModel, id, data)
+			//if  err == nil {
 				// update state
-				logger.Debugf("CreateMessageData: %+v", data)
-				_, err = dsquery.CreateMessageState(&data, &stateTxn)
-				if err != nil {
-					stateTxn.Discard(context.Background())
-					logger.Debugf("CreateMessageErrror: %+v", err)
-					_, err = saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, nil)
-	
-					if err != nil {
-						// tx.Rollback()
-						stateTxn.Discard(context.Background())
-						logger.Errorf("SaveStateError %v", err)
-						return err
-					}
+				// logger.Debugf("CreateMessageData: %+v", data)
+				// _, err = dsquery.CreateMessageState(&data, &stateTxn)
 				
-				} else {
-					err = stateTxn.Commit(context.Background())
-				}
-			}
+				// if err != nil {
+				// 	stateTxn.Discard(context.Background())
+				// 	logger.Debugf("CreateMessageErrror: %+v", err)
+				// 	// _, err = saveMessageEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()}, &txn, nil)
+	
+				// 	if err != nil {
+				// 		// tx.Rollback()
+				// 		stateTxn.Discard(context.Background())
+				// 		logger.Errorf("SaveStateError %v", err)
+				// 		return err
+				// 	}
+				
+				// } else {
+				// 	err = stateTxn.Commit(context.Background())
+				// }
+			//}
 			
-			if err == nil {
-				err =  txn.Commit(context.Background())
-			}
-			if err == nil {
-				go func ()  {
-					dsquery.IncrementStats(event, nil)
-				 dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
-				OnFinishProcessingEvent(ctx, event,  &models.MessageState{
-					Message: data,
-				},  &savedEvent.Payload.Subnet)
-				}()
-			} 
+			// if err == nil {
+			// 	// err =  txn.Commit(context.Background())
+			// } else {
+			// 	panic(err)
+			// 	// logger.Errorf("HandleNewPusSubMessageEventError: %v", err)
+			// 	// return err
+			// }
+			// if err == nil {
+			// 	go func ()  {
+			// 		dsquery.IncrementStats(event, nil)
+			// 	 dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
+			// 	OnFinishProcessingEvent(ctx, event,  &models.MessageState{
+			// 		Message: data,
+			// 	},  &event.Payload.Subnet)
+			// 	}()
+			// }  else {
+			// 	panic(err)
+			// 	// logger.Errorf("HandleNewPusSubMessageEventError: %v", err)
+			// 	// return err
+			// }
 			
+
 			
-			if string(event.Validator) != cfg.PublicKeyEDDHex {
-				go func () {
-				dependent, err := dsquery.GetDependentEvents(event)
-				if err != nil {
-					logger.Debug("Unable to get dependent events", err)
-				}
-				for _, dep := range *dependent {
-					HandleNewPubSubEvent(dep, ctx)
-				}
-				}()
-			}
+			// if string(event.Validator) != cfg.PublicKeyEDDHex {
+			// 	go func () {
+			// 	dependent, err := dsquery.GetDependentEvents(event)
+			// 	if err != nil {
+			// 		logger.Debug("Unable to get dependent events", err)
+			// 	}
+			// 	for _, dep := range *dependent {
+			// 		HandleNewPubSubEvent(dep, ctx)
+			// 	}
+			// 	}()
+			// }
 			
 		}
 	}

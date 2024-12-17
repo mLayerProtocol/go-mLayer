@@ -134,12 +134,12 @@ func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *mode
 	
 	if dsquery.IsErrorNotFound(err) || _topic == nil {
 		logger.Infof("ValidatingTopic 2... %v", err)
-		resp, err := service.UpdateStateFromPeer(payloadData.Topic, entities.TopicModel, cfg, "")
-		logger.Infof("ValidatingTopic 3... %v, %v", err, resp)
-		if err != nil || resp == nil {
+		state, _, err := service.SyncStateFromPeer(payloadData.Topic, entities.TopicModel, cfg, "")
+		// logger.Infof("ValidatingTopic 3... %v, %v", err, state)
+		if err != nil || state == nil {
 			return nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in subnet %s", payloadData.Topic, payload.Subnet))
 		}
-		_topic = resp.(*entities.Topic)
+		_topic = state.(*entities.Topic)
 	}
 
 	currentState, err := service.ValidateSubscriptionData(&payload, _topic)

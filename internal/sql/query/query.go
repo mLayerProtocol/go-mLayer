@@ -163,7 +163,7 @@ func GetOneState[T any](filter any, data *T) error {
 		var model any
 			switch val := filter.(type) {
 				case entities.Subnet:
-					logger.Debug(val)
+					// logger.Debug(val)
 					model = models.SubnetState{Subnet: val}
 				case entities.Authorization:
 					model = models.AuthorizationState{Authorization: val}

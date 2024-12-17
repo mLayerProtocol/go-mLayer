@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
+	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 )
@@ -38,6 +39,8 @@ import (
 // 	return &data, err
 // }
 func GetSubscriptions( filter entities.Subscription, limits *QueryLimit, txn *datastore.Txn) (data []*entities.Subscription, err error) {
+	defer utils.TrackExecutionTime(time.Now(), "GetSubscriptions::")
+
 	ds :=  stores.StateStore
 	var rsl query.Results
 	if limits == nil {
@@ -200,44 +203,44 @@ func CreateSubscriptionState(newState *entities.Subscription, tx *datastore.Txn)
 	return newState, err
 }
 
-func UpdateSubscriptionState(newState *entities.Subscription, tx *datastore.Txn) (*entities.Subscription, error) {
-	ds := stores.StateStore
-	txn, err := InitTx(ds, tx)
-	if err != nil {
-		return nil, err
-	}
-	if tx == nil {
-		defer txn.Discard(context.Background())
-	}
-	if newState.Topic == "" || newState.Subscriber == "" || newState.Subnet == "" {
-		return nil, fmt.Errorf("new state must include acc, snet and agent field")
-	}
+// func UpdateSubscriptionState(newState *entities.Subscription, tx *datastore.Txn) (*entities.Subscription, error) {
+// 	ds := stores.StateStore
+// 	txn, err := InitTx(ds, tx)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if tx == nil {
+// 		defer txn.Discard(context.Background())
+// 	}
+// 	if newState.Topic == "" || newState.Subscriber == "" || newState.Subnet == "" {
+// 		return nil, fmt.Errorf("new state must include acc, snet and agent field")
+// 	}
 	
-	accountRsl,  err := txn.Query(context.Background(), query.Query{
-		Prefix: newState.SubscriberKey(),
-	})
-	if err != nil && !IsErrorNotFound(err) {
-		return nil, err
-	}
-	entries, _ := accountRsl.Rest()
-	for _, entry := range entries { 
-		txn.Delete(context.Background(), datastore.NewKey(entry.Key))
-	}
-	return CreateSubscriptionState(newState, tx)
-	// err = UpdateState(id, NewStateParam{
-	// 	OldIDKey: newState.Key(),
-	// 	DataKey: newState.DataKey(),
-	// 	Data: newState.MsgPack(),
-	// 	EventHash: newState.Event.Hash,
-	// 	RefKey: &newState.Ref,
-	// 	OldRefKey: &oldTopic.Ref,
-	// }, tx)
-	// if err != nil {
-	// 	return nil, err
-	// }
+// 	accountRsl,  err := txn.Query(context.Background(), query.Query{
+// 		Prefix: newState.SubscriberKey(),
+// 	})
+// 	if err != nil && !IsErrorNotFound(err) {
+// 		return nil, err
+// 	}
+// 	entries, _ := accountRsl.Rest()
+// 	for _, entry := range entries { 
+// 		txn.Delete(context.Background(), datastore.NewKey(entry.Key))
+// 	}
+// 	return CreateSubscriptionState(newState, tx)
+// 	// err = UpdateState(id, NewStateParam{
+// 	// 	OldIDKey: newState.Key(),
+// 	// 	DataKey: newState.DataKey(),
+// 	// 	Data: newState.MsgPack(),
+// 	// 	EventHash: newState.Event.Hash,
+// 	// 	RefKey: &newState.Ref,
+// 	// 	OldRefKey: &oldTopic.Ref,
+// 	// }, tx)
+// 	// if err != nil {
+// 	// 	return nil, err
+// 	// }
 	
-	// return newState, nil
-}
+// 	// return newState, nil
+// }
 
 
 func GetSubscriptionStates(subnet string, topic string, subscriber entities.DeviceString, limits QueryLimit) (rsl []*entities.Subscription, err error) {

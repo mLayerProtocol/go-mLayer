@@ -26,11 +26,12 @@ import (
 
 
 
-func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *context.Context) (model S, err error) {
+func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model any, err error) {
+	defer utils.TrackExecutionTime(time.Now(), "CreateEvent::")
 	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 	stateDS, _ := (*ctx).Value(constants.ValidStateStore).(*ds.Datastore)
 	if !strings.EqualFold(utils.AddressToHex(payload.Validator), utils.AddressToHex(cfg.OwnerAddress.String())) {
-		return nil, apperror.Forbidden(fmt.Sprintf("Validator (%s) not authorized to procces this request", cfg.OwnerAddress.String()))
+		return model, apperror.Forbidden(fmt.Sprintf("Validator (%s) not authorized to procces this request", cfg.OwnerAddress.String()))
 	}
 
 	
@@ -43,16 +44,16 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		
 		// logger.Debugf("New Event for Agent/Device2 %s", (*agent))
 		if err != nil && err != gorm.ErrRecordNotFound && !dsquery.IsErrorNotFound(err)  {
-			return nil, err
+			return model, err
 		}
 		if authState == nil || *authState.Authorization.Priviledge < constants.MemberPriviledge {
 			// agent not authorized
-			return nil, apperror.Unauthorized("agent unauthorized to write in this subnet")
+			return model, apperror.Unauthorized("agent unauthorized to write in this subnet")
 		}
 
 		if *authState.Duration != 0 && uint64(time.Now().UnixMilli()) >
 			(uint64(*authState.Timestamp)+uint64(*authState.Duration)) {
-			return nil, apperror.Unauthorized("Agent authorization expired")
+			return model, apperror.Unauthorized("Agent authorization expired")
 		}
 		payload.Agent = *agent
 	}
@@ -66,16 +67,8 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		// query.GetOneState(entities.Subnet{ID: payload.Subnet}, &subnetState)
 		snet, _ := dsquery.GetSubnetStateById(payload.Subnet)
 		if err != nil {
-			if  dsquery.IsErrorNotFound(err) {
-				snet, err = service.UpdateSubnetFromPeer(payload.Subnet, cfg, "")
-				if err != nil {
-					logger.Errorf("CreateEventError: %v", err)
-					return nil, err
-				}
-			} else {
 				logger.Errorf("CreateEvent/GetSubnetError: %v", err)
-				return nil, err
-			}
+				return model, err
 		}
 		subnetState.Subnet = *snet
 	}
@@ -92,12 +85,12 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		// 	logger.Errorf("UnmarshalError %v", e)
 		// }
 		// payload.Data = authData
-		logger.Infof("NewRequest: %v",  "Authorization")
+		// logger.Infof("NewRequest: %v",  "Authorization")
 		assocPrevEvent, assocAuthEvent, err = ValidateAuthPayload(cfg, payload)
 		logger.Infof("NewRequestProcessed: %v",  "Authorization")
 		if err != nil {
 			logger.Errorf("AuthDataVerificationError: %v", err)
-			return nil, err
+			return model, err
 		}
 		
 		
@@ -109,10 +102,10 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		assocPrevEvent, assocAuthEvent, err = ValidateTopicPayload(payload, authState)
 		// return nil, fmt.Errorf("just debugiing")
 		if err != nil {
-			return nil, err
+			return model, err
 		}
 		if *authState.Authorization.Priviledge < constants.MemberPriviledge {
-			return nil, apperror.Forbidden("Agent not authorized to perform this action")
+			return model, apperror.Forbidden("Agent not authorized to perform this action")
 		}
 		if assocPrevEvent == nil {
 			assocPrevEvent = &subnetState.Event
@@ -135,7 +128,7 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		assocPrevEvent, assocAuthEvent, err = ValidateSubnetPayload(payload, authState, ctx)
 		if err != nil {
 			logger.Errorf("InvalidSubnetPayload: %v", err)
-			return nil, err
+			return model, err
 		}
 		logger.Infof("ValidSubnetPayload: %v", payload)
 		
@@ -146,11 +139,11 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		// }
 		assocPrevEvent, assocAuthEvent, err = ValidateWalletPayload(payload, authState)
 		if err != nil {
-			return nil, err
+			return model, err
 		}
 	case uint16(constants.SubscribeTopicEvent), uint16(constants.ApprovedEvent), uint16(constants.BanMemberEvent), uint16(constants.UnbanMemberEvent):
 		if *authState.Authorization.Priviledge < constants.MemberPriviledge {
-			return nil, apperror.Forbidden("Agent not authorized to perform this action")
+			return model, apperror.Forbidden("Agent not authorized to perform this action")
 		}
 		
 		logger.Infof("ValidatingTopic...")
@@ -158,7 +151,7 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		
 		if err != nil {
 			logger.Debugf("SubscriptionError: %+v", err)
-			return nil, err
+			return model, err
 		}
 	case uint16(constants.SendMessageEvent):
 		logger.Debugf("authState 2: %d ", *authState.Authorization.Priviledge)
@@ -170,11 +163,11 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		assocPrevEvent, assocAuthEvent, err = ValidateMessagePayload(payload, authState)
 		if err != nil {
 			logger.Error("ERRRRRRR:::", err)
-			return nil, err
+			return model, err
 		}
 	default:
 	}
-	logger.Debugf("UPDATINGSUBNE1: %v", err)
+	// logger.Debugf("UPDATINGSUBNE1: %v", err)
 	payloadHash, err := payload.GetHash()
 	
 	if err != nil {
@@ -195,7 +188,7 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		subnet, err = entities.GetId(payload.Data.(entities.Subnet), "")
 		if err != nil {
 			logger.Debugf("Subnet error: %v", err)
-			return nil, err
+			return model, err
 		}
 		
 	}
@@ -223,22 +216,36 @@ func CreateEvent[S *models.EventInterface](payload entities.ClientPayload, ctx *
 		Subnet: subnet,
 	}
 	
-	logger.Debugf("NewEvent: %v", event)
+	 logger.Debugf("NewEvent: %v, %v", event.ID, eventPayloadType)
+
 	b, err := event.EncodeBytes()
 	if err != nil {
-		return nil, apperror.Internal(err.Error())
+		return model, apperror.Internal(err.Error())
 	}
-	logger.Debugf("Validator 2: %s", event.Validator)
-	logger.Debugf("eventPayloadType 2: %s", eventPayloadType)
+	// logger.Debugf("Validator 2: %s", event.Validator)
+	// logger.Debugf("eventPayloadType 2: %s", eventPayloadType)
 
 	event.Hash = hex.EncodeToString(crypto.Sha256(b))
 	_, event.Signature = crypto.SignEDD(b, cfg.PrivateKeyEDD)
-	err = dsquery.CreateEvent(&event, nil)
-		if err != nil {
-			return nil, err
-		}
-	model =	p2p.PublishEvent(event)
-	return model, nil
+	// err = dsquery.CreateEvent(&event, nil)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	logger.Infof("EventCreated...")
+	event.ID, err = event.GetId()
+	if err != nil {
+		return model, err
+	}
+	service.HandleNewPubSubEvent(event, ctx) 
+	event.Broadcasted = true;
+	go p2p.PublishEvent(event)
+	// dispatch to network
+
+	// if err != nil {
+	// 	return nil, err
+	// }
+	
+	return event, nil
 }
 
 

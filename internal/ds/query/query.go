@@ -63,10 +63,15 @@ func EntityDataKey(model entities.EntityModel, eventHash string) string {
 }
 
 func GetStateById(did string, modelType entities.EntityModel) ([]byte, error) {
+	defer utils.TrackExecutionTime(time.Now(), "GetStateById")
 	var stateData []byte
-	err := stores.StateStore.DB.View(func(txn *badger.Txn) error {
+	_store := stores.StateStore
+	if modelType == entities.MessageModel {
+		_store = stores.MessageStore
+	}
+	err := _store.DB.View(func(txn *badger.Txn) error {
 		key := EntityKey(modelType, did)
-		logger.Infof("IDKEY: %s", key)
+		// logger.Infof("IDKEY: %s", key)
 		item, err := txn.Get(datastore.NewKey(key).Bytes())
 		if err != nil {
 			logger.Infof("GettateByIdError: %s, %s, %v", modelType, did, err)
@@ -77,7 +82,7 @@ func GetStateById(did string, modelType entities.EntityModel) ([]byte, error) {
 			if val == nil {
 				return datastore.ErrNotFound
 			}
-			logger.Infof("IDKEYVALUE: %s", string(val))
+			// logger.Infof("IDKEYVALUE: %s", string(val))
 			value, err := txn.Get(datastore.NewKey(EntityDataKey(modelType, string(val))).Bytes())
 			if err != nil {
 				return err
@@ -119,7 +124,7 @@ func CreateState(newState CreateStateParam, tx *datastore.Txn) (err error) {
 
 	// return txn.Set(key.Bytes(), value)
 	for _, key := range keys {
-		logger.Infof("NewStateKey: %v, %v", key, newState.EventHash)
+		// logger.Infof("NewStateKey: %v, %v", key, newState.EventHash)
 		if strings.EqualFold(key, newState.DataKey) {
 			if err := txn.Put(context.Background(), datastore.NewKey(key), stateBytes); err != nil {
 				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, err)
@@ -231,7 +236,7 @@ func RefExists(entityType entities.EntityModel, ref string, subnet string) (bool
 	}
 	value, err := ds.Get(context.Background(), datastore.NewKey(refKey))
 	if err != nil {
-		if err == datastore.ErrNotFound {
+		if IsErrorNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -245,6 +250,19 @@ func RefExists(entityType entities.EntityModel, ref string, subnet string) (bool
 func GetStateFromEntityPath(ePath *entities.EntityPath) ([]byte, error) {
 	if ePath == nil || len(ePath.Hash) == 0 {
 		return nil, nil
+	}
+	if len(ePath.Hash) > 36 && ePath.Model == entities.AuthModel {
+		authorization, err := entities.AccountAuthorizationsKeyToAuthorization(ePath.Hash)
+		if err != nil {
+			return nil, err
+		}
+		auths, err := GetAccountAuthorizations(*authorization, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		if len(auths) > 0 {
+			return auths[0].MsgPack(), nil
+		}
 	}
 	return GetStateById(ePath.Hash, ePath.Model)
 

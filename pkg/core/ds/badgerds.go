@@ -218,16 +218,28 @@ func (d *Datastore) newImplicitTransaction(readOnly bool) *txn {
 
 func (d *Datastore) Get(ctx context.Context, key ds.Key) (value []byte, err error) {
 	
-	d.closeLk.RLock()
-	defer d.closeLk.RUnlock()
-	if d.closed {
-		return nil, ErrClosed
-	}
-	txn := d.newImplicitTransaction(false)
-	defer txn.discard()
-	val, err := txn.get(key)
+	// d.closeLk.RLock()
+	// defer d.closeLk.RUnlock()
+	// if d.closed {
+	// 	return nil, ErrClosed
+	// }
+	// txn := d.newImplicitTransaction(false)
+	// defer txn.discard()
+	// val, err := txn.get(key)
 	
-	return val, err
+	// return val, err
+	
+	err = d.DB.View(func(txn *badger.Txn) error {
+		// Read-only transaction
+		item, err := txn.Get(key.Bytes())
+		if err != nil {
+			return err
+		}
+		value, err =  item.ValueCopy(nil)
+		return err
+	})
+
+	return value, err
 	
 }
 

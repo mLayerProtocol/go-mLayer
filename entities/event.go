@@ -210,7 +210,7 @@ func (g *Event) GetKeys() (keys []string)  {
 	keys = append(keys, g.BlockKey())
 	// keys = append(keys, fmt.Sprintf("cy/%d/%d/%s/%s", g.Cycle, utils.IfThenElse(g.Synced, 1,0), g.Subnet, g.ID))
 	
-	keys = append(keys, g.Key())
+	keys = append(keys, g.DataKey())
 	// keys = append(keys, fmt.Sprintf("%s/%s/%s", EntityModel, g.Subnet, g.ID))
 	// keys = append(keys,fmt.Sprintf("hash/%s",  g.GetIdHash()))
 	// keys = append(keys,fmt.Sprintf("%s/%s", TopicModel, g.Hash))
@@ -219,7 +219,7 @@ func (g *Event) GetKeys() (keys []string)  {
 	// keys = append(keys, fmt.Sprintf("cy/%d/%s/%s", g.Cycle, GetModelTypeFromEventType(constants.EventType(g.EventType)), g.ID))
 	return keys;
 }
-func (e *Event) Key() string {
+func (e *Event) DataKey() string {
 	return fmt.Sprintf("id/%s",  e.ID)
 }
 
@@ -312,6 +312,11 @@ func (e *Event) GetDataModelType() EntityModel {
 	return GetModel(e.Payload.Data)
 }
 
+func (e *Event) IsLocal(cfg *configs.MainConfiguration) bool {
+	return e.Validator == PublicKeyString(cfg.PublicKeyEDDHex)
+}
+
+
 func GetModel(ent any) EntityModel {
 	var model EntityModel
 	val := reflect.ValueOf(ent)
@@ -320,7 +325,7 @@ func GetModel(ent any) EntityModel {
 	}
 	switch val.Interface().(type) {
 		case Subnet:
-			logger.Debug(val)
+			// logger.Debug(val)
 			model = SubnetModel
 		case Authorization:
 			model = AuthModel
@@ -599,3 +604,4 @@ func NetworkCounterKey(subnet *string) string {
 func CycleSubnetKey(cycle uint64, subnet string) string {
 	return fmt.Sprintf("cyc/%015d/%s", cycle, subnet)
 }
+

@@ -129,11 +129,11 @@ func Sha256(s []byte) []byte {
 func GetSignerECC(message *[]byte, signature *string) (string, error) {
 	decoded, err := hexutil.Decode(*signature)
 	if err != nil {
-		logger.Debug(err)
+		logger.Errorf("GetSignerECCError: %v", err)
 		return "", err
 	}
 	hash := Keccak256Hash(*message)
-	logger.Debug("Keccak256Hash Hash:: ", hex.EncodeToString(hash))
+	// logger.Debug("Keccak256Hash Hash:: ", hex.EncodeToString(hash))
 	if decoded[crypto.RecoveryIDOffset] == 27 || decoded[crypto.RecoveryIDOffset] == 28 {
 		decoded[crypto.RecoveryIDOffset] -= 27 // Transform yellow paper V from 27/28 to 0/1
 	}

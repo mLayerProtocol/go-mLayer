@@ -46,16 +46,17 @@ func TrackReward(ctx *context.Context) {
 	// validator := (*cfg).PublicKey  
 	
 
-	currentCycle, err := chain.DefaultProvider(cfg).GetCurrentCycle()
+	currentCycle := chain.NetworkInfo.CurrentCycle
+	//chain.DefaultProvider(cfg).GetCurrentCycle()
 	
-	if err != nil {
-		// wait and retry
-		// time.Sleep(5 * time.Second)
-		// TrackReward(ctx) 
-		logger.Debugf("TrackReward: Unable to get current cycle")
-		return;
+	// if err != nil {
+	// 	// wait and retry
+	// 	// time.Sleep(5 * time.Second)
+	// 	// TrackReward(ctx) 
+	// 	logger.Debugf("TrackReward: Unable to get current cycle")
+	// 	return;
 		
-	}
+	// }
 	lastCycleClaimedKey :=  datastore.NewKey("c")
 	lastClaimedCycle := uint64(0)
 	//batch, err :=	claimedRewardStore.Batch(*ctx)

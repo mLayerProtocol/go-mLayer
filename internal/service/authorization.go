@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs.MainConfiguration) (prevAuthState *models.AuthorizationState, grantorAuthState *models.AuthorizationState, subnet *models.SubnetState, err error) {
+func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs.MainConfiguration, dataStates *dsquery.DataStates, validator string) (prevAuthState *models.AuthorizationState, grantorAuthState *models.AuthorizationState, subnet *models.SubnetState, err error) {
 	auth := clientPayload.Data.(entities.Authorization)
 	// if err != nil {
 	// 	return nil, nil, nil, err
@@ -39,19 +39,28 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs
 
 	// TODO find subnets state prior to the current state
 	// err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: auth.Subnet}}, &subnet)
-	_subnet, err := dsquery.GetSubnetStateById(auth.Subnet)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
-			_subnet, err = UpdateSubnetFromPeer(auth.Subnet, cfg, "")
-			if err != nil {
-				return nil, nil, nil, err
-			}
+	// _subnet, err := dsquery.GetSubnetStateById(auth.Subnet)
+	// if err != nil {
+	// 	if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
+	// 		snet, err := SyncStateFromPeer(auth.Subnet, entities.SubnetModel, cfg, validator)
+	// 		if err != nil {
+	// 			return nil, nil, nil, err
+	// 		}
+	// 		_subnet = snet.(*entities.Subnet)
 			
-		} else {
-			return nil, nil, nil, err
-		}
+	// 	} else {
+	// 		return nil, nil, nil, err
+	// 	}
+	// }
+	_subnet := entities.Subnet{}
+	 _, err = SyncTypedStateById(auth.Subnet, &_subnet,  cfg, validator )
+	 if err != nil {
+		return  nil, nil, subnet, err
+	 }
+	 if *_subnet.Status ==  0 {
+		return nil, nil, subnet, apperror.Forbidden("Subnet is disabled")
 	}
-	subnet = &models.SubnetState{Subnet: *_subnet}
+	subnet = &models.SubnetState{Subnet: _subnet}
 
 	if auth.Account != subnet.Account && *auth.Priviledge > *subnet.DefaultAuthPrivilege {
 		return nil, nil, subnet, apperror.Internal("invalid auth priviledge. Cannot be higher than subnets default")
@@ -75,16 +84,56 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs
 	if err = VerifyAuthDataSignature(auth, msg, cfg.ChainId); err != nil {
 		return nil, nil, subnet, apperror.Unauthorized("Invalid authorization data signature")
 	}
-	if auth.Grantor != auth.Account {
+	if auth.Grantor != auth.Account  {
 		// grantorAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Account: entities.DIDString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()})
 		_grantorAuthState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Account: entities.DIDString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()}, dsquery.DefaultQueryLimit, nil)
 
-		if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
-			return nil, nil, subnet, apperror.Unauthorized("Grantor not authorized agent")
-		}
-		grantorAuthState = &models.AuthorizationState{Authorization: *_grantorAuthState[0]}
-		if *grantorAuthState.Authorization.Priviledge != constants.AdminPriviledge {
+		// if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
+		// 	accAuth := entities.Authorization{Account: entities.DIDString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()}
+		// 	auth:= entities.Authorization{}
+		// 	pp, err := p2p.GetState(cfg, entities.EntityPath{Model: entities.AuthModel, Hash:  accAuth.ToAccountAuthKey(), }, nil, &auth)
+		// 	if err != nil {
+		// 		return nil, nil, subnet, apperror.Unauthorized("Grantor not authorized agent")
+		// 	}
+		// 	if len(pp.Event) < 2 {
+		// 		return nil, nil, subnet, fmt.Errorf("invalid event data")
+		// 	}
+		// 	authEvent, err := entities.UnpackEvent(pp.Event, entities.AuthModel)
+		// 	if err != nil {
+		// 		logger.Error(err)
+		// 		return  nil, nil, subnet, err
+		// 	}
+			
+		// 	if authEvent != nil  && *authEvent.Synced && len(pp.States) > 0 {
+		// 		// return HandleNewPubSubTopicEvent(topicEvent, ctx)
+		// 		// dataStates.Events[topicEvent.ID] = *topicEvent
+		// 		dataStates.AddEvent(*authEvent)
+		// 		authState, err := entities.UnpackAuthorization(pp.States[0])
+		// 		if err != nil {
+		// 			return nil, nil, subnet, err
+		// 		}
+		// 		// err = dsquery.CreateEvent(topicEvent, &txn)
+				
+		// 		// dataStates.CurrentStates[*entities.NewEntityPath("", entities.TopicModel, topic.ID)] = topic
+		// 		dataStates.AddCurrentState(entities.AuthModel, authState.ID, &authState)
+		// 		// if err == nil {
+		// 		// 	_, err = dsquery.CreateTopicState(&topic, nil)
+		// 		// }
+		// 		if err != nil {
+		// 			return nil, nil, subnet, err
+		// 		}
+				
+		// 	}
+			
+		// }
+		if err != nil ||! dsquery.IsErrorNotFound(err) {
 			return nil, grantorAuthState, subnet, apperror.Forbidden(" Grantor does not have enough permission")
+		}
+		if err == nil && len(_grantorAuthState) > 0 {
+			grantorAuthState = &models.AuthorizationState{Authorization: *_grantorAuthState[0]}
+			if *grantorAuthState.Authorization.Priviledge != constants.AdminPriviledge {
+				return nil, grantorAuthState, subnet, apperror.Forbidden(" Grantor does not have enough permission")
+			}
 		}
 	}
 	// prevAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Agent:  agent.ToDeviceString(), Subnet: auth.Subnet})
@@ -185,6 +234,9 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 	if !ok {
 		panic("Unable to load config from context")
 	}
+	dataStates := dsquery.NewDataStates(cfg)
+	dataStates.AddEvent(*event)
+
 	data := event.Payload.Data.(entities.Authorization)
 	data.BlockNumber = event.BlockNumber
 	data.Cycle = event.Cycle
@@ -198,6 +250,24 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 	}
 	data.Hash = hex.EncodeToString(hash)
 	var subnet = data.Subnet
+
+	defer func () {
+	
+		if err != nil {
+			logger.Errorf("HandleNewPubsubAuthEvent %v", err)
+			return
+		}
+		stateUpdateError := dataStates.Commit(nil, nil, nil)
+		if stateUpdateError != nil {
+			logger.Error(err)
+			panic(stateUpdateError)
+		} else {
+			go OnFinishProcessingEvent(ctx, event,  data)
+			
+			// go utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("newMessage" + "\n"))
+		}
+	
+	}()
 
 	var localState *models.AuthorizationState
 	// err := query.GetOne(&models.TopicState{Topic: entities.Topic{ID: id}}, &localTopicState)
@@ -256,7 +326,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 
 	eventData := PayloadData{Subnet: subnet, localDataState: localDataState, localDataStateEvent: localDataStateEvent}
 
-	previousEventUptoDate, authEventUpToDate, _, eventIsMoreRecent, err := ProcessEvent(event, eventData, false, saveAuthorizationEvent, &txn, tx, ctx)
+	previousEventUptoDate, authEventUpToDate, _, eventIsMoreRecent, err := ProcessEvent(event, eventData, false, saveAuthorizationEvent, &txn, tx, ctx, dataStates)
 	if err != nil {
 		logger.Warnf("Processing Error: %v", err)
 		return err
@@ -268,68 +338,80 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 			logger.Debugf("IncrementError: %+v", err)
 			return err
 		}
-		_, _, _, err = ValidateAuthPayloadData(&event.Payload, cfg)
+		if !event.IsLocal(cfg) {
+			_, _, _, err = ValidateAuthPayloadData(&event.Payload, cfg, dataStates, string(event.Validator))
+		}
 		if err != nil {
 			logger.Infof("ErrorValidatingAuth %v", err)
-			saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced: utils.TruePtr()}, &txn, nil)
+			// saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.FalsePtr(), Synced: utils.TruePtr()}, &txn, nil)
+			dataStates.AddEvent(entities.Event{ID: event.ID, Error: err.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()})
+
 		} else {
 			// TODO if event is older than our state, just save it and mark it as synced
 
-			savedEvent, err := saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
-
+			// savedEvent, err := saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
+			dataStates.AddEvent(entities.Event{ID: event.ID, IsValid:  utils.TruePtr(), Synced:  utils.TruePtr()})
+		
 			if eventIsMoreRecent && err == nil {
-				// update state
-				if localState.ID != "" {
-					_, err = dsquery.CreateAuthorizationState(&data, &stateTxn)
-					if err != nil {
-						// TODO worker that will retry processing unSynced valid events with error
-						_, err = saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
-
-					}
-				} else {
-					_, err = dsquery.CreateAuthorizationState(&data, &stateTxn)
-					if err != nil {
-						// TODO worker that will retry processing unSynced valid events with error
-						_, err = saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
-					}
-				}
-				if err == nil {
-					err = stateTxn.Commit(context.Background())
-					if err == nil {
-						err = txn.Commit(context.Background())
-					} else {
-						logger.Infof("Error %v", err)
-					}
-
-				}
+				dataStates.AddCurrentState(entities.AuthModel, data.DataKey(), data)
+			} else {
+				dataStates.AddHistoricState(entities.AuthModel, data.DataKey(), data.MsgPack())
 			}
-			if err != nil {
-				logger.Debug("SaveEroror:::", err)
-			}
+			// if eventIsMoreRecent && err == nil {
+			// 	// update state
+			// 	if localState.ID != "" {
+			// 		dataStates.AddCurrentState(entities.AuthModel, data.ID, data)
 
-			if err == nil {
-				go func() {
-					dsquery.IncrementStats(event, nil)
-					dsquery.UpdateAccountCounter(utils.IfThenElse(len(data.Account) > 0, data.Account.ToString(), string(data.Agent)))
-					event.Subnet = event.Payload.Subnet
-					OnFinishProcessingEvent(ctx, event, &models.AuthorizationState{
-						Authorization: data,
-					}, &savedEvent.ID)
-				}()
-			}
+			// 		_, err = dsquery.CreateAuthorizationState(&data, &stateTxn)
+			// 		if err != nil {
+			// 			// TODO worker that will retry processing unSynced valid events with error
+			// 			_, err = saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
+					
+			// 		}
+			// 	} else {
+			// 		_, err = dsquery.CreateAuthorizationState(&data, &stateTxn)
+			// 		if err != nil {
+			// 			// TODO worker that will retry processing unSynced valid events with error
+			// 			_, err = saveAuthorizationEvent(entities.Event{ID: event.ID}, nil, &entities.Event{Error: err.Error(), IsValid: utils.TruePtr(), Synced: utils.TruePtr()}, &txn, nil)
+			// 		}
+			// 	}
+			// 	if err == nil {
+			// 		err = stateTxn.Commit(context.Background())
+			// 		if err == nil {
+			// 			err = txn.Commit(context.Background())
+			// 		} else {
+			// 			logger.Infof("Error %v", err)
+			// 		}
 
-			if string(event.Validator) != cfg.PublicKeyEDDHex {
-				go func() {
-					dependent, err := dsquery.GetDependentEvents(event)
-					if err != nil {
-						logger.Debug("Unable to get dependent events", err)
-					}
-					for _, dep := range *dependent {
-						logger.Debugf("Processing Dependend Event %s", dep.Hash)
-						go HandleNewPubSubEvent(dep, ctx)
-					}
-				}()
-			}
+			// 	}
+			// }
+			// if err != nil {
+			// 	logger.Debug("SaveEroror:::", err)
+			// }
+
+			// if err == nil {
+			// 	go func() {
+			// 		dsquery.IncrementStats(event, nil)
+			// 		dsquery.UpdateAccountCounter(utils.IfThenElse(len(data.Account) > 0, data.Account.ToString(), string(data.Agent)))
+			// 		event.Subnet = event.Payload.Subnet
+			// 		OnFinishProcessingEvent(ctx, event, &models.AuthorizationState{
+			// 			Authorization: data,
+			// 		})
+			// 	}()
+			// }
+
+			// if string(event.Validator) != cfg.PublicKeyEDDHex {
+			// 	go func() {
+			// 		dependent, err := dsquery.GetDependentEvents(event)
+			// 		if err != nil {
+			// 			logger.Debug("Unable to get dependent events", err)
+			// 		}
+			// 		for _, dep := range *dependent {
+			// 			logger.Debugf("Processing Dependend Event %s", dep.Hash)
+			// 			go HandleNewPubSubEvent(dep, ctx)
+			// 		}
+			// 	}()
+			// }
 
 		}
 	}
