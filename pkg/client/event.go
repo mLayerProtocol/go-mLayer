@@ -339,7 +339,7 @@ func GetEvent(eventId string, eventType int) (model interface{}, err error) {
 		event, err1 := dsquery.GetEventById(eventId, modelType)
 
 		if err1 != nil {
-			logger.Error(err)
+			logger.Error("GetEvent: ", err)
 			return nil, err1
 		}
 		return event, nil
@@ -350,7 +350,7 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 		event, err1 := dsquery.GetEventById(eventHash, modelType)
 
 		if err1 != nil {
-			logger.Error(err)
+			logger.Error("GetEventByPath: ", err)
 			return nil, err1
 		}
 		return event, nil

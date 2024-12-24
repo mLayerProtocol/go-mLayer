@@ -85,7 +85,7 @@ func (handshake *NodeHandshake) IsValid(chainId configs.ChainId) bool {
 	
 	isValid, err := crypto.VerifySignatureSECP(handshake.Signer, data, handshake.Signature)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("NodeHandshake/VerifySignatureSECP: ", err)
 		return false
 	}
 	logger.Debugf("Validating handshake signature for %s:  %v",  hex.EncodeToString(handshake.Signer), isValid)

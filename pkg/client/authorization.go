@@ -41,7 +41,7 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 	
 	// TODO If error is because the subnet was not found, check the dht for the subnet
 	if err != nil {
-		logger.Error(err)
+		logger.Error("ValidateuthPayload: ", err)
 		return nil, nil, err
 	}
 

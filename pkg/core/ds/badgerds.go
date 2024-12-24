@@ -232,6 +232,9 @@ func (d *Datastore) Get(ctx context.Context, key ds.Key) (value []byte, err erro
 	err = d.DB.View(func(txn *badger.Txn) error {
 		// Read-only transaction
 		item, err := txn.Get(key.Bytes())
+		if err == badger.ErrKeyNotFound {
+			return ds.ErrNotFound
+		}
 		if err != nil {
 			return err
 		}

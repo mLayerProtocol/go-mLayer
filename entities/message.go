@@ -370,7 +370,7 @@ func (entity Message) GetAgent() DeviceString {
 func MessageFromBytes(b []byte) *Message {
 	var message Message
 	if err := json.Unmarshal(b, &message); err != nil {
-		logger.Error(err)
+		logger.Error("MessageFromBytes:", err)
 	}
 	return &message
 }

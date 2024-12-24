@@ -66,7 +66,7 @@ func TrackReward(ctx *context.Context) {
 	lastClaimed, err := stores.ClaimedRewardStore.Get(*ctx, lastCycleClaimedKey)
 		if err != nil  {
 			if err != datastore.ErrNotFound {
-				logger.Error(err)
+				logger.Error("ClaimedRewardStore.Get: ", err)
 				return;
 			}
 		} else {
@@ -166,7 +166,7 @@ func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguratio
 	logger.Debugf("Hash: %s", hashNumber)
 		totalLicenses, err := chain.DefaultProvider(cfg).GetSentryActiveLicenseCount(big.NewInt(int64(batch.Cycle)))
 		if err != nil {
-			logger.Error(err)
+			logger.Error("GetSentryActiveLicenseCount: ", err)
 			return
 		}
 		if totalLicenses.Cmp(big.NewInt(0)) == 0 {
@@ -227,7 +227,7 @@ func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguratio
 				
 				response, err := payload.SendDataRequest( operator) // nonce public key
 				if err != nil {
-					logger.Error(err)
+					logger.Error("SendDataRequest: ", err)
 					continue
 				}
 				
@@ -320,7 +320,7 @@ func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguratio
 							pendingClaimsKey :=  datastore.NewKey(fmt.Sprintf("validClaim/%s",  hex.EncodeToString(hash[:])))
 							err = stores.ClaimedRewardStore.Put(ctx, pendingClaimsKey, batch.MsgPack())
 							if err != nil {
-								logger.Error(err)
+								logger.Error("ClaimedRewardStore/Put ", err)
 							} else {
 								for _, d := range batch.Data {
 									logger.Debugf("[")

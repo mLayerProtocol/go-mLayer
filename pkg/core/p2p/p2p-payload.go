@@ -125,7 +125,7 @@ func (nma * P2pPayload) IsValid(chainId configs.ChainId) bool {
 	
 	isValid, err := crypto.VerifySignatureEDD(nma.Signer, &data, nma.Signature)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("P2pPayload/VerifySignatureEDD: ", err)
 		return false
 	}
 	
@@ -232,7 +232,7 @@ func (p *P2pPayload) SendP2pRequestToAddress(privateKey []byte, address multiadd
 				//TODO reconnect
 				return nil, err
 			}
-			logger.Error(err)
+			logger.Error("SendP2pReqeust: ", err)
 			return nil, err
 		}
 		

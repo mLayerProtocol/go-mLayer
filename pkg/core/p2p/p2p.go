@@ -157,7 +157,7 @@ func discover(ctx context.Context, h host.Host, kdht *dht.IpfsDHT, rendezvous st
 			logger.Println("Finding Peer at", rendezvous)
 			peers, err := routingDiscovery.FindPeers(ctx, rendezvous)
 			if err != nil {
-				logger.Error(err)
+				logger.Error("FindPeersError: ", err)
 				continue
 			}
 			
@@ -627,13 +627,13 @@ func validateHandShake(cfg *configs.MainConfiguration, handshake NodeHandshake, 
 			validHandshake, err := chain.NetworkInfo.IsValidator(hex.EncodeToString(handshake.Signer))
 			logger.Debugf("IsValidator: %v; OnchainValidator: %v", handshake.NodeType == constants.ValidatorNodeType, validHandshake)
 			if err != nil || !validHandshake {
-				logger.Error(err)
+				logger.Error("validateHandShake: ", err)
 				return false
 			}
 		} else {
 			validHandshake, err := chain.NetworkInfo.IsSentry(hex.EncodeToString(handshake.Signer), nil)
 			if err != nil || !validHandshake {
-				logger.Error(err)
+				logger.Error("chain.NetworkInfo.IsSentry: ", err)
 				return false
 			}
 		}
@@ -669,7 +669,7 @@ func syncBlocks(cfg *configs.MainConfiguration, hostQuicAddress multiaddr.Multia
 		if len(resp.Error) == 0 {
 		data, err := utils.DecompressGzip(resp.Data)
 		if err != nil {
-			logger.Error(err)
+			logger.Error("DecompressGzip: ", err)
 			return err
 		}
 		delimiter := []byte{':', '|'}		
@@ -867,7 +867,7 @@ func storeAddress(ctx *context.Context, h *host.Host) {
 
 		mad, err := NewNodeMultiAddressData(cfg, cfg.PrivateKeySECP, GetMultiAddresses(*h), cfg.PublicKeyEDD)
 		if err != nil {
-			logger.Error(err)
+			logger.Error("storeAddress: ", err)
 		}
 		key := "/ml/val/" + cfg.PublicKeyEDDHex
 		keySecP := "/ml/val/" + cfg.PublicKeySECPHex
@@ -939,7 +939,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 	pubKey := (*h).Peerstore().PubKey(pairAddr.ID)
 	pubk, err := pubKey.Raw()
 	if err != nil {
-		logger.Error(err)
+		logger.Error("handleConnectV2/Raw: ", err)
 		return
 	}
 	// hostPubKey, _ := Host.ID().ExtractPublicKey()
@@ -981,7 +981,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 	handshake, err := UnpackNodeHandshake(responsePayload.Data)
 	if err != nil {
 		disconnect(pairAddr.ID)
-		logger.Error(err)
+		logger.Error("handleConnectV2/UnpackNodeHandshake: ", err)
 		return
 	}
 	if validateHandShake(cfg, handshake, pairAddr.ID) {

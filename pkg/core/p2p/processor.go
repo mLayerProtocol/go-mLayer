@@ -674,7 +674,7 @@ func HandleQuicConnection(ctx *context.Context, cfg *configs.MainConfiguration, 
 			break // End of file, stop reading
 		}
 		if err != nil {
-			logger.Error(err) // Handle error
+			logger.Error("HandleQuicConnection/writedata: ", err) // Handle error
 			return
 		}
 	}
@@ -682,7 +682,7 @@ func HandleQuicConnection(ctx *context.Context, cfg *configs.MainConfiguration, 
 	payload, err := UnpackP2pPayload(data.Bytes())
 
 	if err != nil {
-		logger.Error(err)
+		logger.Error("HandleQuicConnection/UnpackP2pPayload: ", err)
 		return
 	}
 	if !payload.IsValid(cfg.ChainId) {
@@ -691,7 +691,7 @@ func HandleQuicConnection(ctx *context.Context, cfg *configs.MainConfiguration, 
 	}
 	response, err := processP2pPayload(cfg, payload, false)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("HandleQuicConnection/processP2pPayload: "err)
 		return
 	}
 	_, err = stream.Write(response.MsgPack())

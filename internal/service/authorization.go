@@ -259,7 +259,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 		}
 		stateUpdateError := dataStates.Commit(nil, nil, nil)
 		if stateUpdateError != nil {
-			logger.Error(err)
+			logger.Error("HandleNewPubSubAuthEvent/Commit", err)
 			panic(stateUpdateError)
 		} else {
 			go OnFinishProcessingEvent(ctx, event,  data)
@@ -285,7 +285,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 	defer txn.Discard(context.Background())
 	_localState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Subnet: subnet, Account: entities.AddressFromString(string(data.Account)).ToString(), Agent: entities.AddressFromString(string(data.Agent)).ToDeviceString()}, dsquery.DefaultQueryLimit, &stateTxn)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("GetAccountAuthorizations:", err)
 	}
 	if len(_localState) > 0 {
 		localState = &models.AuthorizationState{Authorization: *_localState[0]}

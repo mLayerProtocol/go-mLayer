@@ -83,7 +83,7 @@ func (nma *ClientHandshake) IsValid(chainId configs.ChainId) bool {
 
 	isValid := crypto.VerifySignatureECC(DIDFromString(string(nma.Signer)).Addr, &data, nma.Signature)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("VerifySignatureECC:", err)
 		return false
 	}
 

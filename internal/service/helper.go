@@ -212,7 +212,7 @@ func ValidateEvent(event interface{}) error {
 	sign, _ := hex.DecodeString(e.GetSignature())
 	valid, err := crypto.VerifySignatureEDD(e.GetValidator().Bytes(), &b, sign)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("ValidateEvent: ", err)
 		return err
 	}
 	if !valid {

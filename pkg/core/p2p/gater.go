@@ -70,7 +70,7 @@ func (g *NetworkGater) performHandshake(p peer.ID) bool {
         lastSync, _ := ds.GetLastSyncedBlock(g.config.Context)
     message, err := NewNodeHandshake(g.config, handShakeProtocolId, g.config.PrivateKeySECP, g.config.PublicKeyEDD, nodeType, lastSync, utils.RandomAplhaNumString(6))
     if err != nil {
-        logger.Error(err)
+        logger.Error("NewNodeHandshake: ", err)
     }
     msgBytes := message.MsgPack()
     _, err = s.Write(msgBytes)

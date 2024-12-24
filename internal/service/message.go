@@ -176,7 +176,7 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) (e
 			}
 			stateUpdateError := dataStates.Commit(nil, nil, nil)
 			if err != nil {
-				logger.Error(err)
+				logger.Error("HandleNewPubSubMessageEvent: ", err)
 				panic(stateUpdateError)
 			} else {
 				go OnFinishProcessingEvent(ctx, event,  &data)

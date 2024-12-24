@@ -553,7 +553,7 @@ func ProcessEvent(
 			//_, err = saveEvent(entities.Event{ID: event.ID}, event,  &entities.Event{Error: badEvent.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()}, txn, tx)
 			dataDataStates.AddEvent(entities.Event{ID: event.ID, Error: badEvent.Error(), IsValid: utils.FalsePtr(), Synced:  utils.TruePtr()})
 			if err != nil {
-				logger.Error(err)
+				logger.Error("dataDataStates.AddEvent: ", err)
 			}
 			// notify the originator so it can correct it e.g. let it know that there is a new authorization
 

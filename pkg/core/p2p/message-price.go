@@ -66,7 +66,7 @@ func (mp *MessagePrice) IsValid(prefix configs.ChainId) bool {
 	// }
 	isValid, err := crypto.VerifySignatureSECP(signer, data, mp.Signature)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("VerifySignatureSECP: ", err)
 		return false
 	}
 	if !isValid {

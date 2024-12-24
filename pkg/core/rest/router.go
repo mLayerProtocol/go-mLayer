@@ -101,7 +101,7 @@ func (p *RestService) Initialize() *gin.Engine {
 	router.GET("/api/info", func(c *gin.Context) {
 		info, err := requestProcessor.Process(client.GetNodeInfoRequest, nil, nil)
 		if err != nil {
-			logger.Error(err)
+			logger.Error("Router:/api/info: ", err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
@@ -113,7 +113,7 @@ func (p *RestService) Initialize() *gin.Engine {
 
 		b, parseError := utils.ParseQueryString(c)
 		if parseError != nil {
-			logger.Error(parseError)
+			logger.Error("Router:/api/authorizations/ParseQueryString: ", parseError)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: parseError.Error()}))
 			return
 		}
@@ -124,7 +124,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		auths, err := client.GetAuthorizations(&authEntity)
 
 		if err != nil {
-			logger.Error(err)
+			logger.Error("router/GetAuthorizations: ", err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}

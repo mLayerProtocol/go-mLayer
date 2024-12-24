@@ -417,14 +417,14 @@ func GenerateImportScript[T any](db *gorm.DB, model T, where string, fileName st
 	
 	rows, err := Db.Query(query)
     if err != nil {
-        logger.Error(err)
+        logger.Error("GenerateImportScript: ", err)
 		return nil, err
     }
 	defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
-        logger.Error(err)
+        logger.Error("GenerateImportScript/Columns: ", err)
 		return nil, err
     }
 	var results [][]interface{}

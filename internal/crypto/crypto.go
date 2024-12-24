@@ -264,7 +264,7 @@ func VerifySignatureAmino(signedData string, signature []byte, account string, p
 	sig, _ := ToBtcecSignature(hex.EncodeToString(signature))
 	verified, err := VerifySignatureSECP(pubKey, b, *sig)
 	if err != nil {
-		logger.Error(err)
+		logger.Error("VerifySignatureAmino:", err)
 		return false, err
 	}
 	return verified, err

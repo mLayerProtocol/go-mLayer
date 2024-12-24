@@ -91,7 +91,7 @@ func (ep *EventProcessor) processSubnet(ctx context.Context, subnet string, ch c
 			if event.Validator != entities.PublicKeyString(hex.EncodeToString(cfg.PublicKeyEDD)) {
 				isValidator, err := chain.NetworkInfo.IsValidator(string(event.Validator))
 				if err != nil {
-					logger.Error(err)
+					logger.Error("processSubnet/IsValidator: ", err)
 					return
 				}
 				if !isValidator {

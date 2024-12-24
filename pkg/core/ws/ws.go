@@ -172,7 +172,7 @@ func (p *WsService) HandleConnection(w http.ResponseWriter, r *http.Request) {
 					Id:           payload.Id,
 				})
 				if err != nil {
-					logger.Error(err)
+					logger.Error("HandleConnection/WriteJSON: ", err)
 				}
 				continue
 			}
@@ -185,7 +185,7 @@ func (p *WsService) HandleConnection(w http.ResponseWriter, r *http.Request) {
 					Id:           payload.Id,
 				})
 				if err != nil {
-					logger.Error(err)
+					logger.Error("HandleConnection/WriteJSON2: ",err)
 				}
 				continue
 			}
