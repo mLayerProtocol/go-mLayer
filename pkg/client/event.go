@@ -25,7 +25,6 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
 	"gorm.io/gorm"
 )
 
@@ -286,8 +285,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		return model, err
 	}
 	go service.HandleNewPubSubEvent(event, ctx) 
-	event.Broadcasted = true;
-	go p2p.PublishEvent(event)
+	
 	// dispatch to network
 
 	// if err != nil {

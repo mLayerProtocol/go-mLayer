@@ -266,17 +266,26 @@ func HandleNewPubSubEvent(event entities.Event, ctx *context.Context) error {
 	
 	switch  event.Payload.Data.(type) {
 	case entities.Subnet:
-		return HandleNewPubSubSubnetEvent(&event, ctx)
+		return broadcastEvent(&event, ctx, HandleNewPubSubSubnetEvent(&event, ctx))
 	case entities.Authorization:
-		return HandleNewPubSubAuthEvent(&event, ctx)
+		return broadcastEvent(&event, ctx, HandleNewPubSubAuthEvent(&event, ctx))
 	case entities.Topic:
-		return HandleNewPubSubTopicEvent(&event, ctx)
+		return broadcastEvent(&event, ctx, HandleNewPubSubTopicEvent(&event, ctx))
 	case entities.Subscription:
-		return HandleNewPubSubSubscriptionEvent(&event, ctx)
+		return broadcastEvent(&event, ctx, HandleNewPubSubSubscriptionEvent(&event, ctx))
 	case entities.Message:
-		return HandleNewPubSubMessageEvent(&event, ctx)
+		return broadcastEvent(&event, ctx, HandleNewPubSubMessageEvent(&event, ctx)) 
 	}
 	return nil
+}
+
+func broadcastEvent(event *entities.Event, ctx *context.Context, err error)  error {
+	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
+	if err == nil && !event.Broadcasted && event.Validator == entities.PublicKeyString(cfg.PublicKeyEDDHex) {
+		event.Broadcasted = true;
+		go p2p.PublishEvent(*event)
+	}
+	return err
 }
 
 func OnFinishProcessingEvent(ctx *context.Context, event  *entities.Event, state  interface{}) {
