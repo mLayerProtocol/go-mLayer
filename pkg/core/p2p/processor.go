@@ -691,7 +691,7 @@ func HandleQuicConnection(ctx *context.Context, cfg *configs.MainConfiguration, 
 	}
 	response, err := processP2pPayload(cfg, payload, false)
 	if err != nil {
-		logger.Error("HandleQuicConnection/processP2pPayload: "err)
+		logger.Error("HandleQuicConnection/processP2pPayload: ", err)
 		return
 	}
 	_, err = stream.Write(response.MsgPack())
