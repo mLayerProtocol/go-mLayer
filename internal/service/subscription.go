@@ -222,6 +222,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 			}
 			
 		}
+		go dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
 	} 
 		return nil
 	

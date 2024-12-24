@@ -357,6 +357,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 			} else {
 				dataStates.AddHistoricState(entities.AuthModel, data.DataKey(), data.MsgPack())
 			}
+			go dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
 			// if eventIsMoreRecent && err == nil {
 			// 	// update state
 			// 	if localState.ID != "" {

@@ -288,6 +288,7 @@ func HandleNewPubSubSubnetEvent(event *entities.Event, ctx *context.Context, ) e
 			} else {
 				dataStates.AddHistoricState(entities.SubnetModel, data.ID, data.MsgPack())
 			}
+			go dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
 			// if err == nil {
 			// 	if err = txn.Commit(context.Background()); err != nil {
 			// 		logger.Errorf("ErorrSavingEvent: %v", err)
