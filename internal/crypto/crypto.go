@@ -457,7 +457,7 @@ func GetOrGenerateCert(ctx *context.Context) *CertData {
 	certKey := datastore.NewKey("/cert")
 		certData, err := SystemStore.Get(*ctx, certKey)
 		if err != nil  && err != datastore.ErrNotFound {
-			logger.Fatal("unable to load server certdata")
+			logger.Fatalf("unable to load server certdata: %v", err)
 		}
 		generated := false
 		if certData == nil {
