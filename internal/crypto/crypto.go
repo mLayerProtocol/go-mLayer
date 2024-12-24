@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ipfs/go-datastore"
@@ -456,7 +457,7 @@ func GetOrGenerateCert(ctx *context.Context) *CertData {
 	}
 	certKey := datastore.NewKey("/cert")
 		certData, err := SystemStore.Get(*ctx, certKey)
-		if err != nil  && err != datastore.ErrNotFound {
+		if err != nil  && err != datastore.ErrNotFound  && err != badger.ErrKeyNotFound {
 			logger.Fatalf("unable to load server certdata: %v", err)
 		}
 		generated := false
