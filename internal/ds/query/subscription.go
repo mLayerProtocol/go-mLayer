@@ -74,11 +74,11 @@ func GetSubscriptions( filter entities.Subscription, limits *QueryLimit, txn *da
 	
 	for _, entry := range entries { 
 		
-		value, qerr := GetSubscriptionByEvent(entities.EventPath{EntityPath: entities.EntityPath{ Hash: string(entry.Value)}})
+		value, qerr := GetSubscriptionByEvent(entities.EventPath{EntityPath: entities.EntityPath{ ID: string(entry.Value)}})
 		if qerr != nil {
 			continue
 		}
-		logger.Debugf("Getting Subscription Event ID...: %s,",string(value.Event.Hash))
+		logger.Debugf("Getting Subscription Event ID...: %s,",string(value.Event.ID))
 		if value.Timestamp == nil {
 			if index := strings.LastIndex(entry.Key, string("/")); index != -1 {
 				layout := "200602011504000"
@@ -93,7 +93,7 @@ func GetSubscriptions( filter entities.Subscription, limits *QueryLimit, txn *da
 			}
 		}
 		
-		logger.Debugf("Getting Subscription Event ID2...: %s,",string(value.Event.Hash))
+		logger.Debugf("Getting Subscription Event ID2...: %s,",string(value.Event.ID))
 		data = append(data, value)
 		err = qerr
 	}
@@ -194,7 +194,7 @@ func CreateSubscriptionState(newState *entities.Subscription, tx *datastore.Txn)
 		RefKey: refKey,
 		Keys: newState.GetKeys(),
 		Data: newState.MsgPack(),
-		EventHash: newState.Event.Hash,
+		EventHash: newState.Event.ID,
 	}, tx)
 	if err != nil {
 		logger.Errorf("ERRORRRRR: %v", err)
@@ -231,7 +231,7 @@ func CreateSubscriptionState(newState *entities.Subscription, tx *datastore.Txn)
 // 	// 	OldIDKey: newState.Key(),
 // 	// 	DataKey: newState.DataKey(),
 // 	// 	Data: newState.MsgPack(),
-// 	// 	EventHash: newState.Event.Hash,
+// 	// 	EventHash: newState.Event.ID,
 // 	// 	RefKey: &newState.Ref,
 // 	// 	OldRefKey: &oldTopic.Ref,
 // 	// }, tx)
@@ -255,7 +255,7 @@ func GetSubscriptionStates(subnet string, topic string, subscriber entities.Devi
 	}
 	entries, _ := result.Rest()
 	for _, entry := range entries { 
-		value, qerr := GetSubscriptionByEvent(entities.EventPath{EntityPath: entities.EntityPath{ Hash: string(entry.Value)}})
+		value, qerr := GetSubscriptionByEvent(entities.EventPath{EntityPath: entities.EntityPath{ ID: string(entry.Value)}})
 		if qerr != nil {
 			continue
 		}

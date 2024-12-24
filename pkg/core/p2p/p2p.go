@@ -1397,8 +1397,6 @@ func PublishEvent(event entities.Event) *models.EventInterface {
 			channelpool.TopicEventPublishC <- &event
 			var returnModel = models.EventInterface(models.TopicEvent{Event: event})
 			model = &returnModel
-
-
 		case entities.SubscriptionModel:
 			channelpool.SubscriptionEventPublishC <- &event
 			logger.Infof("SubscriptionEvent: %+v", event)

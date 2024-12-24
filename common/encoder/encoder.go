@@ -99,6 +99,11 @@ func EncodeBytes(args ...EncoderParam) (data []byte, err error) {
 				return []byte(""), err
 			}
 			m[i] = NumberToByte(num)
+			// if num == 0 {
+			// 	m[i] = []byte{}
+			// } else {
+			// 	m[i] = NumberToByte(num)
+			// }
 		}
 		if arg.Type == BoolEncoderDataType {
 			val := 0

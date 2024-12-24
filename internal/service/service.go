@@ -106,7 +106,7 @@ func ProcessEvent(
 	// // hash, _ := event.GetHash()
 	
 	if event.IsLocal(cfg) {
-		if len(event.AuthEvent.Hash) > 0 {
+		if len(event.AuthEvent.ID) > 0 {
 			_, stateByte, err := SyncEventByPath(&event.AuthEvent, cfg, string(event.Validator))
 			if err != nil {
 				return true, false, nil, true, err
@@ -255,7 +255,7 @@ func ProcessEvent(
 			// if len(_agentAuthState) > 0 && currentLocaltAuthState.ID == "" {
 			// 	currentLocaltAuthState = models.AuthorizationState{Authorization: *(_agentAuthState[0])}
 			// }
-			if currentLocaltAuthState.Priviledge != nil && *currentLocaltAuthState.Priviledge < constants.MemberPriviledge && currentLocaltAuthState.ID == event.AuthEvent.Hash {
+			if currentLocaltAuthState.Priviledge != nil && *currentLocaltAuthState.Priviledge < constants.MemberPriviledge && currentLocaltAuthState.ID == event.AuthEvent.ID {
 					// authorizationIndex = i
 				return  false, false, nil, eventIsMoreRecent, fmt.Errorf("no write priviledge")
 			}
@@ -275,7 +275,7 @@ func ProcessEvent(
 
 		// }
 		logger.Debugf("PreviousEvent: %s", event.PreviousEvent)
-		if len(event.PreviousEvent.Hash) > 0 {
+		if len(event.PreviousEvent.ID) > 0 {
 			// previousEvent, err = query.GetEventFromPath(&event.PreviousEvent)
 
 			
@@ -292,7 +292,7 @@ func ProcessEvent(
 				previousEventUptoDate = true
 			} else {
 				// get the previous event from the sending node and process it as well
-				logger.Infof("GettingPreviousEvent: %s", event.PreviousEvent.Hash)
+				logger.Infof("GettingPreviousEvent: %s", event.PreviousEvent.ID)
 				previousEvent, pl, err := getEventFromP2p(cfg, event.PreviousEvent, nil)
 				if err != nil {
 					logger.Debugf("ErrorRetrievingPreviousEvent: %v", err)
@@ -306,8 +306,8 @@ func ProcessEvent(
 					// 	logger.Errorf("Create previous event error %v", err)
 					// } else {
 						for _, stData := range pl.States {
-							dataDataStates.AddHistoricState(event.PreviousEvent.Model, event.PreviousEvent.Hash, stData)
-							// err = dsquery.SaveHistoricState(event.PreviousEvent.Model, event.PreviousEvent.Hash, stData)
+							dataDataStates.AddHistoricState(event.PreviousEvent.Model, event.PreviousEvent.ID, stData)
+							// err = dsquery.SaveHistoricState(event.PreviousEvent.Model, event.PreviousEvent.ID, stData)
 							// if err != nil {
 							// 	logger.Errorf("Save previous historic state error %v", err)
 							// }
@@ -335,9 +335,9 @@ func ProcessEvent(
 		}
 
 	
-		if (validAgentRequired || len(event.AuthEvent.Hash) > 0) && (currentLocaltAuthState.ID != "" || currentLocaltAuthState.Event.Hash != event.AuthEvent.Hash) {
+		if (validAgentRequired || len(event.AuthEvent.ID) > 0) && (currentLocaltAuthState.ID != "" || currentLocaltAuthState.Event.ID != event.AuthEvent.ID) {
 			// check if we have the associated auth event locally, if we dont we can't proceed until we get it
-			if event.AuthEvent.Hash == "" {
+			if event.AuthEvent.ID == "" {
 				return previousEventUptoDate, authEventUptoDate, nil, eventIsMoreRecent, fmt.Errorf("auth event not provided")
 			}
 			// authEvent, err = query.GetEventFromPath(&event.AuthEvent)
@@ -426,8 +426,8 @@ func ProcessEvent(
 				// if err != nil && !dsquery.IsErrorNotFound(err) {
 				// 	return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to get local auth state")
 				// } 
-				// if len(localAuthState) == 0 || IsMoreRecentEvent(localAuthState[0].Event.Hash, int(*localAuthState[0].Timestamp), _auth.Event.Hash, int(*_auth.Timestamp), ) {
-				if currentLocaltAuthState.ID == "" || IsMoreRecentEvent(currentLocaltAuthState.Event.Hash, int(*currentLocaltAuthState.Timestamp), authEventAuthState.Event.Hash, int(*authEventAuthState.Timestamp), ) {
+				// if len(localAuthState) == 0 || IsMoreRecentEvent(localAuthState[0].Event.ID, int(*localAuthState[0].Timestamp), _auth.Event.ID, int(*_auth.Timestamp), ) {
+				if currentLocaltAuthState.ID == "" || IsMoreRecentEvent(currentLocaltAuthState.Event.ID, int(*currentLocaltAuthState.Timestamp), authEventAuthState.Event.ID, int(*authEventAuthState.Timestamp), ) {
 					// dataDataStates.CurrentStates[entities.EntityPath{Model: entities.AuthModel, Hash: authEventAuthState.ID}] = authEventAuthState
 					dataDataStates.AddCurrentState(entities.AuthModel, authEventAuthState.ID, authEventAuthState)
 					dataDataStates.AddEvent(*authEvent)
@@ -480,7 +480,7 @@ func ProcessEvent(
 		
 		if entityState != nil &&  len(entityState.ID) > 0 {
 			// check if state.Event is same as events previous has
-			if entityState.Event.Hash != event.PreviousEvent.Hash {
+			if entityState.Event.ID != event.PreviousEvent.ID {
 				// either we are not upto date, or the sender is not
 				// get the event that resulted in current state
 				// topicEvent, err = query.GetEventFromPath(&topicState.Event)
@@ -493,8 +493,8 @@ func ProcessEvent(
 
 					logger.Debugf("STATEEVENT %v, %+v", stateEvent, previousEvent)
 					 // if this event is more recent, then it must referrence our local event or an event after it
-					if previousEvent != nil && eventIsMoreRecent  && stateEvent.Hash != event.PreviousEvent.Hash {
-						previousEventMoreRecent := IsMoreRecentEvent(stateEvent.Hash, int(stateEvent.Timestamp), previousEvent.Hash, int(previousEvent.Timestamp))
+					if previousEvent != nil && eventIsMoreRecent  && stateEvent.Hash != event.PreviousEvent.ID {
+						previousEventMoreRecent := IsMoreRecentEvent(stateEvent.Hash, int(stateEvent.Timestamp), previousEvent.ID, int(previousEvent.Timestamp))
 						if !previousEventMoreRecent {
 							badEvent = fmt.Errorf(constants.ErrorBadRequest)
 						}
@@ -516,7 +516,7 @@ func ProcessEvent(
 		// if its a new one, we have to confirm that it is referencing the true latest auth event
 
 		// so lets get the referrenced authorization
-		// if event.AuthEvent.Hash != "" {
+		// if event.AuthEvent.ID != "" {
 		// 	err = query.GetOne(models.AuthorizationState{Authorization: entities.Authorization{Event: event.AuthEvent}}, eventAuthState)
 		// 	if err != nil && err != query.ErrorNotFound {
 		// 		return false, false, nil, false,fmt.Errorf("db error: %s", err.Error())
@@ -524,17 +524,17 @@ func ProcessEvent(
 		// 	// if we dont have it, get it from another node
 		// }
 		// if event is more recent that our local state, we have to check its validity since it updates state
-		if eventIsMoreRecent && validAgentRequired && currentLocaltAuthState.ID  != "" && currentLocaltAuthState.Event.Hash != event.AuthEvent.Hash && authEvent != nil {
+		if eventIsMoreRecent && validAgentRequired && currentLocaltAuthState.ID  != "" && currentLocaltAuthState.Event.ID != event.AuthEvent.ID && authEvent != nil {
 			// get the event that is responsible for the current state
-			// err := query.GetOne(models.AuthorizationEvent{Event: entities.Event{Hash: agentAuthState.Event.Hash}}, &agentAuthStateEvent)
-			localAuthEvent, err := dsquery.GetEventById(currentLocaltAuthState.Event.Hash, entities.AuthModel)
+			// err := query.GetOne(models.AuthorizationEvent{Event: entities.Event{Hash: agentAuthState.Event.ID}}, &agentAuthStateEvent)
+			localAuthEvent, err := dsquery.GetEventById(currentLocaltAuthState.Event.ID, entities.AuthModel)
 			if err != nil && !dsquery.IsErrorNotFound(err) {
 				logger.Debug(err)
 				return previousEventUptoDate, authEventUptoDate, &eventAuthState, eventIsMoreRecent, err
 			}
 			// agentAuthStateEvent = models.AuthorizationEvent{Event: *authEvent}
-			if localAuthEvent != nil && localAuthEvent.Hash != ""  {
-				authMoreRecent = IsMoreRecentEvent(currentLocaltAuthState.Hash, int(*currentLocaltAuthState.Timestamp), localAuthEvent.Hash, int(localAuthEvent.Timestamp))
+			if localAuthEvent != nil && localAuthEvent.ID != ""  {
+				authMoreRecent = IsMoreRecentEvent(currentLocaltAuthState.ID, int(*currentLocaltAuthState.Timestamp), localAuthEvent.ID, int(localAuthEvent.Timestamp))
 				// authMoreRecent = authMoreRecent &&
 				if !authMoreRecent {
 					// this is a bad event using an old auth state.

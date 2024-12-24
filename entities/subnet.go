@@ -68,7 +68,7 @@ func (d Subnet) GetSignature() (string) {
 	return ""
 }  
 // func (g Subnet) GetId() (string) {
-// 	// return g.Event.Hash[:32]
+// 	// return g.Event.ID[:32]
 // 	return g.ID
 // }
 
@@ -81,7 +81,7 @@ func (g *Subnet) GetKeys() (keys []string)  {
 	keys = append(keys, g.Key())
 	keys = append(keys, g.RefKey())
 	// keys = append(keys, fmt.Sprintf("%s/%d/%s", SubnetModel, g.Cycle, g.ID))
-	// keys = append(keys,fmt.Sprintf("%s/%s/%s", g.Event.Hash, SubnetModel, g.Hash ))
+	// keys = append(keys,fmt.Sprintf("%s/%s/%s", g.Event.ID, SubnetModel, g.Hash ))
 	keys = append(keys, g.DataKey())
 	keys = append(keys, g.ArchiveKey())
 	// keys = append(keys, g.GetEventStateKey())
@@ -92,7 +92,7 @@ func (g *Subnet) GetKeys() (keys []string)  {
 //    return fmt.Sprintf("ev/%s", g.Event.ToString() )
 // }
 func (item *Subnet) DataKey() string {
-	return fmt.Sprintf(DataKey, SubnetModel, item.Event.Hash )
+	return fmt.Sprintf(DataKey, SubnetModel, item.Event.ID )
 }
 
 func (item *Subnet) ArchiveKey() string {

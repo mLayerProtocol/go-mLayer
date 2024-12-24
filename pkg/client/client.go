@@ -159,7 +159,7 @@ func ValidateClientPayload(
 					return nil, &agent, apperror.Unauthorized("agent not authorized")
 				}
 				for _, a := range authDatas {
-					logger.Debugf("AuthStatesss::: %s", a.Event.Hash)
+					logger.Debugf("AuthStatesss::: %s", a.Event.ID)
 				}
 				
 				authData = models.AuthorizationState{Authorization: *authDatas[0]};

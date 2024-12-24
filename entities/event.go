@@ -50,8 +50,9 @@ Event paths define the unique path to an event and its relation to the entitie
 */
 type EntityPath struct {
 	Model     EntityModel      `json:"mod"`
-	Hash      string          `json:"h"`
+	ID      string          `json:"id"`
 	Validator PublicKeyString `json:"val"`
+	Index int64 `json:"idx"`
 }
 
 type EventPath struct {
@@ -59,21 +60,21 @@ type EventPath struct {
 }
 
 func (e *EntityPath) ToString() string {
-	if e == nil || e.Hash == "" {
+	if e == nil || e.ID == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s/%s/%s", e.Validator, e.Model, e.Hash)
+	return fmt.Sprintf("%s/%s/%s", e.Validator, e.Model, e.ID)
 }
 
 func (e *EntityPath) ToByteHash() ([]byte, error) {
 	
-	if e == nil || e.Hash == "" {
+	if e == nil || e.ID == "" {
 		return []byte(""), fmt.Errorf("hash is empty")
 	}
-	if strings.Contains(e.Hash, "-") {
-		return utils.UuidToBytes(e.Hash), nil
+	if strings.Contains(e.ID, "-") {
+		return utils.UuidToBytes(e.ID), nil
 	}
-	return hex.DecodeString(e.Hash)
+	return hex.DecodeString(e.ID)
 	
 }
 func (e *EntityPath) ToHexHash() (string) {
@@ -84,11 +85,11 @@ func (e *EntityPath) ToHexHash() (string) {
 	return hex.EncodeToString(b)
 }
 
-func NewEntityPath(validator PublicKeyString, model EntityModel, hash string) *EntityPath {
-	return &EntityPath{Model: model, Hash: hash, Validator: validator}
+func NewEntityPath(validator PublicKeyString, model EntityModel, id string) *EntityPath {
+	return &EntityPath{Model: model, ID: id, Validator: validator}
 }
-func NewEventPath(validator PublicKeyString, model EntityModel, hash string) *EventPath {
-	return &EventPath{EntityPath{Model: model, Hash: hash, Validator: validator}}
+func NewEventPath(validator PublicKeyString, model EntityModel, id string) *EventPath {
+	return &EventPath{EntityPath{Model: model, ID: id, Validator: validator}}
 }
 
 func (e *EntityPath) MsgPack() ([]byte) {
@@ -120,20 +121,20 @@ func EntityPathFromString(path string) *EntityPath {
 		return &EntityPath{
 			//Relationship: EventAssoc(assoc),
 			Model: EntityModel(""),
-			Hash:  parts[0],
+			ID:  parts[0],
 		}
 	case 2:
 		return &EntityPath{
 			//Relationship: EventAssoc(assoc),
 			Model:     EntityModel(""),
-			Hash:      parts[1],
+			ID:      parts[1],
 			Validator: PublicKeyString(parts[0]),
 		}
 	default:
 		return &EntityPath{
 			Validator: PublicKeyString(parts[0]),
 			Model:     EntityModel(parts[1]),
-			Hash:      parts[2],
+			ID:      parts[2],
 		}
 	}
 }
@@ -201,6 +202,7 @@ type Event struct {
 	Synced      *bool            `json:"sync" gorm:"default:false"`
 	Validator   PublicKeyString `json:"val"`
 	Subnet   	string			`json:"snet"`
+	Index int64 `json:"vec"`
 
 	Total int `json:"total"`
 }
@@ -211,10 +213,11 @@ func (g *Event) GetKeys() (keys []string)  {
 	// keys = append(keys, fmt.Sprintf("cy/%d/%d/%s/%s", g.Cycle, utils.IfThenElse(g.Synced, 1,0), g.Subnet, g.ID))
 	
 	keys = append(keys, g.DataKey())
+	
 	// keys = append(keys, fmt.Sprintf("%s/%s/%s", EntityModel, g.Subnet, g.ID))
 	// keys = append(keys,fmt.Sprintf("hash/%s",  g.GetIdHash()))
 	// keys = append(keys,fmt.Sprintf("%s/%s", TopicModel, g.Hash))
-	// keys = append(keys,fmt.Sprintf("prev/%s", g.PreviousEvent.Hash ))
+	// keys = append(keys,fmt.Sprintf("prev/%s", g.PreviousEvent.ID ))
 	
 	// keys = append(keys, fmt.Sprintf("cy/%d/%s/%s", g.Cycle, GetModelTypeFromEventType(constants.EventType(g.EventType)), g.ID))
 	return keys;
@@ -223,6 +226,9 @@ func (e *Event) DataKey() string {
 	return fmt.Sprintf("id/%s",  e.ID)
 }
 
+func (e *Event) VectorKey(topic string) string {
+	return fmt.Sprintf("vec/%s/%s", e.Validator, topic)
+}
 
 func (e *Event) SubnetKey()  string {
 	return  fmt.Sprintf("snet/%s/%015d", e.Subnet, e.Cycle)
@@ -344,7 +350,11 @@ func (e *Event) GetPath() *EventPath {
 	if err != nil {
 		return nil
 	}
-	return NewEventPath(e.Validator, e.GetDataModelType(), id)
+	path := NewEventPath(e.Validator, e.GetDataModelType(), id)
+	if e.Index > 0 {
+		path.Index = e.Index
+	}
+	return path
 }
 
 func UnpackEvent(b []byte, model EntityModel) (*Event, error) {
@@ -465,23 +475,25 @@ func (e Event) EncodeBytes() ([]byte, error) {
 		return []byte(""), err
 	}
 	// previousEvent := []byte{}
-	// if e.PreviousEvent.Hash  != "" {
+	// if e.PreviousEvent.ID  != "" {
 	// 	previousEvent, err =  e.PreviousEvent.ToByteHash()
 	// 	if err != nil {
 	// 		return nil, err
 	// 	}
 	// }
+	
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: d},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: strings.Join(e.Associations, "")},
-		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.AuthEvent.Hash)},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.AuthEvent.ID)},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.BlockNumber},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Cycle},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Epoch},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.EventType},
-		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.PreviousEvent.Hash)},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.PreviousEvent.ID)},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.Subnet)},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Timestamp},
+		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Index},
 	)
 }
 

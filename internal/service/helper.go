@@ -54,7 +54,7 @@ func ConnectClient(cfg *configs.MainConfiguration, handshake *entities.ClientHan
 
 
 func SyncEventByPath(path *entities.EventPath, cfg *configs.MainConfiguration, validator string) (event *entities.Event, stateResp []byte, err error) {
-	event, err = dsquery.GetEventById(path.Hash, path.Model)
+	event, err = dsquery.GetEventById(path.ID, path.Model)
 	if err != nil {
 		if !dsquery.IsErrorNotFound(err) {
 			return nil, nil, err
@@ -631,8 +631,8 @@ func FinalizeEvent [ T entities.Payload, State any] (
 	// Confirm if this is an older event coming after a newer event.
 	// If it is, then we only have to update our event history, else we need to also update our current state
 
-	prevEventUpToDate := query.EventExist(&event.PreviousEvent) || (currentState == nil && event.PreviousEvent.Hash == "") || (currentState != nil && currentStateEventHash == event.PreviousEvent.Hash)
-	// authEventUpToDate := query.EventExist(&event.AuthEvent) || (authState == nil && event.AuthEvent.Hash == "") || (authState != nil && authState.Event == authEventHash)
+	prevEventUpToDate := query.EventExist(&event.PreviousEvent) || (currentState == nil && event.PreviousEvent.ID == "") || (currentState != nil && currentStateEventHash == event.PreviousEvent.ID)
+	// authEventUpToDate := query.EventExist(&event.AuthEvent) || (authState == nil && event.AuthEvent.ID == "") || (authState != nil && authState.Event == authEventHash)
 	isMoreRecent := false
 	if currentState != nil && currentStateHash != dataHash {
 		err := query.GetOne(entities.Event{Hash: currentStateEventHash}, currentStateEvent)
@@ -845,10 +845,10 @@ func HandleNewPubSubEvent(event *entities.Event, ctx *context.Context, validator
 
 	// check if we are upto date on this event
 
-	prevEventUpToDate := query.EventExist(&event.PreviousEvent) || (currentState == nil && event.PreviousEvent.Hash == "") || (currentState != nil && (*currentState).GetEvent().Hash == event.PreviousEvent.Hash)
+	prevEventUpToDate := query.EventExist(&event.PreviousEvent) || (currentState == nil && event.PreviousEvent.ID == "") || (currentState != nil && (*currentState).GetEvent().Hash == event.PreviousEvent.ID)
 	authEventUpToDate := true
-	if event.AuthEvent.Hash != "" {
-		authEventUpToDate = query.EventExist(&event.AuthEvent) || (authState == nil && event.AuthEvent.Hash == "") || (authState != nil && authState.Event == authEventHash)
+	if event.AuthEvent.ID != "" {
+		authEventUpToDate = query.EventExist(&event.AuthEvent) || (authState == nil && event.AuthEvent.ID == "") || (authState != nil && authState.Event == authEventHash)
 	}
 
 	// Confirm if this is an older event coming after a newer event.
@@ -881,7 +881,7 @@ func HandleNewPubSubEvent(event *entities.Event, ctx *context.Context, validator
 				if currentStateEvent.Payload.Timestamp == event.Payload.Timestamp {
 					// logger.Debugf("Current state %v", currentStateEvent.Payload)
 					csN := new(big.Int)
-					csN.SetString(currentState.Event.Hash[56:], 16)
+					csN.SetString(currentState.Event.ID[56:], 16)
 					nsN := new(big.Int)
 					nsN.SetString(event.Hash[56:], 16)
 

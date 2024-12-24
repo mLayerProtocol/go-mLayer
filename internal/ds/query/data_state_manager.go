@@ -51,7 +51,7 @@ func (ds *DataStates) AddEvent( event entities.Event) {
 }
 
 func (ds *DataStates) AddCurrentState( model entities.EntityModel, id string, state interface{}) {
-	path := entities.EntityPath{Model: model, Hash: id}
+	path := entities.EntityPath{Model: model, ID: id}
 	logger.Infof("VENTMOREREC %+v", path)
 	if ds.CurrentStates[path] == nil {
 		ds.CurrentStates[path] =  state
@@ -62,7 +62,7 @@ func (ds *DataStates) AddCurrentState( model entities.EntityModel, id string, st
 }
 
 func (ds *DataStates) AddHistoricState( model entities.EntityModel, id string, state []byte) {
-	path := entities.EntityPath{Model: model, Hash: id}
+	path := entities.EntityPath{Model: model, ID: id}
 	if ds.HistoricState[path] == nil {
 		ds.DataCount++
 	}
@@ -99,13 +99,13 @@ func (ds *DataStates) Commit(stateTx *datastore.Txn, eventTx *datastore.Txn, mes
 		switch k.Model {
 		case entities.SubnetModel:
 			state := v.(entities.Subnet)
-			_, err = UpdateSubnetState(k.Hash, &state, &_stateTxn, true)
+			_, err = UpdateSubnetState(k.ID, &state, &_stateTxn, true)
 		case entities.AuthModel:
 			state := v.(entities.Authorization)
 			_, err = CreateAuthorizationState(&state, &_stateTxn)
 		case entities.TopicModel:
 			state := v.(entities.Topic)
-			_, err = UpdateTopicState(k.Hash, &state, &_stateTxn, true)
+			_, err = UpdateTopicState(k.ID, &state, &_stateTxn, true)
 		case entities.SubscriptionModel:
 			state := v.(entities.Subscription)
 			_, err = CreateSubscriptionState(&state, &_stateTxn)
@@ -119,7 +119,7 @@ func (ds *DataStates) Commit(stateTx *datastore.Txn, eventTx *datastore.Txn, mes
 	}
 
 	for k, v := range ds.HistoricState {
-		 err = SaveHistoricState(k.Model, k.Hash, v)
+		 err = SaveHistoricState(k.Model, k.ID, v)
 		if err != nil {
 			return err
 		}

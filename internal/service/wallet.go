@@ -61,18 +61,18 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) err
 	}
 
 	// check if we are upto date on this event
-	prevEventUpToDate := query.EventExist(&event.PreviousEvent) || (currentState == nil && event.PreviousEvent.Hash == "") || (currentState != nil && currentState.Event.Hash == event.PreviousEvent.Hash)
-	authEventUpToDate := query.EventExist(&event.AuthEvent) || (authState == nil && event.AuthEvent.Hash == "") || (authState != nil && authState.Event == authEventHash)
+	prevEventUpToDate := query.EventExist(&event.PreviousEvent) || (currentState == nil && event.PreviousEvent.ID == "") || (currentState != nil && currentState.Event.ID == event.PreviousEvent.ID)
+	authEventUpToDate := query.EventExist(&event.AuthEvent) || (authState == nil && event.AuthEvent.ID == "") || (authState != nil && authState.Event == authEventHash)
 
 	// Confirm if this is an older event coming after a newer event.
 	// If it is, then we only have to update our event history, else we need to also update our current state
 	isMoreRecent := false
-	if currentState != nil && currentState.Hash != data.Hash {
+	if currentState != nil && currentState.ID != data.Hash {
 		var currentStateEvent = &models.WalletEvent{}
-		query.GetOne(entities.Event{Hash: currentState.Event.Hash}, currentStateEvent)
+		query.GetOne(entities.Event{Hash: currentState.Event.ID}, currentStateEvent)
 		isMoreRecent, markAsSynced = IsMoreRecent(
 			currentStateEvent.ID,
-			currentState.Event.Hash,
+			currentState.Event.ID,
 			currentStateEvent.Payload.Timestamp,
 			event.Hash,
 			event.Payload.Timestamp,

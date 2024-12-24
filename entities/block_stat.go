@@ -28,7 +28,7 @@ type BlockStats struct {
 func GetBlockStatsKeys(event *Event) []string {
 	keys := []string{}
 	keys = append(keys, "e")
-	logger.Infof("EventType %s, %d",  GetModelTypeFromEventType(constants.EventType(event.EventType)), event.EventType)
+	// logger.Infof("EventType %s, %d",  GetModelTypeFromEventType(constants.EventType(event.EventType)), event.EventType)
 	keys = append(keys, fmt.Sprintf("e/%s", GetModelTypeFromEventType(constants.EventType(event.EventType))))
 	keys = append(keys, fmt.Sprintf("b/%015d/%s", event.BlockNumber, GetModelTypeFromEventType(constants.EventType(event.EventType))))
 	keys = append(keys, fmt.Sprintf("b/%015d", event.BlockNumber))

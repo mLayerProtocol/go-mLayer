@@ -49,7 +49,7 @@ func CreateSubnetState(newState *entities.Subnet, tx *datastore.Txn) (sub *entit
 
 	// return txn.Set(key.Bytes(), value)
 	for _, key := range keys {
-		logger.Infof("NewStateKey: %v, %v", key, newState.Event.Hash)
+		logger.Infof("NewStateKey: %v, %v", key, newState.Event.ID)
 		if strings.EqualFold(key, newState.DataKey()) {
 			if err := txn.Put(context.Background(), datastore.NewKey(key), stateBytes); err != nil {
 				return nil, err
@@ -58,7 +58,7 @@ func CreateSubnetState(newState *entities.Subnet, tx *datastore.Txn) (sub *entit
 		}
 		if strings.EqualFold(key, newState.Key()) {
 
-			if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.Hash)); err != nil {
+			if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.ID)); err != nil {
 				return nil, err
 			}
 
@@ -104,14 +104,14 @@ func UpdateSubnetState(id string, newState *entities.Subnet, tx *datastore.Txn, 
 		return nil, err
 	}
 
-	logger.Debugf("UpdateSubnet %v, %v, %v, %v", id, oldState.ID, newState.ID, newState.Event.Hash)
+	logger.Debugf("UpdateSubnet %v, %v, %v, %v", id, oldState.ID, *oldState.DefaultAuthPrivilege, *newState.DefaultAuthPrivilege)
 
 	if err := txn.Put(context.Background(), datastore.NewKey(newState.DataKey()), stateBytes); err != nil {
 		logger.Errorf("error updateing state key: %v", err)
 		return nil, err
 	}
 
-	if err := txn.Put(context.Background(), datastore.NewKey(oldState.Key()), []byte(newState.Event.Hash)); err != nil {
+	if err := txn.Put(context.Background(), datastore.NewKey(oldState.Key()), []byte(newState.Event.ID)); err != nil {
 		logger.Errorf("error updateing state key: %v", err)
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func UpdateSubnetState(id string, newState *entities.Subnet, tx *datastore.Txn, 
 		if err != nil {
 			return nil, err
 		}
-		if err := txn.Put(context.Background(), datastore.NewKey(newState.RefKey()), []byte(newState.Event.Hash)); err != nil {
+		if err := txn.Put(context.Background(), datastore.NewKey(newState.RefKey()), []byte(newState.Event.ID)); err != nil {
 			logger.Errorf("error updateing subnet ref: %v", err)
 			return nil, err
 		}
@@ -132,7 +132,7 @@ func UpdateSubnetState(id string, newState *entities.Subnet, tx *datastore.Txn, 
 		}
 	}
 
-	logger.Infof("SubnetKey: %s", newState.Event.Hash)
+	logger.Infof("SubnetKey: %s", newState.Event.ID)
 
 	// if err := txn.Commit(context.Background()); err != nil {
 	// 	return nil, err
@@ -149,7 +149,7 @@ func GetAccountSubnets(account entities.DIDString, limit QueryLimit) (data []*en
 		Offset: limit.Offset,
 	})
 	if err != nil {
-		return nil, err
+		
 	}
 	entries, _ := rsl.Rest()
 	logger.Debugf("EntriesLen for key: %v,  %v", key, len(entries))

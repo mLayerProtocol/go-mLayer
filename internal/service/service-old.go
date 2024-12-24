@@ -162,9 +162,9 @@ package service
 // 				return
 // 			}
 // 			if curState != nil {
-// 				currentState = &CurrentState{EventHash: curState.Event.Hash, Hash: curState.Hash}
+// 				currentState = &CurrentState{EventHash: curState.Event.ID, Hash: curState.ID}
 // 				var currStateEvent *models.TopicEvent
-// 				query.GetOne(entities.Event{Hash: curState.Event.Hash}, currStateEvent)
+// 				query.GetOne(entities.Event{Hash: curState.Event.ID}, currStateEvent)
 // 				if currStateEvent != nil {
 // 					utils.CopyStructValues(currStateEvent.Event, currentStateEvent)
 // 				}
@@ -227,9 +227,9 @@ package service
 // 				validAuth = true
 // 			}
 // 			if curState != nil {
-// 				currentState = &CurrentState{EventHash: curState.Event.Hash, Hash: curState.Hash}
+// 				currentState = &CurrentState{EventHash: curState.Event.ID, Hash: curState.ID}
 // 				var currStateEvent *models.AuthorizationEvent
-// 				query.GetOne(entities.Event{Hash: curState.Event.Hash}, currStateEvent)
+// 				query.GetOne(entities.Event{Hash: curState.Event.ID}, currStateEvent)
 // 				if currStateEvent != nil {
 // 					utils.CopyStructValues(currStateEvent.Event, currentStateEvent)
 // 				}
@@ -270,17 +270,17 @@ package service
 // 	}
 
 // 		logger.Debugf("PREVIOUSEVENTHASH: %s", previousEventHash.ToString())
-// 	prevEventUpToDate := query.EventExist(&previousEventHash) || (currentState == nil && previousEventHash.Hash == "") || (currentState != nil && currentState.Event.Hash == previousEventHash.Hash)
-// 	authEventUpToDate := query.EventExist(&authEventHash) || (authState == nil && event.AuthEvent.Hash == "") || (authState != nil && authState.Event == authEventHash)
+// 	prevEventUpToDate := query.EventExist(&previousEventHash) || (currentState == nil && previousEventHash.Hash == "") || (currentState != nil && currentState.Event.ID == previousEventHash.Hash)
+// 	authEventUpToDate := query.EventExist(&authEventHash) || (authState == nil && event.AuthEvent.ID == "") || (authState != nil && authState.Event == authEventHash)
 
 // 	if validAuth {
 
 // 		isMoreRecent := false
-// 		if currentState != nil && currentState.Hash != entityHash {
+// 		if currentState != nil && currentState.ID != entityHash {
 
 // 			isMoreRecent, markAsSynced = IsMoreRecent(
 // 				currentStateEvent.ID,
-// 				currentState.Hash,
+// 				currentState.ID,
 // 				currentStateEvent.Payload.Timestamp,
 // 				event.Hash,
 // 				event.Payload.Timestamp,
@@ -615,7 +615,7 @@ package service
 // 		// 	// the event responsible for my local authstate
 // 		// 	isMoreRecent, _ := IsMoreRecent(
 // 		// 		localAuthStateEvent.ID,
-// 		// 		localAuthState.Hash,
+// 		// 		localAuthState.ID,
 // 		// 		localAuthStateEvent.Payload.Timestamp,
 // 		// 		event.Hash,
 // 		// 		event.Payload.Timestamp,

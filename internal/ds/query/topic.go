@@ -91,7 +91,7 @@ func CreateTopicState(newState *entities.Topic, tx *datastore.Txn) (sub *entitie
 		RefKey: &refKey,
 		Keys: newState.GetKeys(),
 		Data: newState.MsgPack(),
-		EventHash: newState.Event.Hash,
+		EventHash: newState.Event.ID,
 	}, tx)
 	if err != nil {
 		logger.Errorf("ERRORRRRR: %v", err)
@@ -115,7 +115,7 @@ func CreateTopicState(newState *entities.Topic, tx *datastore.Txn) (sub *entitie
 
 	// // return txn.Set(key.Bytes(), value)
 	// for _, key := range keys {
-	// 	logger.Infof("NewStateKey: %v, %v", key, newState.Event.Hash)
+	// 	logger.Infof("NewStateKey: %v, %v", key, newState.Event.ID)
 	// 	if strings.EqualFold(key, newState.DataKey()) {
 	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), stateBytes); err != nil {
 	// 			return nil, err
@@ -124,7 +124,7 @@ func CreateTopicState(newState *entities.Topic, tx *datastore.Txn) (sub *entitie
 	// 	}
 	// 	if strings.EqualFold(key, newState.Key()) {
 
-	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.Hash)); err != nil {
+	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.ID)); err != nil {
 	// 			return nil, err
 	// 		}
 
@@ -152,19 +152,17 @@ func UpdateTopicState(id string, newState *entities.Topic, tx *datastore.Txn, cr
 	}
 	oldTopic, err :=  GetTopicById(id)
 	if err != nil {
-		if  IsErrorNotFound(err) {
-			return nil, err
-		}
-		if create {
+		if IsErrorNotFound(err) && create {
 			return CreateTopicState(newState, tx)
 		}
+		return nil, err
 	}
 	
 	err = UpdateState(id, NewStateParam{
 		OldIDKey:  fmt.Sprintf("%s/id/%s", entities.TopicModel, id),
 		DataKey: newState.DataKey(),
 		Data: newState.MsgPack(),
-		EventHash: newState.Event.Hash,
+		EventHash: newState.Event.ID,
 		RefKey: &newState.Ref,
 		OldRefKey: &oldTopic.Ref,
 	}, tx)

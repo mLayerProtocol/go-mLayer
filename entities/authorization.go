@@ -139,7 +139,7 @@ func (item *Authorization) Key() string {
 }
 
 func (item *Authorization) DataKey() string {
-	return fmt.Sprintf(DataKey, GetModel(item), item.Event.Hash )
+	return fmt.Sprintf(DataKey, GetModel(item), item.Event.ID )
 }
 
 func (item *Authorization) MsgPack() []byte {

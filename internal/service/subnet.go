@@ -87,6 +87,7 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 	case entities.EthereumPubKey:
 		authMsg := fmt.Sprintf(constants.SignatureMessageString, action,  subnet.Ref, chainID, encoder.ToBase64Padded(msg))
 		msgByte := crypto.EthMessage([]byte(authMsg))
+		logger.Infof("AUTHMESSAGE %s", authMsg)
 
 		valid = crypto.VerifySignatureECC(entities.AddressFromString(string(subnet.Account)).Addr, &msgByte, subnet.SignatureData.Signature)
 
@@ -201,14 +202,14 @@ func HandleNewPubSubSubnetEvent(event *entities.Event, ctx *context.Context, ) e
 	if localState.ID != "" {
 		localDataState = &LocalDataState{
 			ID: localState.ID,
-			Hash: localState.Hash,
+			Hash: localState.ID,
 			Event: &localState.Event,
 			Timestamp: localState.Timestamp,
 		}
 	}
 	// localDataState := utils.IfThenElse(localTopicState != nil, &LocalDataState{
 	// 	ID: localTopicState.ID,
-	// 	Hash: localTopicState.Hash,
+	// 	Hash: localTopicState.ID,
 	// 	Event: &localTopicState.Event,
 	// 	Timestamp: localTopicState.Timestamp,
 	// }, nil)

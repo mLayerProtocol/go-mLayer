@@ -60,7 +60,7 @@ func (g *Subscription) GetKeys() (keys []string)  {
 	return keys;
 }
 func (item *Subscription) DataKey() string {
-	return fmt.Sprintf(DataKey, GetModel(item), item.Event.Hash )
+	return fmt.Sprintf(DataKey, GetModel(item), item.Event.ID )
 }
 func (item *Subscription) RefKey() string {
 	return fmt.Sprintf("%s|ref|%s", SubscriptionModel, item.Ref)

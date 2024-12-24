@@ -53,7 +53,7 @@ import (
 var ErrorNotFound = gorm.ErrRecordNotFound
 
 func EventExist(ePath *entities.EventPath) bool {
-	if ePath.Hash == "" {
+	if ePath.ID == "" {
 		return true
 	}
 	event, _ := GetEventFromPath(ePath)
@@ -61,15 +61,15 @@ func EventExist(ePath *entities.EventPath) bool {
 }
 
 func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
-	if  ePath == nil || len(ePath.Hash) == 0  {
+	if  ePath == nil || len(ePath.ID) == 0  {
 		return nil, nil
 	}
 	if ePath.Model == entities.SubscriptionModel {
 		var data *models.SubscriptionEvent
 		err := GetOneWithOr(models.SubscriptionEvent{
-			Event: entities.Event{Hash: ePath.Hash},
+			Event: entities.Event{Hash: ePath.ID},
 		}, models.SubscriptionEvent{
-			Event: entities.Event{ID: ePath.Hash},
+			Event: entities.Event{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -80,9 +80,9 @@ func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 	if ePath.Model == entities.TopicModel {
 		var data *models.TopicEvent
 		err := GetOneWithOr(models.TopicEvent{
-			Event: entities.Event{Hash: ePath.Hash},
+			Event: entities.Event{Hash: ePath.ID},
 		}, models.TopicEvent{
-			Event: entities.Event{ID: ePath.Hash},
+			Event: entities.Event{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -93,9 +93,9 @@ func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 	if ePath.Model == entities.SubnetModel {
 		var data *models.SubnetEvent
 		err := GetOneWithOr(models.SubnetEvent{
-			Event: entities.Event{Hash: ePath.Hash},
+			Event: entities.Event{Hash: ePath.ID},
 		}, models.SubnetEvent{
-			Event: entities.Event{ID: ePath.Hash},
+			Event: entities.Event{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -106,9 +106,9 @@ func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 	if ePath.Model == entities.AuthModel {
 		var data *models.AuthorizationEvent
 		err := GetOneWithOr(models.AuthorizationEvent{
-			Event: entities.Event{Hash: ePath.Hash},
+			Event: entities.Event{Hash: ePath.ID},
 		}, models.AuthorizationEvent{
-			Event: entities.Event{ID: ePath.Hash},
+			Event: entities.Event{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -119,9 +119,9 @@ func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 	if ePath.Model == entities.MessageModel {
 		var data *models.MessageEvent
 		err := GetOneWithOr(models.MessageEvent{
-			Event: entities.Event{Hash: ePath.Hash},
+			Event: entities.Event{Hash: ePath.ID},
 		}, models.MessageEvent{
-			Event: entities.Event{ID: ePath.Hash},
+			Event: entities.Event{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -133,13 +133,13 @@ func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 }
 
 func GetStateFromPath(ePath *entities.EntityPath) (any, error) {
-	if  ePath == nil || len(ePath.Hash) == 0  {
+	if  ePath == nil || len(ePath.ID) == 0  {
 		return nil, nil
 	}
 	if ePath.Model == entities.SubscriptionModel {
 		var data *models.SubscriptionState
 		err := GetOne(models.SubscriptionState{
-			Subscription: entities.Subscription{ID: ePath.Hash},
+			Subscription: entities.Subscription{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -150,7 +150,7 @@ func GetStateFromPath(ePath *entities.EntityPath) (any, error) {
 	if ePath.Model == entities.TopicModel {
 		var data *models.TopicState
 		err := GetOne(models.TopicState{
-			Topic: entities.Topic{ID: ePath.Hash},
+			Topic: entities.Topic{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -161,7 +161,7 @@ func GetStateFromPath(ePath *entities.EntityPath) (any, error) {
 	if ePath.Model == entities.SubnetModel {
 		var data *models.SubnetState
 		err := GetOne(models.SubnetState{
-			Subnet: entities.Subnet{ID: ePath.Hash},
+			Subnet: entities.Subnet{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -172,7 +172,7 @@ func GetStateFromPath(ePath *entities.EntityPath) (any, error) {
 	if ePath.Model == entities.AuthModel {
 		var data *models.AuthorizationState
 		err := GetOne(models.AuthorizationState{
-			Authorization: entities.Authorization{ID: ePath.Hash},
+			Authorization: entities.Authorization{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
@@ -183,7 +183,7 @@ func GetStateFromPath(ePath *entities.EntityPath) (any, error) {
 	if ePath.Model == entities.MessageModel {
 		var data *models.MessageState
 		err := GetOne(models.MessageState{
-			Message: entities.Message{ID: ePath.Hash},
+			Message: entities.Message{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err

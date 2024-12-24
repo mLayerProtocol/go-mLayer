@@ -57,12 +57,12 @@ func GetAccountAuthorizations( auth entities.Authorization, limits *QueryLimit, 
 		
 		//keyString := strings.Split(entry.Key, "/")
 	logger.Debugf("Getting Authorizations Entries ID...: %s,",string(entry.Key))
-		value, qerr := GetAuthorizationByEvent(entities.EventPath{EntityPath: entities.EntityPath{ Hash: string(entry.Value)}})
+		value, qerr := GetAuthorizationByEvent(entities.EventPath{EntityPath: entities.EntityPath{ ID: string(entry.Value)}})
 		if qerr != nil {
 			logger.Infof("AuthERROR: %+v", qerr)
 			continue
 		}
-		logger.Debugf("Getting Authorizations Event ID...: %s,",string(value.Event.Hash))
+		logger.Debugf("Getting Authorizations Event ID...: %s,",string(value.Event.ID))
 		data = append(data, value)
 		err = qerr
 	}
@@ -150,14 +150,14 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 		RefKey: nil,
 		Keys: keys,
 		Data: stateBytes,
-		EventHash: newState.Event.Hash,
-		RestKeyValue: []byte(newState.Event.Hash),
+		EventHash: newState.Event.ID,
+		RestKeyValue: []byte(newState.Event.ID),
 	}, tx)
 	if err != nil {
 		return nil, err
 	}
 	// for _, key := range keys {
-	// 	logger.Infof("NewStateKey: %v, %v", key, newState.Event.Hash)
+	// 	logger.Infof("NewStateKey: %v, %v", key, newState.Event.ID)
 	// 	if strings.EqualFold(key, newState.DataKey()) {
 	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), stateBytes); err != nil {
 	// 			return nil, err
@@ -167,14 +167,14 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 		
 	// 	if strings.EqualFold(key, newState.Key()) {
 
-	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.Hash)); err != nil {
+	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.ID)); err != nil {
 	// 			return nil, err
 	// 		}
 
 	// 		continue
 	// 	}
 
-	// 	if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.Hash)); err != nil {
+	// 	if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.ID)); err != nil {
 	// 		return nil, err
 	// 	}
 	// }
@@ -234,7 +234,7 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 // 		return nil, err
 // 	}
 
-// 	if err := txn.Put(context.Background(), datastore.NewKey(newState.Key()), []byte(newState.Event.Hash)); err != nil {
+// 	if err := txn.Put(context.Background(), datastore.NewKey(newState.Key()), []byte(newState.Event.ID)); err != nil {
 // 		logger.Errorf("error updateing state key: %v", err)
 // 		return nil, err
 // 	}
@@ -262,7 +262,7 @@ func GetAgentAuthorizationStates(subnet string, agent entities.DeviceString, lim
 	}
 	entries, _ := result.Rest()
 	for _, entry := range entries { 
-		value, qerr := GetAuthorizationByEvent(entities.EventPath{EntityPath: entities.EntityPath{ Hash: string(entry.Value)}})
+		value, qerr := GetAuthorizationByEvent(entities.EventPath{EntityPath: entities.EntityPath{ ID: string(entry.Value)}})
 		if qerr != nil {
 			continue
 		}

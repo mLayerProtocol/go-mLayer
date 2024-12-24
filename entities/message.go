@@ -200,7 +200,7 @@ func (msg Message) GetHash() ([]byte, error) {
 }
 
 func (item *Message) DataKey() string {
-	return fmt.Sprintf(DataKey, GetModel(item), item.Event.Hash )
+	return fmt.Sprintf(DataKey, GetModel(item), item.Event.ID )
 }
 
 
@@ -211,11 +211,12 @@ func (g *Message) GetKeys() (keys []string)  {
 	}
 	keys = append(keys, g.Key())
 	keys = append(keys, g.DataKey())
-	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageReceiverKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)), g.Event.Hash ))
-	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageSenderKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.Hash))
-	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageSenderReceiverKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.Hash))
-	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.TopicMessageKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.Hash))
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageReceiverKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)), g.Event.ID ))
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageSenderKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.ID))
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.MessageSenderReceiverKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.ID))
+	keys = append(keys,fmt.Sprintf("%s/%s/%s", g.TopicMessageKey(), utils.IntMilliToTimestampString(int64(g.EventTimestamp)),  g.Event.ID))
 	keys = append(keys, g.UniqueId())
+	
 	
 	// keys = append(keys, g.GetEventStateKey())
 	// keys = append(keys, fmt.Sprintf("%s/%d/%s", AuthModel, g.Cycle, g.ID))

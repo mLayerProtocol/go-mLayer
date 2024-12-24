@@ -143,7 +143,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	if localState.ID != "" {
 		localDataState = &LocalDataState{
 			ID: localState.ID,
-			Hash: localState.Hash,
+			Hash: localState.ID,
 			Event: &localState.Event,
 			Timestamp: *localState.Timestamp,
 		}
@@ -152,7 +152,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	
 	// localDataState := utils.IfThenElse(localTopicState != nil, &LocalDataState{
 	// 	ID: localTopicState.ID,
-	// 	Hash: localTopicState.Hash,
+	// 	Hash: localTopicState.ID,
 	// 	Event: &localTopicState.Event,
 	// 	Timestamp: localTopicState.Timestamp,
 	// }, nil)

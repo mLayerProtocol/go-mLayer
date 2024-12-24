@@ -126,14 +126,14 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 	if localState.ID != "" {
 		localDataState = &LocalDataState{
 			ID:        localState.ID,
-			Hash:      localState.Hash,
+			Hash:      localState.ID,
 			Event:     &localState.Event,
 			Timestamp: localState.Timestamp,
 		}
 	}
 	// localDataState := utils.IfThenElse(localState != nil, &LocalDataState{
 	// 	ID: localState.ID,
-	// 	Hash: localState.Hash,
+	// 	Hash: localState.ID,
 	// 	Event: &localState.Event,
 	// 	Timestamp: localState.Timestamp,
 	// }, nil)

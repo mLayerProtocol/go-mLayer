@@ -248,11 +248,11 @@ func RefExists(entityType entities.EntityModel, ref string, subnet string) (bool
 }
 
 func GetStateFromEntityPath(ePath *entities.EntityPath) ([]byte, error) {
-	if ePath == nil || len(ePath.Hash) == 0 {
+	if ePath == nil || len(ePath.ID) == 0 {
 		return nil, nil
 	}
-	if len(ePath.Hash) > 36 && ePath.Model == entities.AuthModel {
-		authorization, err := entities.AccountAuthorizationsKeyToAuthorization(ePath.Hash)
+	if len(ePath.ID) > 36 && ePath.Model == entities.AuthModel {
+		authorization, err := entities.AccountAuthorizationsKeyToAuthorization(ePath.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +264,7 @@ func GetStateFromEntityPath(ePath *entities.EntityPath) ([]byte, error) {
 			return auths[0].MsgPack(), nil
 		}
 	}
-	return GetStateById(ePath.Hash, ePath.Model)
+	return GetStateById(ePath.ID, ePath.Model)
 
 }
 func GetNumAccounts() (uint64, error) {

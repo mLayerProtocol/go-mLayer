@@ -302,11 +302,11 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 		}
 		return mainStats, nil
 	case "GET:event-path/:hash/:type/:id":
-		hash := params["hash"].(string)
+		id := params["id"].(string)
 		typeParam := params["type"].(string)
 		// typeParamInt := GetEventTypeFromModel(entities.EntityModel(typeParam))
 
-		topic, err := dsquery.GetStateFromEventPath(&entities.EventPath{EntityPath: entities.EntityPath{Hash: hash, Model: entities.EntityModel(typeParam)}})
+		topic, err := dsquery.GetStateFromEventPath(&entities.EventPath{EntityPath: entities.EntityPath{ID: id, Model: entities.EntityModel(typeParam)}})
 
 		if err != nil {
 			return nil, err

@@ -49,7 +49,7 @@ func (d *Wallet) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 // func (e *Wallet) Key() string {
-// 	return fmt.Sprintf("/%s", e.Hash)
+// 	return fmt.Sprintf("/%s", e.ID)
 // }
 
 func (e *Wallet) ToJSON() []byte {
@@ -75,8 +75,8 @@ func WalletFromJSON(b []byte) (Event, error) {
 }
 
 func (e Wallet) GetHash() ([]byte, error) {
-	if e.Hash != "" {
-		return hex.DecodeString(e.Hash)
+	if e.ID != "" {
+		return hex.DecodeString(e.ID)
 	}
 	b, err := e.EncodeBytes()
 	if err != nil {
@@ -94,7 +94,7 @@ func (entity Wallet) GetAgent() (DeviceString) {
 
 func (e Wallet) ToString() (string, error) {
 	values := []string{}
-	values = append(values, e.Hash)
+	values = append(values, e.ID)
 	values = append(values, e.Name)
 	values = append(values, e.Subnet)
 	values = append(values, e.Account.ToString())

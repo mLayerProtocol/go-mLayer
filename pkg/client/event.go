@@ -6,9 +6,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/mlayerprotocol/go-mlayer/common/apperror"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
@@ -17,6 +21,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
+	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
@@ -25,6 +30,12 @@ import (
 )
 
 
+type PaddedInt64 struct {
+	once  sync.Once
+	value int64
+	_     [56]byte // 60 bytes padding + 4 bytes int32 = 64 bytes
+}
+var messageVectors  sync.Map
 
 func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model any, err error) {
 	defer utils.TrackExecutionTime(time.Now(), "CreateEvent::")
@@ -216,6 +227,44 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		Subnet: subnet,
 	}
 	
+	if  uint16(constants.SendMessageEvent) == event.EventType {
+		vecKey := event.VectorKey(event.Payload.Data.(entities.Message).Topic)
+		vectorInterface, loaded := messageVectors.LoadOrStore(vecKey, &PaddedInt64{})
+		vector := vectorInterface.(*PaddedInt64)
+		// var  _err error
+		if !loaded {
+			// load it from your local db
+			// vector.once.Do(func() {
+				d, err := stores.NetworkStatsStore.Get(context.Background(), datastore.NewKey(vecKey))
+				if err != nil && !dsquery.IsErrorNotFound(err) {
+					return nil, err
+				}
+				i, err := strconv.Atoi(string(d))
+				if err != nil {
+					i = 0
+				}
+				// messageVectors[vecKey] = &v
+				atomic.StoreInt64(&vector.value, int64(i))
+			// })
+		}
+		// if _err != nil {
+		// 	return nil, _err
+		// }
+		logger.Infof("Vector")
+		event.Index = atomic.AddInt64(&vector.value, 1)
+		
+		// err := stores.NetworkStatsStore.Set(context.Background(), datastore.NewKey(vecKey), []byte(fmt.Sprint(vector.value)), true)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// defer func ()  {
+		// 	if err == nil {
+		// 		stores.EventStore.Get(context.Background(), datastore.NewKey(vecKey))
+		// 	}
+		// } ()
+	}
+
+	
 	 logger.Debugf("NewEvent: %v, %v", event.ID, eventPayloadType)
 
 	b, err := event.EncodeBytes()
@@ -236,7 +285,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 	if err != nil {
 		return model, err
 	}
-	service.HandleNewPubSubEvent(event, ctx) 
+	go service.HandleNewPubSubEvent(event, ctx) 
 	event.Broadcasted = true;
 	go p2p.PublishEvent(event)
 	// dispatch to network

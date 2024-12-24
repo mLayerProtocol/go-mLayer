@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -129,6 +130,25 @@ func UpdateEvent(event *entities.Event, tx *datastore.Txn, create bool) error {
 			return fmt.Errorf("event does not exist")
 		  } 
 	}
+	if event.GetDataModelType() == entities.MessageModel {
+		message := event.Payload.Data.(entities.Message)
+		vecKey :=  datastore.NewKey(event.VectorKey(message.Topic))
+		vec , err := txn.Get(context.Background(), vecKey)
+		c := 0
+		if err != nil {
+			if !IsErrorNotFound(err) {
+				return err
+			}
+		} else {
+			c, err = strconv.Atoi(string(vec))
+			if err != nil {
+				return err
+			}
+		}
+		if c < int(event.Index) {
+			txn.Put(context.Background(), vecKey, []byte(fmt.Sprint(event.Index)))
+		}
+	}
 	eventBytes := event.MsgPack()
 	if err := txn.Put(context.Background(), datastore.NewKey(event.DataKey()), eventBytes); err != nil {
 		logger.Infof("PUTEVENT %v", err)
@@ -174,10 +194,10 @@ func UpdateEvent(event *entities.Event, tx *datastore.Txn, create bool) error {
 
 func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 
-	if ePath == nil || len(ePath.Hash) == 0 {
+	if ePath == nil || len(ePath.ID) == 0 {
 		return nil, nil
 	}
-	event, err := GetEventById(ePath.Hash, ePath.Model)
+	event, err := GetEventById(ePath.ID, ePath.Model)
 
 	if err != nil {
 		return nil, err
@@ -360,7 +380,7 @@ func GetStateBytesFromEventPath(path *entities.EventPath) ([]byte, error) {
 	if path.Model == entities.MessageModel {
 		dsStores = stores.MessageStore
 	}
-	stateKey := fmt.Sprintf(entities.DataKey, path.Model, path.Hash)
+	stateKey := fmt.Sprintf(entities.DataKey, path.Model, path.ID)
 	logger.Infof("STATEKEEYYY %s", stateKey)
 	return dsStores.Get(context.Background(), datastore.NewKey(stateKey))
 

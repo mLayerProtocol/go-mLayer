@@ -323,7 +323,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			//path := eventPath.(entities.EventPath)
 			// ev, err := dsquery.GetEventFromPath(&d.Event)
 			eventPath := entities.EventPath{EntityPath: entities.EntityPath{
-				Hash: fmt.Sprint(pathMap["h"]),
+				ID: fmt.Sprint(pathMap["h"]),
 				Model:  entities.EntityModel(fmt.Sprint(pathMap["mod"])),
 				Validator: entities.PublicKeyString(fmt.Sprint(pathMap["val"])),
 			}}

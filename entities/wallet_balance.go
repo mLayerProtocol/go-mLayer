@@ -57,7 +57,7 @@ func (entity WalletBalance) GetAgent() (DeviceString) {
 }
 
 // func (e *WalletBalance) Key() string {
-// 	return fmt.Sprintf("/%s", e.Hash)
+// 	return fmt.Sprintf("/%s", e.ID)
 // }
 
 func (e *WalletBalance) ToJSON() []byte {

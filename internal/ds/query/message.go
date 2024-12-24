@@ -133,14 +133,14 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 		RefKey: nil,
 		Keys: newState.GetKeys(),
 		Data: stateBytes,
-		EventHash: newState.Event.Hash,
+		EventHash: newState.Event.ID,
 		RestKeyValue: []byte{},
 	}, tx)
 	if err != nil {
 		return nil, err
 	}
 	// for _, key := range keys {
-	// 	logger.Infof("NewStateKey: %v, %v", key, newState.Event.Hash)
+	// 	logger.Infof("NewStateKey: %v, %v", key, newState.Event.ID)
 	// 	if strings.EqualFold(key, newState.DataKey()) {
 	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), stateBytes); err != nil {
 				
@@ -151,7 +151,7 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 		
 	// 	if strings.EqualFold(key, newState.Key()) {
 
-	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.Hash)); err != nil {
+	// 		if err := txn.Put(context.Background(), datastore.NewKey(key), []byte(newState.Event.ID)); err != nil {
 	// 			return nil, err
 	// 		}
 
@@ -176,10 +176,10 @@ func CreateMessageState(newState *entities.Message, tx *datastore.Txn) (sub *ent
 
 
 
-func GetMessageByEventHash( hash string) (*entities.Message, error) {
+func GetMessageByEventHash( id string) (*entities.Message, error) {
 	ds :=  stores.MessageStore
 	
-	value, err := ds.Get(context.Background(), datastore.NewKey((&entities.Message{Event: entities.EventPath{EntityPath: entities.EntityPath{Hash: hash}}}).DataKey()))
+	value, err := ds.Get(context.Background(), datastore.NewKey((&entities.Message{Event: entities.EventPath{EntityPath: entities.EntityPath{ID: id}}}).DataKey()))
 	if err != nil {
 		return nil, err
 	}
