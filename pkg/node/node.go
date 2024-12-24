@@ -305,7 +305,7 @@ func Start(mainCtx *context.Context) {
 		// time.Sleep(1 * time.Minute)
 		for {
 			if err := loadChainInfo(cfg); err != nil {
-				logger.Error(err)
+				logger.Error("loadChainInfoError:", err)
 				// time.Sleep(1 * time.Second)
 				panic(err)
 				// continue
@@ -330,11 +330,11 @@ func Start(mainCtx *context.Context) {
 			// }
 			addr, err := multiaddr.NewMultiaddr("/ip4/154.12.228.25/udp/5002/quic-v1/p2p/12D3KooWFipGipTgu1XxtqpV1wUXcosTjK351Yip7Nj32npo68in")
 			if err != nil {
-				logger.Error(err)
+				logger.Error("NewMultiaddr:", err)
 			}
 			certResponse, err := certPayload.SendP2pRequestToAddress(cfg.PrivateKeyEDD, addr, p2p.DataRequest)
 			if err != nil {
-				logger.Error(err)
+				logger.Error("SendP2pRequestToAddress", err)
 			}
 			if certResponse != nil {
 				logger.Debugf("RESPONSEEEEE: %d", certResponse.Action)
