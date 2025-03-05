@@ -25,6 +25,7 @@ import (
 )
 
 
+
 type EntityModel string
 
 const (
@@ -33,15 +34,27 @@ const (
 	SubscriptionModel EntityModel = "sub"
 	MessageModel      EntityModel = "msg"
 	SubnetModel       EntityModel = "snet"
+	TopicInterestModel       EntityModel = "topInt"
 	WalletModel       EntityModel = "wal"
+	SystemModel		EntityModel = "sys"
+	
 )
 
 var EntityModels = []EntityModel{
-	AuthModel, TopicModel, SubscriptionModel, MessageModel, SubnetModel, WalletModel,
+	AuthModel, TopicModel, SubscriptionModel, MessageModel, SubnetModel, WalletModel, SystemModel,
 }
 
 
+type QueryLimit struct {
+	Limit  int `json:"lim"`
+	Offset int 	`json:"off"`
+}
 
+
+type KeyByteValue struct {
+	Key   string
+	Value []byte
+}
 /*
 *
 Event paths define the unique path to an event and its relation to the entitie
@@ -49,36 +62,55 @@ Event paths define the unique path to an event and its relation to the entitie
 *
 */
 type EntityPath struct {
+	Version float32 `json:"_v"`
 	Model     EntityModel      `json:"mod"`
 	ID      string          `json:"id"`
 	Validator PublicKeyString `json:"val"`
 	Index int64 `json:"idx"`
+	NodeCount int32 `json:"n"`
+	Timestamp      uint64          `json:"ts"`
 }
 
 type EventPath struct {
 	EntityPath
+	// AuthEvent *EntityPath
 }
 
 func (e *EntityPath) ToString() string {
 	if e == nil || e.ID == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s/%s/%s", e.Validator, e.Model, e.ID)
+	return fmt.Sprintf("%s/%s/%s/%d/%d/%d", e.Validator, e.Model, e.ID, e.Index, e.NodeCount, e.Timestamp)
 }
 
-func (e *EntityPath) ToByteHash() ([]byte, error) {
-	
-	if e == nil || e.ID == "" {
-		return []byte(""), fmt.Errorf("hash is empty")
-	}
-	if strings.Contains(e.ID, "-") {
-		return utils.UuidToBytes(e.ID), nil
-	}
-	return hex.DecodeString(e.ID)
-	
+func (e *EntityPath) EncodeBytes() ([]byte, error) {
+	b, _ := encoder.EncodeBytes(
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.ID)},
+		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value:e.Model},
+		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value:e.Validator},
+		// encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value:e.Index},
+		// encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value:e.NodeCount},
+		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value:e.Timestamp},
+	)
+	return b, nil
 }
+// func (e *EventPath) EncodeBytes() ([]byte, error) {
+// 	bb, err := e.EntityPath.EncodeBytes()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	params := []encoder.EncoderParam{{Type: encoder.ByteEncoderDataType, Value: bb}}
+// 	if e.AuthEvent != nil {
+// 		a, _ := e.AuthEvent.EncodeBytes()
+// 		params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: a})
+// 	}
+// 	b, _ := encoder.EncodeBytes(
+// 		params...
+// 	)
+// 	return b, nil
+// }
 func (e *EntityPath) ToHexHash() (string) {
-	b, err := e.ToByteHash()
+	b, err := e.EncodeBytes()
 	if err != nil {
 		return ""
 	}
@@ -177,34 +209,102 @@ type EventInterface interface {
 	ValidateData(config *configs.MainConfiguration)  (authState any, err error)
 }
 
+// type StateEvents struct {
+// 	Subnet EventPath `json:"snet"`
+// 	Authorization EventPath `json:"auth"`
+// 	Topic EventPath`json:"top"`
+// 	Subscription EventPath`json:"sub"`
+// 	Message EventPath `json:"message"`
+// }
+type StateEvents struct {
+	ID string `json:"id"`
+	Event EventPath `json:"e"`
+}
+
+func (sh StateEvents) EncodeBytes() ([]byte) {
+	b, _ := encoder.EncodeBytes(
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(sh.Event.ID)},
+	)
+	return b
+}
+
+type EventDelta struct {
+	Delta json.RawMessage `json:"d"`
+	Event Event `json:"e"`
+	PreviousHash json.RawMessage `json:"ph"`
+	Hash json.RawMessage `json:"hash"`
+	Signatures []SignatureData `json:"sig"`
+	Error string  `json:"err"`
+}
+
+func (e EventDelta) MsgPack() ([]byte) {
+	p, _ := encoder.MsgPackStruct(e)
+	return p
+}
+
+func (e EventDelta) EncodeBytes() ([]byte, error) {
+	b, err :=  e.Event.EncodeBytes()
+	if err != nil {
+		return nil, err
+	}
+	return encoder.EncodeBytes(
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: e.Delta},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: e.PreviousHash},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType,Value: b},
+	)
+}
+func (e EventDelta) GetHash() ([]byte, error) {
+	b, err := e.EncodeBytes()
+		if err != nil {
+			return nil, err
+		}
+		return crypto.Sha256(b), nil
+}
+
+type EventProcessorResponse struct {
+	State interface{} `json:"state"`
+	Event EventPath `json:"e"`
+	Hash  string `json:"hash"`
+	Signature json.RawMessage `json:"sign"`
+	Validator json.RawMessage `json:"val"`
+	Error string  `json:"err"`
+}
+// type RemoteEvent struct {
+// 	Event *Event
+// 	ResponseChannel *chan *EventDelta
+// }
 type Event struct {
+	Version float32 `json:"_v"`
 	// Primary
 	ID string `gorm:"primaryKey;type:uuid;not null" json:"id,omitempty"`
 
 	Payload           ClientPayload `json:"pld"  msgpack:",noinline"`
-	Nonce             string        `json:"nonce" gorm:"type:varchar(80);default:null" msgpack:",noinline"`
+	Nonce             string        `json:"nonce,omitempty" gorm:"type:varchar(80);default:null" msgpack:",noinline"`
 	Timestamp         uint64        `json:"ts"`
-	EventType         uint16        `json:"t"`
-	Associations      []string      `json:"assoc" gorm:"type:text[]"`
-	PreviousEvent EventPath     `json:"preE" gorm:"type:varchar;default:null"`
-	AuthEvent     EventPath     `json:"authE" gorm:"type:varchar;default:null"`
-	PayloadHash       string        `json:"pH" gorm:"type:char(64);unique"`
+	EventType         constants.EventType        `json:"t,omitempty"`
+	
+	PreviousEvent EventPath     `json:"preE,omitempty" gorm:"type:varchar;default:null"`
+	AuthEvent     EventPath     `json:"authE,omitempty" gorm:"type:varchar;default:null"`
+	PayloadHash       string        `json:"pH,omitempty" gorm:"type:char(64);unique"`
+	StateEvents	[]StateEvents `json:"sEs"  msgpack:",noinline"`
 	// StateHash string `json:"sh"`
 	// Secondary
-	Error       string          `json:"err"`
-	Hash        string          `json:"h" gorm:"type:char(64)"`
-	Signature   string          `json:"sig"`
-	Broadcasted bool            `json:"br"`
-	BlockNumber uint64          `json:"blk"`
-	Cycle   	uint64			`json:"cy"`
-	Epoch		uint64			`json:"ep"`
-	IsValid     *bool            `json:"isVal" gorm:"default:false"`
-	Synced      *bool            `json:"sync" gorm:"default:false"`
-	Validator   PublicKeyString `json:"val"`
-	Subnet   	string			`json:"snet"`
-	Index int64 `json:"vec"`
+	Error       string          `json:"err,omitempty"`
+	Hash        string          `json:"h,omitempty" gorm:"type:char(64)"`
+	Signature   string          `json:"sig,omitempty"`
+	Broadcasted bool            `json:"br,omitempty"`
+	BlockNumber uint64          `json:"blk,omitempty"`
+	Cycle   	uint64			`json:"cy,omitempty"`
+	Epoch		uint64			`json:"ep,omitempty"`
+	IsValid     *bool            `json:"isVal,omitempty" gorm:"default:false"`
+	Synced      *bool            `json:"sync,omitempty" gorm:"default:false"`
+	Validator   PublicKeyString `json:"val,omitempty"`
+	Subnet   	string			`json:"snet,omitempty"`
+	Index int64 `json:"vec,omitempty"`
+	NodeCount int32 `json:"n,omitempty"`
 
-	Total int `json:"total"`
+	Total int `json:"total,omitempty"`
+	// Associations      []string      `json:"assoc,omitempty" gorm:"type:text[]"` // deprecated
 }
 
 func (g *Event) GetKeys() (keys []string)  {
@@ -241,7 +341,8 @@ func (e *Event) BlockKey() string {
 	// 	return  fmt.Sprintf("bl/%d/%d/%s/%s", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1), GetModelTypeFromEventType(constants.EventType(e.EventType)), e.Subnet)
 	// }
 	if e.ID != "" {
-		return  fmt.Sprintf("/bl/%020d/%015d/%s", e.BlockNumber, time.Now().UnixMilli(), e.ID)
+		return utils.CreateKey("/", "bl",fmt.Sprintf("%020d/%015d",  e.BlockNumber, time.Now().UnixMilli()),  e.ID)
+		// return  fmt.Sprintf("/bl/%020d/%015d/%s", e.BlockNumber, time.Now().UnixMilli(), e.ID)
 	}
 	// if e.EventType != 0 {
 	// 	return  fmt.Sprintf("bl/%d/%d", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced,0,1))
@@ -311,6 +412,7 @@ func (e *Event) ToJSON() []byte {
 }
 
 func (e *Event) MsgPack() []byte {
+	defer utils.TrackExecutionTime(time.Now(), "EventPacked::")
 	b, _ := encoder.MsgPackStruct(e)
 	return b
 }
@@ -341,6 +443,8 @@ func GetModel(ent any) EntityModel {
 			model = SubscriptionModel
 		case Message:
 			model = MessageModel
+		case SystemMessage:
+			model = SystemModel
 	}
 	return model
 }
@@ -351,10 +455,23 @@ func (e *Event) GetPath() *EventPath {
 		return nil
 	}
 	path := NewEventPath(e.Validator, e.GetDataModelType(), id)
+	path.Timestamp = e.Timestamp
+	path.NodeCount = e.NodeCount
 	if e.Index > 0 {
 		path.Index = e.Index
 	}
 	return path
+}
+func (e *Event) Lean() Event {
+	
+	return Event{
+		ID: e.ID,
+		AuthEvent: e.AuthEvent,
+		PreviousEvent: e.PreviousEvent,
+		Timestamp: e.Timestamp,
+		Validator: e.Validator,
+		Hash: e.Hash,
+	}
 }
 
 func UnpackEvent(b []byte, model EntityModel) (*Event, error) {
@@ -363,58 +480,51 @@ func UnpackEvent(b []byte, model EntityModel) (*Event, error) {
 	if err := encoder.MsgPackUnpackStruct(b, &e); err != nil {
 		return nil, err
 	}
-	c, err := json.Marshal(e.Payload)
+	
+	
+	dBytes, err := encoder.MsgPackStruct(e.Payload.Data)
 	if err != nil {
 		return nil, err
 	}
-
-	pl := ClientPayload{}
-	
-	err = json.Unmarshal(c, &pl)
-	
-	if err != nil {
-		logger.Errorf("UnmarshalError:: %o", err)
-	}
-	
-	dBytes, err := json.Marshal(pl.Data)
-	
 	switch model {
 	case AuthModel:
 		r := Authorization{}
-		json.Unmarshal(dBytes, &r)
-		pl.Data = r
+		encoder.MsgPackUnpackStruct(dBytes, &r)
+		e.Payload.Data = r
 	case SubnetModel:
 		r := Subnet{}
-		json.Unmarshal(dBytes, &r)
-		pl.Data = r
+		encoder.MsgPackUnpackStruct(dBytes, &r)
+		e.Payload.Data = r
 	case TopicModel:
 		r := Topic{}
-		json.Unmarshal(dBytes, &r)
+		encoder.MsgPackUnpackStruct(dBytes, &r)
 		logger.Debugf("PAYLOADDDDD %v", r)
-		pl.Data = r
+		e.Payload.Data = r
 	case SubscriptionModel:
 		r := Subscription{}
-		json.Unmarshal(dBytes, &r)
-		pl.Data = r
+		encoder.MsgPackUnpackStruct(dBytes, &r)
+		e.Payload.Data = r
 	case MessageModel:
 		r := Message{}
-		json.Unmarshal(dBytes, &r)
-		pl.Data = r
+		encoder.MsgPackUnpackStruct(dBytes, &r)
+		e.Payload.Data = r
+	case SystemModel:
+		r := SystemMessage{}
+		encoder.MsgPackUnpackStruct(dBytes, &r)
+		e.Payload.Data = r
 	}
 	
-	// json.Unmarshal(dBytes, &pl.Data)
-	// pl.Data, err = UnpackToEntity(dBytes, model)
-	_, err2 := (&pl).EncodeBytes()
+	_, err2 := e.Payload.EncodeBytes()
 	if err2 != nil {
-		logger.Errorf("EncodeBytesError:: %o", err)
+		logger.Errorf("EncodeBytesError:: %o", err2)
 	}
-	copier.Copy(e.Payload, &pl)
+	// copier.Copy(e.Payload, &pl)
 	newEvent := Event{
-		Payload: pl,
+		Payload: e.Payload,
 	}
 	copier.Copy(&e.Payload, &newEvent.Payload)
 
-	return &e, err
+	return &e, nil
 }
 
 
@@ -461,7 +571,7 @@ func (e Event) ToString() string {
 	values = append(values, e.ID)
 	values = append(values, fmt.Sprintf("%d", e.BlockNumber))
 	values = append(values, fmt.Sprintf("%d", e.EventType))
-	values = append(values, strings.Join(e.Associations, ","))
+	// values = append(values, strings.Join(e.Associations, ","))
 	values = append(values, e.PreviousEvent.ToString())
 	values = append(values, e.AuthEvent.ToString())
 	values = append(values, fmt.Sprintf("%d", e.Timestamp))
@@ -481,10 +591,14 @@ func (e Event) EncodeBytes() ([]byte, error) {
 	// 		return nil, err
 	// 	}
 	// }
+	stateEventsBytes := []byte{}
+	for _, v := range e.StateEvents {
+		stateEventsBytes = append(stateEventsBytes, v.EncodeBytes()...)
+	}
 	
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: d},
-		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: strings.Join(e.Associations, "")},
+		// encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: strings.Join(e.Associations, "")},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.AuthEvent.ID)},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.BlockNumber},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Cycle},
@@ -492,8 +606,11 @@ func (e Event) EncodeBytes() ([]byte, error) {
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.EventType},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.PreviousEvent.ID)},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.Subnet)},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: stateEventsBytes},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Timestamp},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Index},
+		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.NodeCount},
+		
 	)
 }
 
@@ -531,6 +648,9 @@ func GetEventEntityFromModel(eventType EntityModel) *Event {
 	case SubnetModel:
 		event.Payload.Data = Subnet{}
 
+	case SystemModel:
+		event.Payload.Data = SystemMessage{}
+
 	case WalletModel:
 		event.Payload.Data = Wallet{}
 	}
@@ -558,6 +678,8 @@ func GetStateModelFromEntityType(entityType EntityModel) any {
 
 	case SubnetModel:
 		return Subnet{}
+	case SystemModel:
+		return SystemMessage{}
 
 	case WalletModel:
 		return Wallet{}
@@ -569,6 +691,9 @@ func GetStateModelFromEntityType(entityType EntityModel) any {
 
 
 func GetModelTypeFromEventType(eventType constants.EventType ) EntityModel {
+	if eventType < 50 {
+		return  SystemModel	
+	}
 	if eventType < 600 {
 		return  SubnetModel	
 	}
@@ -617,3 +742,8 @@ func CycleSubnetKey(cycle uint64, subnet string) string {
 	return fmt.Sprintf("cyc/%015d/%s", cycle, subnet)
 }
 
+
+type EventPayload struct {
+		EventType         constants.EventType        `json:"t,omitempty"`
+		Event json.RawMessage  `json:"e,omitempty"`
+}

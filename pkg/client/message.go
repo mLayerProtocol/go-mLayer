@@ -22,12 +22,6 @@ var logger = &log.Logger
 
 type Flag string
 
-// !sign web3 m
-// type msgError struct {
-// 	code int
-// 	message string
-// }
-
 type MessageService struct {
 	Ctx context.Context
 	Cfg configs.MainConfiguration
@@ -100,7 +94,8 @@ func NewMessageService(mainCtx *context.Context) *MessageService {
 // 	return nil, errors.New("INVALID MESSAGE SIGNER")
 // }
 
-func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *models.AuthorizationState) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, err error) {
+func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *models.AuthorizationState, topicData *entities.Topic)  (
+	assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath , _subscription *entities.Subscription,  err error) {
 	defer utils.TrackExecutionTime(time.Now(), "ValidateMessagePayload")
 	payloadData := entities.Message{}
 	d, _ := json.Marshal(payload.Data)
@@ -110,38 +105,28 @@ func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *mo
 	}
 	payload.Data = payloadData
 
-	topicData, err := dsquery.GetTopicById(payloadData.Topic)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	// topicData, err := dsquery.GetTopicById(payloadData.Topic)
+	// if err != nil {
+	// 	if !dsquery.IsErrorNotFound(err) {
+	// 		return nil, nil, err
+	// 	}
+	// }
+	
 	if topicData == nil {
-		return nil, nil, apperror.BadRequest("Invalid topic id")
+		return nil, nil, nil, apperror.BadRequest("Invalid topic id")
 	}
-
-	
-	// pool = channelpool.SubscriptionEventPublishC
-
-	
-	
-
-
 	subscription, err := service.ValidateMessageData(&payload, topicData)
-	
-	
-	
 	if err != nil {
 		if  payload.Account != topicData.Account {
 			if err == gorm.ErrRecordNotFound {
 				if payload.Account != topicData.Account {
-					return nil, &currentAuthState.Event, apperror.Forbidden(err.Error())
+					return nil, &currentAuthState.Event, nil, apperror.Forbidden(err.Error())
 				}
 			}
-			return nil, &currentAuthState.Event, err
+			return nil, &currentAuthState.Event,  nil, err
 		}
-		return nil, nil, err
+		return nil, nil, nil,  err
 	}
-
 	// generate associations
 		if subscription != nil  {
 			assocPrevEvent = &subscription.Event
@@ -152,9 +137,9 @@ func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *mo
 				subState, err := dsquery.GetSubnetStateById(topicData.Subnet)
 				if err != nil {
 					if err == gorm.ErrRecordNotFound  || dsquery.IsErrorNotFound(err){
-						return nil, nil, apperror.Forbidden("Invalid subnet id")
+						return nil, nil, subscription, apperror.Forbidden("Invalid subnet id")
 					}
-					return nil, nil, apperror.Internal(err.Error())
+					return nil, nil, subscription,  apperror.Internal(err.Error())
 				}
 				assocPrevEvent = &subState.Event
 			
@@ -165,5 +150,5 @@ func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *mo
 	if currentAuthState != nil {
 		assocAuthEvent = &currentAuthState.Event
 	}
-	return assocPrevEvent, assocAuthEvent, nil
+	return assocPrevEvent, assocAuthEvent, subscription, nil
 }

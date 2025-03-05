@@ -71,7 +71,7 @@ func GetCycleRecentEvent(cycle uint64) string {
 	}
 	return string(d)
 }
-func GetStats(query BlockStatsQuery, limit *QueryLimit) (uint64, error) {
+func GetStats(query BlockStatsQuery, limit *entities.QueryLimit) (uint64, error) {
 	key := ""
 	if query.Block != nil {
 		if query.EventType != nil {

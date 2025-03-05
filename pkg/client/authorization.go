@@ -14,7 +14,7 @@ import (
 
 
 
-func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.ClientPayload) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, err error) {
+func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.ClientPayload) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, subnetState *entities.Subnet, err error) {
 	authData := entities.Authorization{}
 	
 	d, _ := json.Marshal(payload.Data)
@@ -25,26 +25,27 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 	
 	payload.Data = authData
 	if uint64(*authData.Timestamp) == 0 || uint64(*authData.Timestamp) > uint64(time.Now().UnixMilli())+15000 || uint64(*authData.Timestamp) < uint64(time.Now().UnixMilli())-15000 {
-		return nil, nil, apperror.BadRequest("Invalid event timestamp")
+		return nil, nil, nil, apperror.BadRequest("Invalid event timestamp")
 	}
 	logger.Debugf("CurrentStateDD: %+v", payload.Data)
 	if *authData.Duration != 0 && uint64(time.Now().UnixMilli()) >
 		(uint64(*authData.Timestamp)+uint64(*authData.Duration)) {
-		return nil, nil, apperror.BadRequest("Authorization duration exceeded")
+		return nil, nil, nil, apperror.BadRequest("Authorization duration exceeded")
 	}
 	logger.Debugf("CurrentStateEE")
-	dataStates := dsquery.NewDataStates(cfg)
-	currentState, grantorAuthState, _, err := service.ValidateAuthPayloadData(&payload, cfg, dataStates, "")
-	if !dataStates.Empty() {
-		dataStates.Commit(nil, nil, nil)
-	}
+	// dataStates := dsquery.NewDataStates(cfg)
+	currentState, grantorAuthState, _, err := service.ValidateAuthPayloadData(&payload, cfg, "")
+	// if !dataStates.Empty() {
+	// 	dataStates.Commit(nil, nil, nil)
+	// }
 	
 	// TODO If error is because the subnet was not found, check the dht for the subnet
 	if err != nil {
 		logger.Error("ValidateuthPayload: ", err)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-
+	subnetState, _ = dsquery.GetSubnetStateById(authData.Subnet)
+	
 	// generate associations
 	if currentState != nil {
 		
@@ -58,8 +59,8 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 		// Get the subnets state event
 		// subnetState := &models.SubnetState{}
 		//err = query.GetOne(&models.SubnetState{Subnet: entities.Subnet{ID: authData.Subnet }}, subnetState)
-		subnetState, err := dsquery.GetSubnetStateById(authData.Subnet)
-		if err != nil {
+		
+		if subnetState == nil {
 			// find ways to get the subnet
 		} else {
 			assocPrevEvent = &subnetState.Event
@@ -75,7 +76,7 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 		// 	Model: entities.AuthorizationEventModel,
 		// }
 	}
-	return assocPrevEvent, assocAuthEvent, nil
+	return assocPrevEvent, assocAuthEvent, subnetState, nil
 }
 
 func GetAuthorizations(auth *entities.Authorization) (*[]models.AuthorizationState, error) {

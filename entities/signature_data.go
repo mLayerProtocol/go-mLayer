@@ -12,9 +12,9 @@ import (
 )
 
 type SignatureData struct {
-	Type      PubKeyType `json:"ty"`
-	PublicKey string     `json:"pubK,omitempty"`
-	Signature string     `json:"sig"`
+	Type      PubKeyType `json:"ty,omitempty"`
+	PublicKey PublicKeyString     `json:"pubK,omitempty"`
+	Signature HexString     `json:"sig"`
 }
 
 func (sD SignatureData) GormDataType() string {

@@ -16,9 +16,10 @@ import (
 
 
 type WalletBalance struct {
+	Version float32 `json:"_v"`
 	// Primary
 	ID string `gorm:"primaryKey;type:uuid;not null" json:"id,omitempty"`
-	Account           DIDString `json:"acct"  gorm:"type:varchar(64);uniqueIndex:idx_wallet_acct;not null"`
+	Account           AccountString `json:"acct"  gorm:"type:varchar(64);uniqueIndex:idx_wallet_acct;not null"`
 	Wallet string `json:"wal"  gorm:"type:char(36);uniqueIndex:idx_wallet_acct;not null"`
 	Balance             big.Int        `json:"bal" gorm:"index;not null;default:0"`
 	Agent DeviceString `json:"agt,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`

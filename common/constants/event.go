@@ -35,7 +35,9 @@ package constants
 type EventType uint16
 
 // Authrization
-
+const (
+	SystemMessage   EventType = 10
+)
 
 // Administrative Subnet Actions
 const (

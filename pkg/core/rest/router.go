@@ -4,13 +4,16 @@ import (
 	// "errors"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
+	"github.com/mlayerprotocol/go-mlayer/common/encoder"
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
@@ -70,7 +73,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	// router.Use(gin.Logger(), gin.Recovery())
-	requestProcessor := client.NewClientRequestProcess(p.Ctx)
+	requestProcessor := client.NewClientRequestHandler(p.Ctx)
 	// router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
     //     logger.Infof("[GIN]: %s - [%s] \"%s %s %s %d %s \"%s\" \"%s\"\n",
     //         param.ClientIP,
@@ -155,7 +158,7 @@ func (p *RestService) Initialize() *gin.Engine {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-		payload.EventType = uint16(constants.UpdateTopicEvent)
+		payload.EventType = (constants.UpdateTopicEvent)
 		topic := entities.Topic{}
 		d, _ := json.Marshal(payload.Data)
 		e := json.Unmarshal(d, &topic)
@@ -301,6 +304,43 @@ func (p *RestService) Initialize() *gin.Engine {
 		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: messages}))
 	})
 
+	router.GET("/api/topics/:id/data/:dataId", func(c *gin.Context) {
+		b, parseError := utils.ParseQueryString(c)
+		if parseError != nil {
+			logger.Error(parseError)
+			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: parseError.Error()}))
+			return
+		}
+		var payload  = make(map[string]interface{})
+		json.Unmarshal(*b, &payload)
+		// payload["sub"] = c.Param("acct")
+		// snet := c.Param("snet")
+		topicId :=strings.Trim( c.Param("id"), " ")
+		id := strings.Trim(c.Param("dataId"), " ")
+		
+		topic, err := dsquery.GetTopicById(topicId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
+			return
+		}		
+		
+		data, err := dsquery.GetTopicSmartletData(topic, utils.UuidToBytes( id))
+
+	
+		if err != nil  {
+			c.JSON(http.StatusNotFound, entities.NewClientResponse(entities.ClientResponse{Data: err.Error()}))
+			return
+		}
+		if data == nil {
+			c.JSON(http.StatusNotFound, entities.NewClientResponse(entities.ClientResponse{Data: fmt.Errorf("key not found")}))
+			return
+		}
+		m := map[string]interface{}{}
+		encoder.MsgPackUnpackStruct(data, &m)
+		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: m}))
+	})
+
+
 	router.GET("/api/topics/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		topic, err := dsquery.GetTopicById(id)
@@ -336,6 +376,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		
 		event, err := requestProcessor.Process(client.WriteSubscriptionRequest, nil, payload)
 		if err != nil {
+			logger.Errorf("POST /topics/subscribe: %v", err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
@@ -434,7 +475,7 @@ func (p *RestService) Initialize() *gin.Engine {
 
 	router.POST("/api/topics/messages", func(c *gin.Context) {
 		defer utils.TrackExecutionTime(time.Now(), "POST:CreateEvent")
-		logger.Debugf("NewRequeset:::::: %v")
+		// logger.Debugf("NewRequeset:::::: %v")
 		var payload entities.ClientPayload
 		if err := c.BindJSON(&payload); err != nil {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
@@ -443,7 +484,22 @@ func (p *RestService) Initialize() *gin.Engine {
 		// logger.Debugf("Payload:::::: %v", payload.Data)
 		message := entities.Message{}
 		d, _ := json.Marshal(payload.Data)
+		var err error
 		e := json.Unmarshal(d, &message)
+		// encoding := strings.ToLower(message.DataEncoding)
+		// if encoding == "" {
+		// 	message.Data, err = hex.DecodeString(fmt.Sprintf("%s", message.Data))
+		// 	if err != nil {
+		// 		message.Data, err = base64.RawStdEncoding.DecodeString(fmt.Sprintf("%s", message.Data))
+		// 	}
+		// } else {
+		// 	if encoding == "base64" {
+		// 		message.Data, err = base64.RawStdEncoding.DecodeString(fmt.Sprintf("%s", message.Data))
+		// 	}
+		// 	if encoding == "hex" {
+		// 		message.Data, err = hex.DecodeString(fmt.Sprintf("%s", message.Data))
+		// 	}
+		// }
 		if e != nil {
 			logger.Errorf("Unmarshal Error %v", e)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: e.Error()}))
@@ -452,13 +508,14 @@ func (p *RestService) Initialize() *gin.Engine {
 		// subscription.ID = id
 		payload.Data = message
 		event, err := client.CreateEvent(payload, p.Ctx)
-
+		
 		if err != nil {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-
-		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: event}))
+		// b, err :=  json.Marshal(event)
+		logger.Infof("EVENTTTT",  event.(entities.Event).StateEvents)
+		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: event.(entities.Event)}))
 		// c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: entities.Event{}}))
 
 	})
@@ -483,34 +540,19 @@ func (p *RestService) Initialize() *gin.Engine {
 		
 	})
 
-	router.GET("/api/subscription/account", func(c *gin.Context) {
-
+	router.GET("/api/subscriptions", func(c *gin.Context) {
 		b, parseError := utils.ParseQueryString(c)
 		if parseError != nil {
 			logger.Error(parseError)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: parseError.Error()}))
 			return
 		}
-
-		//
-		var payload entities.Subscription
+		var payload  = make(map[string]interface{})
 		json.Unmarshal(*b, &payload)
-		status := c.Query("status")
-		if status != "" {
-			iStatus, parseError := strconv.Atoi(status)
-			if parseError != nil {
-				logger.Error(parseError)
-				c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: parseError.Error()}))
-				return
-			}
-			statusConst := constants.SubscriptionStatus(iStatus)
-			payload.Status = &statusConst
-		}
-
+		// payload["sub"] = c.Param("acct")
+		
+		subscriptions, err := requestProcessor.Process(client.GetAccountSubscriptionsRequest, payload, nil)
 		//
-
-		subscriptions, err := client.GetAccountSubscriptionsV2(payload)
-
 		if err != nil {
 			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
@@ -519,6 +561,8 @@ func (p *RestService) Initialize() *gin.Engine {
 		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: subscriptions}))
 	})
 
+
+	
 	// router.GET("/api/sync", func(c *gin.Context) {
 	// 	b, parseError := utils.ParseQueryString(c)
 	// 	if parseError != nil {

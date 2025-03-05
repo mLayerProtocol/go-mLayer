@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -24,13 +22,11 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/channelpool"
-	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto/schnorr"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
+	"github.com/mlayerprotocol/go-mlayer/internal/system"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/quic-go/quic-go"
 	// rest "messagingprotocol/pkg/core/rest"
 	// dhtConfig "github.com/libp2p/go-libp2p-kad-dht/internal/config"
 )
@@ -58,8 +54,6 @@ type CertResponseData struct {
 	QuicHost string          `json:"quic"`
 }
 
-
-
 func publishChannelEventToNetwork(channelPool chan *entities.Event, pubsubChannel *entities.Channel, mainCtx *context.Context) {
 	_, cancel := context.WithCancel(context.Background())
 	cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
@@ -74,7 +68,7 @@ func publishChannelEventToNetwork(channelPool chan *entities.Event, pubsubChanne
 			continue
 		}
 		event, ok := <-channelPool
-		
+
 		if !ok {
 			logger.Fatalf("Channel pool closed. %v", &channelPool)
 			panic("Channel pool closed")
@@ -118,7 +112,7 @@ func publishChannelEventToNetwork(channelPool chan *entities.Event, pubsubChanne
 			// 		logger.Errorf("Failed to ENCODE %v", err)
 			// 		continue
 			// 	}
-			
+
 			err := pubsubChannel.Publish(entities.NewPubSubMessage(pack))
 
 			if err != nil {
@@ -144,17 +138,16 @@ func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPub
 			continue
 		}
 		logger.Infof("Listening for broadcasted \"%s\" events...", modelType)
-		
+
 		message, ok := <-fromPubSubChannel.Messages
 		// utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("newMessage" + "\n"))
 		if !ok {
 			logger.Fatalf("Primary Message channel closed. Please restart server to try or adjust buffer size in config")
 			return
 		}
-		
 
 		event, errT := entities.UnpackEvent(message.Data, modelType)
-		
+
 		logger.Debugf("ReceivedEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
 		if errT != nil {
 			logger.Errorf("Error receiving event  %v\n", errT)
@@ -162,14 +155,13 @@ func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPub
 			// continue
 		}
 
-	
 		logger.Debugf("ProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
 		// event.ID, _ = event.GetId()
-	
+
 		channelpool.EventProcessorChannel <- event
 		// go process(event, mainCtx)
 	}
-	logger.Debugf("Done processing event: %s", modelType)
+	//logger.Debugf("Done processing event: %s", modelType)
 	// for {
 	// 	select {
 
@@ -240,11 +232,19 @@ type IState interface {
 }
 
 // process the payload based on the type of request
-func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, mustSign bool) (response *P2pPayload, err error) {
+func ProcessP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, mustSign bool) (response *P2pPayload, err error) {
 	ctx := MainContext
-
+	
 	response = NewP2pPayload(config, P2pActionResponse, []byte{})
 	response.Id = payload.Id
+	if mustSign {
+		if !payload.IsValid(config.ChainId)  {
+			response.ResponseCode = 500
+			response.Error = "Invalid payload data"
+			response.Sign(cfg.PrivateKeyEDD)
+			return response, err
+		}
+	}
 	switch payload.Action {
 	case P2pActionGetEvent:
 		eventPath, err := entities.UnpackEventPath(payload.Data)
@@ -275,15 +275,15 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			if state != nil {
 				states = append(states, state)
 			}
-			
+
 			// if err == nil {
 			// 	for _, st := range result {
 			// 		states = append(states, st.MsgPack())
 			// 	}
-			
-				data := P2pEventResponse{Event: event.MsgPack(), States: states}
+
+			data := P2pEventResponse{Event: event.MsgPack(), States: states}
 			// 	logger.Debugf("EventReseponse: %v", (&data).MsgPack())
-			 	response.Data = (&data).MsgPack()
+			response.Data = (&data).MsgPack()
 			// }
 		}
 	case P2pActionGetState:
@@ -295,9 +295,9 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			logger.Debugf("processP2pPayload: %v", err)
 		}
 		logger.Errorf("ReceivedGetState Request... %v", ePath)
-		
+
 		state, err := dsquery.GetStateFromEntityPath(ePath)
-		
+
 		if err != nil || len(state) == 0 {
 			logger.Errorf("P2pActionGetState: %v", err)
 			if dsquery.IsErrorNotFound(err) {
@@ -308,7 +308,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 				response.Error = err.Error()
 			}
 		} else {
-			logger.Errorf("FoundRequestedState.. %v", state)
+			logger.Debugf("FoundRequestedState.. %v", state)
 			mapp := map[string]interface{}{}
 			err := encoder.MsgPackUnpackStruct(state, &mapp)
 			if err != nil {
@@ -317,16 +317,28 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 				response.Error = "State not found"
 				break
 			}
+
 			pathMap := mapp["e"].(map[string]interface{})
 			logger.Infof("TopicEvent::: %v", pathMap)
 			// := entities.EventPathFromString(eventPath)
 			//path := eventPath.(entities.EventPath)
 			// ev, err := dsquery.GetEventFromPath(&d.Event)
-			eventPath := entities.EventPath{EntityPath: entities.EntityPath{
-				ID: fmt.Sprint(pathMap["h"]),
-				Model:  entities.EntityModel(fmt.Sprint(pathMap["mod"])),
-				Validator: entities.PublicKeyString(fmt.Sprint(pathMap["val"])),
-			}}
+			eventPath := entities.EventPath{}
+			pathBytes, err := encoder.MsgPackStruct(pathMap)
+			if err != nil {
+				response.ResponseCode = 500
+				response.Error = err.Error()
+			}
+			err = encoder.MsgPackUnpackStruct(pathBytes, &eventPath)
+			if err != nil {
+				response.ResponseCode = 500
+				response.Error = err.Error()
+			}
+			// eventPath := entities.EventPath{EntityPath: entities.EntityPath{
+			// 	ID: fmt.Sprint(pathMap[""]),
+			// 	Model:  entities.EntityModel(fmt.Sprint(pathMap["mod"])),
+			// 	Validator: entities.PublicKeyString(fmt.Sprint(pathMap["val"])),
+			// }}
 			event, err := dsquery.GetEventFromPath(&eventPath)
 			if err == nil {
 				states := []json.RawMessage{}
@@ -350,51 +362,51 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		// toBlock :=  new(big.Int).SetBytes(blocks.To)
 		// var where =  fmt.Sprintf("block_number >= %d AND block_number <= %d",  fromBlock.Uint64(), toBlock.Uint64())
 		//  var where = "1=1"
-		
+
 		endBlock := new(big.Int).Sub(chain.NetworkInfo.CurrentBlock, big.NewInt(5))
 		from := new(big.Int).SetBytes(blocks.From)
 		if from.Cmp(endBlock) == 1 {
-				// Path does not exist
-				response.ResponseCode = apperror.BadRequestError
-				response.Error = "invalid from in range"
-				break
+			// Path does not exist
+			response.ResponseCode = apperror.BadRequestError
+			response.Error = "invalid from in range"
+			break
 		}
 		to := new(big.Int).SetBytes(blocks.To)
 		if to.Cmp(endBlock) == 1 {
 			to = endBlock
 		}
 		fromCycle, err := chain.DefaultProvider(cfg).GetCycle(from)
-			if err != nil {
-				response.ResponseCode = apperror.InternalError
-				response.Error = "could not get block cycle"
-				break
-			}
-			
+		if err != nil {
+			response.ResponseCode = apperror.InternalError
+			response.Error = "could not get block cycle"
+			break
+		}
+
 		toCycle, err := chain.DefaultProvider(cfg).GetCycle(to)
-			if err != nil {
-				response.ResponseCode = apperror.InternalError
-				response.Error = "could not get block cycle"
-				break
-			}
+		if err != nil {
+			response.ResponseCode = apperror.InternalError
+			response.Error = "could not get block cycle"
+			break
+		}
 
 		for i := fromCycle.Uint64(); i <= toCycle.Uint64(); i++ {
 			if i != 102 {
 				continue
 			}
-	 		cycleDir := filepath.Join(cfg.ArchiveDir, fmt.Sprint(i))
-			 _, err = os.Stat(cycleDir)
-			 if err != nil && !os.IsNotExist(err) {
+			cycleDir := filepath.Join(cfg.ArchiveDir, fmt.Sprint(i))
+			_, err = os.Stat(cycleDir)
+			if err != nil && !os.IsNotExist(err) {
 				response.ResponseCode = apperror.InternalError
 				response.Error = err.Error()
 				break
 			}
-			 files, err := utils.ListFilesInDir(cycleDir)
-			 if err != nil {
+			files, err := utils.ListFilesInDir(cycleDir)
+			if err != nil {
 				response.ResponseCode = 500
 				response.Error = err.Error()
-			 }
-			
-			 for _, file := range files {
+			}
+
+			for _, file := range files {
 				if !strings.HasSuffix(file, ".dat") {
 					continue
 				}
@@ -405,25 +417,25 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 					response.Error = err.Error()
 				}
 				buffer.Write(data)
-			 }
-			 logger.Infof("SyncCycle: %d, %d, %v", i,  new(big.Int).SetBytes(blocks.To).Uint64(),buffer.Len())
-			if err != nil {
-					response.ResponseCode = 404
-					response.Error = "Event not found"
-					break
 			}
-			
+			logger.Infof("SyncCycle: %d, %d, %v", i, new(big.Int).SetBytes(blocks.To).Uint64(), buffer.Len())
+			if err != nil {
+				response.ResponseCode = 404
+				response.Error = "Event not found"
+				break
+			}
+
 		}
 
 		// for i := from.Uint64(); i <= to.Uint64(); i++ {
-		
+
 		// 	cycle, err := chain.DefaultProvider(cfg).GetCycle(new(big.Int).SetUint64(i))
 		// 	if err != nil {
 		// 		response.ResponseCode = apperror.InternalError
 		// 		response.Error = "could not get block cycle"
 		// 		break
 		// 	}
-			
+
 		// 	 cycleDir := filepath.Join(cfg.ArchiveDir, cycle.String())
 		// 	 _, err = os.Stat(cycleDir)
 		// 	 if err != nil && !os.IsNotExist(err) {
@@ -436,7 +448,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		// 		response.ResponseCode = 500
 		// 		response.Error = err.Error()
 		// 	 }
-			
+
 		// 	 for _, file := range files {
 		// 		if !strings.HasSuffix(file, ".dat") {
 		// 			continue
@@ -448,7 +460,7 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		// 			response.Error = err.Error()
 		// 		}
 		// 		buffer.Write(data)
-				
+
 		// 	 }
 		// 	 logger.Infof("SyncBlock: %d, %d, %v", i,  new(big.Int).SetBytes(blocks.To).Uint64(), err)
 		// 	if err != nil {
@@ -456,9 +468,9 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		// 			response.Error = "Event not found"
 		// 			break
 		// 	}
-			
+
 		// }
-			
+
 		response.Data = buffer.Bytes()
 		// if err != nil {
 		// 	logger.Error("GZIP", err)
@@ -479,9 +491,9 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		//  cycleKey :=  fmt.Sprintf("%s/%d", response.Signer, batch.Cycle)
 		// subnetList := []models.EventCounter{}
 		claimed := false
-		subnetList, err := dsquery.GetCycleCounts( batch.Cycle,  entities.PublicKeyString(hex.EncodeToString(payload.Signer)),  &claimed, nil, &dsquery.QueryLimit{Limit: entities.MaxBatchSize, Offset: batch.Index*entities.MaxBatchSize} )
+		subnetList, err := dsquery.GetCycleCounts(batch.Cycle, entities.PublicKeyString(hex.EncodeToString(payload.Signer)), &claimed, nil, &entities.QueryLimit{Limit: entities.MaxBatchSize, Offset: batch.Index * entities.MaxBatchSize})
 		// err = query.GetManyWithLimit(models.EventCounter{Cycle: &batch.Cycle, Validator: entities.PublicKeyString(hex.EncodeToString(payload.Signer)), Claimed: &claimed}, &subnetList, &map[string]query.Order{"count": query.OrderDec}, entities.MaxBatchSize, batch.Index*entities.MaxBatchSize)
-		
+
 		if err != nil {
 			return nil, err
 		}
@@ -596,45 +608,130 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		// 2. Loop through the Data field and check your /validator/cycle/subnetId/{batchId} to get the last time a proof was requested
 		// 3. If this is less than 10 minutes ago, respond with error - proof requested too early
 		// 4. If non exists or most recent is more than 10 minutes
-	case P2pActionGetCert:
-		certData := crypto.GetOrGenerateCert(ctx)
-		//cert, _ := hex.DecodeString(certData.Cert)
-		keyByte, _ := hex.DecodeString(certData.Key)
-		certByte, _ := hex.DecodeString(certData.Cert)
-		tlsConfig, _ := crypto.GenerateTLSConfig(keyByte, certByte)
-		resp := CertResponseData{
-			CertHash: crypto.Keccak256Hash(tlsConfig.Certificates[0].Certificate[0]),
-			QuicHost: config.QuicHost,
-		}
-		response.Data, err = encoder.MsgPackStruct(resp)
+	case P2pActionGetCert, P2pActionGetHandshake:
+		// certData := crypto.GetOrGenerateCert(ctx)
+		// //cert, _ := hex.DecodeString(certData.Cert)
+		// keyByte, _ := hex.DecodeString(certData.Key)
+		// certByte, _ := hex.DecodeString(certData.Cert)
+		// tlsConfig, _ := crypto.GenerateTLSConfig(keyByte, certByte)
+		// resp := CertResponseData{
+		// 	CertHash: crypto.Keccak256Hash(tlsConfig.Certificates[0].Certificate[0]),
+		// 	QuicHost: config.QuicHost,
+		// }
+		mad, err := NewNodeMultiAddressData(cfg, cfg.PrivateKeySECP, GetMultiAddresses(Host), cfg.PublicKeyEDD)
 		if err != nil {
 			response.Error = err.Error()
 			response.ResponseCode = 400
 			break
 		}
-		response.Sign(config.PrivateKeyEDD)
-	case P2pActionGetHandshake:
-		lastSync, err := ds.GetLastSyncedBlock(ctx)
-		if err != nil {
-			lastSync = big.NewInt(0)
+		response.Data = mad.MsgPack()
+		
+		if mustSign {
+			response.Sign(config.PrivateKeyEDD)
 		}
-		// TODO  remove when we have several bootstrap nodes
-		if cfg.NoSync {
-			lastSync = chain.NetworkInfo.CurrentBlock
-		}
-		handshake, err := NewNodeHandshake(cfg, cfg.ProtocolVersion, cfg.PrivateKeySECP, cfg.PublicKeyEDD, utils.IfThenElse(cfg.Validator, constants.ValidatorNodeType, constants.SentryNodeType), lastSync, payload.Id)
+	// case P2pActionGetHandshake:
+	// 	lastSync, err := ds.GetLastSyncedBlock(ctx)
+	// 	if err != nil {
+	// 		lastSync = big.NewInt(0)
+	// 	}
+	// 	// TODO  remove when we have several bootstrap nodes
+	// 	if cfg.NoSync {
+	// 		lastSync = chain.NetworkInfo.CurrentBlock
+	// 	}
+	// 	handshake, err := NewNodeHandshake(cfg, cfg.ProtocolVersion, cfg.PrivateKeySECP, cfg.PublicKeyEDD, utils.IfThenElse(cfg.Validator, constants.ValidatorNodeType, constants.SentryNodeType), lastSync, payload.Id)
+	// 	if err != nil {
+	// 		response.Error = "invalid action type"
+	// 		response.ResponseCode = 400
+	// 		break
+	// 	}
+
+	// 	response.Data = handshake.MsgPack()
+	case P2pActionGetAccountSubscriptions:
+		account := string(payload.Data)
+		acc, err := entities.AddressFromString(account)
 		if err != nil {
-			response.Error = "invalid action type"
-			response.ResponseCode = 400
+			response.Error = err.Error()
+			response.ResponseCode = 500
 			break
 		}
+		subs, err := dsquery.GetSubscriptions(entities.Subscription{Subscriber: acc.ToAddressString()}, payload.QueryLimit, nil)
+		if err != nil {
+			response.Error = err.Error()
+			response.ResponseCode = 500
+			break
+		}
+		for _, sub := range subs {
+			response.Data = append(response.Data, sub.MsgPack()...)
+			response.Data = append(response.Data, Delimiter...)
+		}
+	case P2pActioNotifyTopicInterest:
 
-		response.Data = handshake.MsgPack()
+		data := entities.NodeInterest{}
+		err = encoder.MsgPackUnpackStruct(payload.Data, &data)
+		if err != nil {
+			logger.Errorf("HandleNewNodeSystemMessageEventErrorEncoder: ", err)
+			response.Error = err.Error()
+			response.ResponseCode = 500
+			break
+		}
+		ownIntersts := []string{}
+		 err := system.RegisterNodeInterest(entities.PublicKeyString(hex.EncodeToString(payload.Signer)), data.Ids, data.Type, &ownIntersts)
+		if err != nil {
+			response.Error = err.Error()
+			response.ResponseCode = 500
+			break
+		}
+		if len(ownIntersts) > 0 {
+			response.Data = (&entities.SystemMessage{
+				Data: (&entities.NodeInterest{
+					Ids: ownIntersts,
+					Type: data.Type,
+					Expiry: int(time.Now().Add(constants.TOPIC_INTEREST_TTL).UnixMilli()),
+				}).MsgPack(),
+			}).MsgPack()
+		}
+	case P2pActionPostEvent:
+		event, err := entities.UnpackEvent(payload.Data, entities.MessageModel)
+		if err != nil {
+			logger.Errorf("P2pActionPostEventError: %v", err)
+			response.Error = err.Error()
+			response.ResponseCode = 500
+			break
+		}
+		// respChann := make(chan *entities.EventProcessorResponse)
+		// var wg sync.WaitGroup
+		// var eventResp *entities.EventProcessorResponse
+		// wg.Add(1)
+		// go func() { // TODO add timeout
+		// 	defer wg.Done()
+		// 	for resp := range respChann {
+		// 		eventResp = resp
+				
+		// 	}
+		// }()
+		// channelpool.RemoteEventProcessorChannel <- &entities.RemoteEvent{
+		// 	Event: event,
+		// 	ResponseChannel: &respChann,
+		// }
+		// wg.Wait()
+		channelpool.EventProcessorChannel <- event
+		// var eventResp *entities.EventProcessorResponse
+		// eventResp.Event = *event.GetPath()
+		// eventResp.State = dsquery.Get
+		response.Data, err = encoder.MsgPackStruct(event)
+		
+		if err != nil {
+			response.Error = err.Error()
+			response.ResponseCode = 500
+			break
+		}
+		
 	default:
 		response.Error = "invalid action type"
 		response.ResponseCode = 400
 
 	}
+
 	if mustSign && len(response.Signature) == 0 {
 		response.Sign(config.PrivateKeyEDD)
 	}
@@ -654,51 +751,6 @@ func processP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 // 				return d, nil
 // }
 
-func HandleQuicConnection(ctx *context.Context, cfg *configs.MainConfiguration, connection quic.Connection) {
-
-	stream, err := connection.AcceptStream(*ctx)
-
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer stream.Close()
-
-	// Read the client's request (the filename)
-	buf := make([]byte, 1024)
-	data := bytes.Buffer{}
-	for {
-
-		n, err := stream.Read(buf) // Read into the buffer
-		data.Write(buf[:n])
-		if n < len(buf) || n == 0 || err == io.EOF {
-			break // End of file, stop reading
-		}
-		if err != nil {
-			logger.Error("HandleQuicConnection/writedata: ", err) // Handle error
-			return
-		}
-	}
-
-	payload, err := UnpackP2pPayload(data.Bytes())
-
-	if err != nil {
-		logger.Error("HandleQuicConnection/UnpackP2pPayload: ", err)
-		return
-	}
-	if !payload.IsValid(cfg.ChainId) {
-		logger.Error(fmt.Errorf("HandleQuicConnection: invalid payload signature for action %d", payload.Action))
-		return
-	}
-	response, err := processP2pPayload(cfg, payload, false)
-	if err != nil {
-		logger.Error("HandleQuicConnection/processP2pPayload: ", err)
-		return
-	}
-	_, err = stream.Write(response.MsgPack())
-	if err != nil {
-		log.Fatalf("Failed to send file: %v", err)
-	}
-}
 
 func parseQuicAddress(cfg *configs.MainConfiguration, maddrs []multiaddr.Multiaddr) (string, multiaddr.Multiaddr, error) {
 	var idx int
@@ -709,7 +761,7 @@ func parseQuicAddress(cfg *configs.MainConfiguration, maddrs []multiaddr.Multiad
 				continue
 			}
 		} else {
-			if  !isRemote(addr) {
+			if !isRemote(addr) {
 				continue
 			}
 		}
@@ -736,7 +788,7 @@ func parseQuicAddress(cfg *configs.MainConfiguration, maddrs []multiaddr.Multiad
 		return "", nil, err
 	}
 
-	return fmt.Sprintf("%s%s", ip, cfg.QuicHost[strings.Index(cfg.QuicHost, ":"):]), maddrs[idx], nil
+	return fmt.Sprintf("%s:%d", ip, cfg.QuicPort), maddrs[idx], nil
 
 }
 func extractIP(maddr multiaddr.Multiaddr) (string, error) {

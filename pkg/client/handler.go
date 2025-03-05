@@ -71,7 +71,7 @@ var requestPatterns = []RequestType{
 	GetMainStatsRequest,
 }
 
-type ClientRequestProcessor struct {
+type ClientRequestHandler struct {
 	Ctx *context.Context
 	Cfg *configs.MainConfiguration
 }
@@ -80,9 +80,9 @@ var (
 	ErrorInvalidRequest error = fmt.Errorf("invalid request type")
 )
 
-func NewClientRequestProcess(mainCtx *context.Context) *ClientRequestProcessor {
+func NewClientRequestHandler(mainCtx *context.Context) *ClientRequestHandler {
 	cfg, _ := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-	return &ClientRequestProcessor{
+	return &ClientRequestHandler{
 		Ctx: mainCtx,
 		Cfg: cfg,
 	}
@@ -139,7 +139,7 @@ func parseClientPayload(payload *entities.ClientPayload, requestType RequestType
 	}
 }
 
-func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[string]interface{}, payload interface{}) (interface{}, error) {
+func (p *ClientRequestHandler) Process(requestPath RequestType, params map[string]interface{}, payload interface{}) (interface{}, error) {
 	var request RequestType
 	queryLimit := dsquery.DefaultQueryLimit
 	for _, pattern := range requestPatterns {
@@ -221,6 +221,7 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 	case WriteSubscriptionRequest:
 		cpl := payload.(entities.ClientPayload)
 		parseClientPayload(&cpl, request)
+		
 		data := entities.Subscription{}
 		d, _ := json.Marshal(cpl.Data)
 		e := json.Unmarshal(d, &data)
@@ -228,6 +229,7 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 			logger.Errorf("UnmarshalError %v", e)
 		}
 		cpl.Data = data
+		
 		return CreateEvent(cpl, p.Ctx)
 	case WriteMessageRequest:
 		cpl := payload.(entities.ClientPayload)
@@ -267,7 +269,7 @@ func (p *ClientRequestProcessor) Process(requestPath RequestType, params map[str
 
 		}
 		json.Unmarshal(pB, &subs)
-		return GetAccountSubscriptionsV2(subs)
+		return GetAccountSubscriptionsV2(p.Cfg, subs)
 	// case SyncClientRequest:
 	// 	//var authEntity entities.Authorization
 	// 	// var payload entities.ClientPayload

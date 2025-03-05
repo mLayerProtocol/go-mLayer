@@ -58,6 +58,11 @@ const (
 	P2pActionGetState P2pAction = 6
 	P2pActionSyncCycle P2pAction = 7
 	P2pActionGetCert P2pAction = 8
+	P2pActionGetAccountSubscriptions P2pAction = 9
+	P2pActioNotifyTopicInterest P2pAction = 10
+	P2pActionPostEvent P2pAction = 11
+	P2pActionNotifyValidEvent P2pAction = 12
+	P2pActionSyncState P2pAction = 13
 	
 	
 )
@@ -65,6 +70,7 @@ type P2pPayload struct {
 	// Messages is a channel of messages received from other peers in the chat channel
 	Id string `json:"id"`
 	Data json.RawMessage `json:"d"`
+	QueryLimit *entities.QueryLimit `json:"pg"`
 	ChainId configs.ChainId `json:"pre"`
 	Timestamp uint64 `json:"ts"`
 	Action P2pAction `json:"ac"`
@@ -168,11 +174,12 @@ func (p *P2pPayload) SendSyncRequest(receiverPublicKey string) (*P2pPayload, err
 }
 
 func (p *P2pPayload) SendQuicSyncRequest(hostAddress multiaddr.Multiaddr, validSigner entities.PublicKeyString) (*P2pPayload, error) {
+
 	p.Action = P2pActionSyncCycle
 	p.Sign(p.config.PrivateKeyEDD)
 	// addr := "127.0.0.1:9533"
 	// logger.Debugf("Sending quic request to: %s", hostAddress)
-	data, err := SendSecureQuicRequest(p.config, hostAddress, validSigner, p.MsgPack())
+	data, err := SendSecureQuicRequest(p.config, hostAddress, string(validSigner), p.MsgPack())
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +198,7 @@ func (p *P2pPayload) SendQuicSyncRequest(hostAddress multiaddr.Multiaddr, validS
 
 func (p *P2pPayload) SendRequestToAddress(privateKey []byte, address multiaddr.Multiaddr,  _type RequestType, validSigner string) (*P2pPayload, error) {
 		p.Sign(privateKey)
-		data, err := SendSecureQuicRequest(p.config, address, entities.PublicKeyString(validSigner), p.MsgPack())
+		data, err := SendSecureQuicRequest(p.config, address, validSigner, p.MsgPack())
 		if err != nil {
 			return nil, err
 		}
@@ -224,7 +231,14 @@ func (p *P2pPayload) SendP2pRequestToAddress(privateKey []byte, address multiadd
 		s := (*stream)
 		// defer s.Close()
 		i, err := rw.Write(append(p.MsgPack(), Delimiter...))
-		rw.Flush()
+		if err != nil {
+			logger.Infof("STREAMWRITEERROR: %v", err)
+			return nil, err
+		}
+		logger.Infof("STREAMWRITEERROR: %v", len(rw.AvailableBuffer()))
+		if len(rw.AvailableBuffer()) > 0 { 
+			err = rw.Flush()
+		}
 		logger.Debugf("BytesWritten: %d", i)
 
 		if err != nil {
@@ -240,9 +254,11 @@ func (p *P2pPayload) SendP2pRequestToAddress(privateKey []byte, address multiadd
 		var payloadBuf bytes.Buffer
 		bufferLen := 1024
 		buf := make([]byte, bufferLen)
-		
+	
 		for {
-			
+			if s == nil ||  s.Conn() == nil || s.Conn().IsClosed() {
+				return nil, fmt.Errorf("invalid stream or stream closed")
+			}
 			n, err := s.Read(buf)
 			
 			if n > 0 {
@@ -298,11 +314,13 @@ func GetState(config *configs.MainConfiguration, path entities.EntityPath,  vali
 	var err error
 	
 	address := chain.NetworkInfo.SyncedValidators[string(*validator)]
+	logger.Infof("SyncedNodeAddress: %s", address)
 	if address == nil {
 		address, err = GetNodeAddress(config.Context, string(*validator))
 		if err != nil || address == nil {
 			return nil, fmt.Errorf("p2p.GetNodeAddress: %v", err)
 		}
+		logger.Infof("GotNodeAddress: %s", address)
 	}
 	
 	resp, err :=  (&pl).SendRequestToAddress(pl.config.PrivateKeyEDD, address, DataRequest, string(*validator))
@@ -320,7 +338,7 @@ func GetState(config *configs.MainConfiguration, path entities.EntityPath,  vali
 	if len(data.States) == 0 {
 		return nil, apperror.NotFound("state not found")
 	}
-	logger.Infof("TopicData: %v", data.States[0])
+	logger.Infof("State of %s: %v", path.Model, data.States[0])
 	return &data, encoder.MsgPackUnpackStruct(data.States[0], &result)
 }
 

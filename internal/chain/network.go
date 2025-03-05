@@ -14,7 +14,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/exp/rand"
 )
-var syncMu sync.Mutex
+
 type NetworkParams struct {
 	StartTime *big.Int 	`json:"start_time"`
 	StartBlock *big.Int `json:"start_block"`
@@ -28,6 +28,9 @@ type NetworkParams struct {
 	Sentries map[string]uint64 `json:"-"`
 	Config *configs.MainConfiguration `json:"-"`
 	Synced bool `json:"synced"`
+	ValidatorOperatorCount *big.Int `json:"validator_count"`
+	SentryOperatorCount *big.Int `json:"sentry_count"`
+	syncMu sync.Mutex
 }
 
 func (n *NetworkParams) GetValidatorKeys(key entities.PublicKeyString) (edd entities.PublicKeyString, secp entities.PublicKeyString) {
@@ -49,6 +52,9 @@ func (n *NetworkParams) GetRandomSyncedNode() string {
 		keys := make([]string, 0, len(n.SyncedValidators))
 		for key := range n.SyncedValidators {
 			keys = append(keys, key)
+		}
+		if len(keys) == 0 {
+			return ""
 		}
 		randomKey := keys[rand.Intn(len(keys))]
 		return randomKey
@@ -105,8 +111,8 @@ func (n *NetworkParams) IsSentry(pubKey string, cycle *big.Int) (bool, error)  {
 }
 
 func (n *NetworkParams) Sync(ctx *context.Context, syncFunc func () bool) {
-		syncMu.Lock()
-		defer syncMu.Unlock()
+		n.syncMu.Lock()
+		defer n.syncMu.Unlock()
 		if n.Synced {
 			return 
 		}
@@ -176,7 +182,7 @@ func Provider (chainId configs.ChainId) api.IChainAPI {
 // 	return *bal
 // }
 
-// func (n *MLChainAPI) GetStakeBalance(address entities.DIDString) big.Int {
+// func (n *MLChainAPI) GetStakeBalance(address entities.AccountString) big.Int {
 // 	bal := new(big.Int)
 // 	bal.SetString("100000000000000000000000000", 10)
 // 	return *bal
@@ -206,7 +212,7 @@ func Provider (chainId configs.ChainId) api.IChainAPI {
 // 	return bal, nil
 // }
 
-// func (n *MLChainAPI) GetChannelBalance(address entities.DIDString) *big.Int {
+// func (n *MLChainAPI) GetChannelBalance(address entities.AccountString) *big.Int {
 // 	bal := new(big.Int)
 // 	bal.SetString("100000000000000000000000000", 10)
 // 	return bal

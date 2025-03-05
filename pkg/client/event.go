@@ -24,13 +24,12 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	"gorm.io/gorm"
 )
 
 
 type PaddedInt64 struct {
-	once  sync.Once
+	// once  sync.Once
 	value int64
 	_     [56]byte // 60 bytes padding + 4 bytes int32 = 64 bytes
 }
@@ -39,18 +38,18 @@ var messageVectors  sync.Map
 func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model any, err error) {
 	defer utils.TrackExecutionTime(time.Now(), "CreateEvent::")
 	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
-	stateDS, _ := (*ctx).Value(constants.ValidStateStore).(*ds.Datastore)
 	if !strings.EqualFold(utils.AddressToHex(payload.Validator), utils.AddressToHex(cfg.OwnerAddress.String())) {
 		return model, apperror.Forbidden(fmt.Sprintf("Validator (%s) not authorized to procces this request", cfg.OwnerAddress.String()))
 	}
-
+	stateEvent := []entities.StateEvents{}
 	
 	var authState *models.AuthorizationState
 	var agent *entities.DeviceString
+	logger.Infof("SUBSCRIPTION_PAYLOAD2 %+v", payload)
 	excludedEvents := []constants.EventType{constants.CreateSubnetEvent, constants.UpdateSubnetEvent, constants.DeleteSubnetEvent, constants.AuthorizationEvent}
 	if !slices.Contains(excludedEvents, constants.EventType(payload.EventType)) {
 		logger.Infof("ISNOTEXLUCDED: %d",  payload.EventType)
-		authState, agent, err = ValidateClientPayload(stateDS, &payload, true, cfg)
+		authState, agent, err = ValidateClientPayload( &payload, true, cfg)
 		
 		// logger.Debugf("New Event for Agent/Device2 %s", (*agent))
 		if err != nil && err != gorm.ErrRecordNotFound && !dsquery.IsErrorNotFound(err)  {
@@ -81,13 +80,14 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 				return model, err
 		}
 		subnetState.Subnet = *snet
+		stateEvent = append(stateEvent, entities.StateEvents{ID: snet.ID, Event: snet.Event})
 	}
 	
 	//Perfom checks base on event types
 	logger.Debugf("authState****** 2: %v ", authState)
 	
 	switch payload.EventType {
-	case uint16(constants.AuthorizationEvent):
+	case constants.AuthorizationEvent:
 		// authData := entities.Authorization{}
 		// d, _ := json.Marshal(payload.Data)
 		// e := json.Unmarshal(d, &authData)
@@ -96,15 +96,18 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		// }
 		// payload.Data = authData
 		// logger.Infof("NewRequest: %v",  "Authorization")
-		assocPrevEvent, assocAuthEvent, err = ValidateAuthPayload(cfg, payload)
-		logger.Infof("NewRequestProcessed: %v",  "Authorization")
+		subnetState := &entities.Subnet{}
+		assocPrevEvent, assocAuthEvent, subnetState, err = ValidateAuthPayload(cfg, payload)
+		stateEvent = append(stateEvent, entities.StateEvents{ID: subnetState.ID, Event: subnetState.Event})
+		
 		if err != nil {
 			logger.Errorf("AuthDataVerificationError: %v", err)
 			return model, err
 		}
 		
 		
-	case uint16(constants.CreateTopicEvent), uint16(constants.UpdateNameEvent), uint16(constants.UpdateTopicEvent), uint16(constants.LeaveEvent):
+		
+	case constants.CreateTopicEvent, constants.UpdateNameEvent, constants.UpdateTopicEvent, constants.LeaveEvent:
 		
 		// if authState.Authorization.Priviledge < constants.AdminPriviledge {
 		// 	return nil, apperror.Forbidden("Agent not authorized to perform this action")
@@ -120,7 +123,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		if assocPrevEvent == nil {
 			assocPrevEvent = &subnetState.Event
 		}
-		// case uint16(constants.SubscribeTopicEvent):
+		// case constants.SubscribeTopicEvent):
 		// 	if authState.Authorization.Priviledge < constants.AdminPriviledge {
 		// 		return nil, apperror.Forbidden("Agent not authorized to perform this action")
 		// 	}
@@ -129,7 +132,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		// 	if err != nil {
 		// 		return nil, err
 		// 	}
-	case uint16(constants.CreateSubnetEvent), uint16(constants.UpdateSubnetEvent):
+	case constants.CreateSubnetEvent, constants.UpdateSubnetEvent:
 		
 		// if authState.Authorization.Priviledge < constants.AdminPriviledge {
 		// 	return nil, apperror.Forbidden("Agent not authorized to perform this action")
@@ -142,7 +145,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		}
 		logger.Infof("ValidSubnetPayload: %v", payload)
 		
-	case uint16(constants.CreateWalletEvent), uint16(constants.UpdateWalletEvent):
+	case constants.CreateWalletEvent,constants.UpdateWalletEvent:
 	
 		// if authState.Authorization.Priviledge < constants.AdminPriviledge {
 		// 	return nil, apperror.Forbidden("Agent not authorized to perform this action")
@@ -151,26 +154,35 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		if err != nil {
 			return model, err
 		}
-	case uint16(constants.SubscribeTopicEvent), uint16(constants.ApprovedEvent), uint16(constants.BanMemberEvent), uint16(constants.UnbanMemberEvent):
+	case constants.SubscribeTopicEvent, constants.ApprovedEvent, constants.BanMemberEvent, constants.UnbanMemberEvent:
 		if *authState.Authorization.Priviledge < constants.MemberPriviledge {
 			return model, apperror.Forbidden("Agent not authorized to perform this action")
 		}
 		
 		logger.Infof("ValidatingTopic...")
-		assocPrevEvent, assocAuthEvent, err = ValidateSubscriptionPayload(payload, authState, cfg)
+		_topic := &entities.Topic{}
+		assocPrevEvent, assocAuthEvent, _topic, err = ValidateSubscriptionPayload(payload, authState, cfg)
 		
 		if err != nil {
 			logger.Debugf("SubscriptionError: %+v", err)
 			return model, err
 		}
-	case uint16(constants.SendMessageEvent):
+		stateEvent = append(stateEvent, entities.StateEvents{ID: _topic.ID, Event: _topic.Event})
+	case constants.SendMessageEvent:
 		logger.Debugf("authState 2: %d ", *authState.Authorization.Priviledge)
 		// 1. Agent message
 		// if *authState.Authorization.Priviledge < constants.MemberPriviledge {
 		// 	return nil, apperror.Forbidden("Agent not authorized to perform this action")
 		// }
-		
-		assocPrevEvent, assocAuthEvent, err = ValidateMessagePayload(payload, authState)
+		topic := &entities.Topic{}
+		_, err := service.SyncTypedStateById(payload.Data.(entities.Message).Topic,  topic, cfg, "")
+		if err != nil {
+			return model, err
+		}
+		stateEvent = append(stateEvent, entities.StateEvents{Event: topic.Event, ID: topic.ID})
+		subscription := &entities.Subscription{}
+		assocPrevEvent, assocAuthEvent, subscription, err = ValidateMessagePayload(payload, authState, topic)
+		stateEvent = append(stateEvent, entities.StateEvents{Event: subscription.Event, ID: subscription.ID})
 		if err != nil {
 			logger.Error("ERRRRRRR:::", err)
 			return model, err
@@ -178,6 +190,9 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 	default:
 	}
 	// logger.Debugf("UPDATINGSUBNE1: %v", err)
+	if authState != nil {
+		stateEvent = append(stateEvent, entities.StateEvents{Event: authState.Event, ID: authState.ID})
+	}
 	payloadHash, err := payload.GetHash()
 	
 	if err != nil {
@@ -194,7 +209,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 	}
 	
 	subnet := payload.Subnet
-	if payload.EventType == uint16(constants.CreateSubnetEvent) {
+	if payload.EventType == constants.CreateSubnetEvent {
 		subnet, err = entities.GetId(payload.Data.(entities.Subnet), "")
 		if err != nil {
 			logger.Debugf("Subnet error: %v", err)
@@ -202,18 +217,18 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		}
 		
 	}
-	if payload.EventType == uint16(constants.UpdateAvatarEvent) {
+	if payload.EventType == constants.UpdateAvatarEvent {
 		subnet = payload.Data.(entities.Subnet).ID
 	}
-	if payload.EventType == uint16(constants.AuthorizationEvent) {
+	if payload.EventType == constants.AuthorizationEvent {
 		subnet = payload.Data.(entities.Authorization).Subnet
 	}
 	
 	event := entities.Event{
 		Payload:           payload,
 		Timestamp:         uint64(time.Now().UnixMilli()),
-		EventType:         uint16(payload.EventType),
-		Associations:      []string{},
+		EventType:        payload.EventType,
+		// Associations:      []string{},
 		PreviousEvent: *utils.IfThenElse(assocPrevEvent == nil, entities.EventPathFromString(""), assocPrevEvent),
 		AuthEvent:     *utils.IfThenElse(assocAuthEvent == nil, entities.EventPathFromString(""), assocAuthEvent),
 		Synced:            utils.FalsePtr(),
@@ -224,13 +239,20 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		Epoch: 				chain.NetworkInfo.CurrentEpoch.Uint64(),		
 		Validator:         entities.PublicKeyString(cfg.PublicKeyEDDHex),
 		Subnet: subnet,
+		StateEvents:  stateEvent,
 	}
 	
-	if  uint16(constants.SendMessageEvent) == event.EventType {
+	if constants.SendMessageEvent == event.EventType {
 		vecKey := event.VectorKey(event.Payload.Data.(entities.Message).Topic)
 		vectorInterface, loaded := messageVectors.LoadOrStore(vecKey, &PaddedInt64{})
 		vector := vectorInterface.(*PaddedInt64)
 		// var  _err error
+		if loaded && vector.value == 0 {
+			// 
+			time.Sleep(5 * time.Millisecond)
+			vectorInterface, loaded = messageVectors.LoadOrStore(vecKey, &PaddedInt64{})
+			vector = vectorInterface.(*PaddedInt64)
+		}
 		if !loaded {
 			// load it from your local db
 			// vector.once.Do(func() {
@@ -284,14 +306,14 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 	if err != nil {
 		return model, err
 	}
-	go service.HandleNewPubSubEvent(event, ctx) 
+	service.HandleNewPubSubEvent(event, ctx) 
 	
 	// dispatch to network
 
 	// if err != nil {
 	// 	return nil, err
 	// }
-	
+
 	return event, nil
 }
 
@@ -324,10 +346,43 @@ func GetEventTypeFromModel(eventType entities.EntityModel) constants.EventType {
 
 	case entities.WalletModel:
 		return constants.CreateWalletEvent
+	case entities.SystemModel:
+		return constants.SystemMessage
 	}
 
 	return 0
 
+}
+
+func PublishInterest(ids []string, _type entities.EntityModel, cfg *configs.MainConfiguration) error {
+	logger.Debugf("Pulbishing interest in topics... %+v", ids)
+	event := entities.Event{
+		Payload:           entities.ClientPayload{
+			Data: entities.SystemMessage{
+				Type: entities.AnnounceTopicInterest,
+				Data: (&entities.NodeInterest{
+					Ids: ids,
+					Type: _type,
+					Expiry: int(time.Now().Add(constants.TOPIC_INTEREST_TTL).UnixMilli()),
+				}).MsgPack(),
+			},
+		},
+		Timestamp:         uint64(time.Now().UnixMilli()),
+		Validator:         entities.PublicKeyString(cfg.PublicKeyEDDHex),
+		EventType: constants.SystemMessage,
+	}
+	b, err := event.EncodeBytes()
+	if err != nil {
+		return apperror.Internal(err.Error())
+	}
+	event.Hash = hex.EncodeToString(crypto.Sha256(b))
+	_, event.Signature = crypto.SignEDD(b, cfg.PrivateKeyEDD)
+	event.ID, err = event.GetId()
+	if err != nil {
+		return err
+	}
+	_, err = service.HandleNewPubSubEvent(event, cfg.Context) 
+	return err
 }
 
 
@@ -337,7 +392,7 @@ func GetEvent(eventId string, eventType int) (model interface{}, err error) {
 		event, err1 := dsquery.GetEventById(eventId, modelType)
 
 		if err1 != nil {
-			logger.Error("GetEvent: ", err)
+			logger.Error("GetEvent: ", err1, " ", eventId)
 			return nil, err1
 		}
 		return event, nil
@@ -354,7 +409,7 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 		return event, nil
 
 	// switch uint16(eventType) {
-	// case uint16(constants.CreateTopicEvent), uint16(constants.UpdateNameEvent), uint16(constants.UpdateTopicEvent), uint16(constants.LeaveEvent):
+	// case constants.CreateTopicEvent), constants.UpdateNameEvent), constants.UpdateTopicEvent), constants.LeaveEvent):
 	// 	event, err1 := dsquery.GetEventById(eventHash, entities.TopicModel)
 
 	// 	if err1 != nil {
@@ -363,7 +418,7 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 	// 	}
 	// 	return event, nil
 
-	// case uint16(constants.CreateSubnetEvent):
+	// case constants.CreateSubnetEvent):
 	// 	event, err1 := dsquery.GetEventById(eventHash, entities.SubnetModel)
 
 	// 	if err1 != nil {
@@ -372,7 +427,7 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 	// 	}
 	// 	return event, nil
 
-	// case uint16(constants.SubscribeTopicEvent), uint16(constants.ApprovedEvent), uint16(constants.BanMemberEvent), uint16(constants.UnbanMemberEvent):
+	// case constants.SubscribeTopicEvent), constants.ApprovedEvent), constants.BanMemberEvent), constants.UnbanMemberEvent):
 	// 	event, err1 :=  dsquery.GetEventById(eventHash, entities.SubscriptionModel)
 
 	// 	if err1 != nil {
@@ -380,7 +435,7 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 	// 		return nil, err1
 	// 	}
 	// 	return event, nil
-	// case uint16(constants.SendMessageEvent), uint16(constants.DeleteMessageEvent):
+	// case constants.SendMessageEvent), constants.DeleteMessageEvent):
 	// 	event, err1 := dsquery.GetEventById(eventHash, entities.MessageModel)
 
 	// 	if err1 != nil {
@@ -389,7 +444,7 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 	// 	}
 	// 	return event, nil
 
-	// case uint16(constants.AuthorizationEvent), uint16(constants.UnauthorizationEvent):
+	// case constants.AuthorizationEvent), constants.UnauthorizationEvent):
 	// 	event, err1 :=  dsquery.GetEventById(eventHash, entities.AuthModel)
 
 	// 	if err1 != nil {

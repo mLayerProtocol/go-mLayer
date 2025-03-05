@@ -13,9 +13,10 @@ import (
 )
 
 type Wallet struct {
+	Version float32 `json:"_v"`
 	// Primary
 	ID        string        `gorm:"primaryKey;type:uuid;not null" json:"id,omitempty"`
-	Account   DIDString `json:"acct"`
+	Account   AccountString `json:"acct"`
 	Subnet    string        `json:"snet" gorm:"type:varchar(32);index;not null" msgpack:",noinline"`
 	Name      string        `json:"n" gorm:"type:varchar(12);not null"`
 	Symbol      string        `json:"sym" gorm:"type:varchar(8);not null"`
@@ -82,7 +83,7 @@ func (e Wallet) GetHash() ([]byte, error) {
 	if err != nil {
 		return []byte(""), err
 	}
-	return crypto.Keccak256Hash(b), nil
+	return crypto.Sha256(b), nil
 }
 
 func (entity Wallet) GetEvent() (EventPath) {
@@ -93,11 +94,13 @@ func (entity Wallet) GetAgent() (DeviceString) {
 }
 
 func (e Wallet) ToString() (string, error) {
+	
+
 	values := []string{}
 	values = append(values, e.ID)
 	values = append(values, e.Name)
 	values = append(values, e.Subnet)
-	values = append(values, e.Account.ToString())
+	values = append(values, string(e.Account))
 
 	return strings.Join(values, ""), nil
 }
@@ -107,6 +110,6 @@ func (e Wallet) EncodeBytes() ([]byte, error) {
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: e.Name},
 		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: e.Subnet},
-		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: e.Account.ToString()},
+		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: e.Account},
 	)
 }

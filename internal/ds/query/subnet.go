@@ -7,6 +7,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	"github.com/mlayerprotocol/go-mlayer/global"
 	"github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
 )
 
@@ -140,19 +141,19 @@ func UpdateSubnetState(id string, newState *entities.Subnet, tx *datastore.Txn, 
 	return newState, nil
 }
 
-func GetAccountSubnets(account entities.DIDString, limit QueryLimit) (data []*entities.Subnet, err error) {
+func GetAccountSubnets(account entities.AccountString, limit entities.QueryLimit) (data []*entities.Subnet, err error) {
 	ds := stores.StateStore
 	key := (&entities.Subnet{Account: account}).AccountSubnetsKey()
 	rsl, err := ds.Query(context.Background(), query.Query{
 		Prefix: key,
 		Limit:  limit.Limit,
-		Offset: limit.Offset,
+		 Offset: limit.Offset,
+		 Orders: []query.Order{query.OrderByKeyDescending{}},
 	})
 	if err != nil {
-		
+		logger.Debugf("ErrorGetAccountSubnets: %v", err)
 	}
 	entries, _ := rsl.Rest()
-	logger.Debugf("EntriesLen for key: %v,  %v", key, len(entries))
 	for _, entry := range entries {
 		keyString := strings.Split(entry.Key, "/")
 		id := keyString[len(keyString)-1]
@@ -165,6 +166,10 @@ func GetAccountSubnets(account entities.DIDString, limit QueryLimit) (data []*en
 		data = append(data, value)
 		err = qerr
 	}
+	for _, globalSubs := range global.GlobalSubnets {
+		data = append(data, &globalSubs)
+	}
+
 	if err != nil {
 		return nil, err
 	}

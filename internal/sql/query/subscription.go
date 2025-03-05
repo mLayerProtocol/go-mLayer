@@ -8,13 +8,13 @@ import (
 )
 
 // Save Subnet state only when it doesnt exist
-func GetSubscriptionStateBySubscriber(subnet string, topic string, subscribers []entities.DIDString, DB *gorm.DB) (*[]models.SubscriptionState, error) {
+func GetSubscriptionStateBySubscriber(subnet string, topic string, subscribers []entities.AccountString, DB *gorm.DB) (*[]models.SubscriptionState, error) {
 	data := []models.SubscriptionState{}
 	tx := DB
 	if DB == nil {
 		tx = sql.SqlDb
 	}
-	subsc := []entities.DIDString{}
+	subsc := []entities.AccountString{}
 	for _, sub := range subscribers {
 		if sub == "" {
 			continue

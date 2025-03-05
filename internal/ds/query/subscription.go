@@ -38,13 +38,13 @@ import (
 // 	}
 // 	return &data, err
 // }
-func GetSubscriptions( filter entities.Subscription, limits *QueryLimit, txn *datastore.Txn) (data []*entities.Subscription, err error) {
+func GetSubscriptions( filter entities.Subscription, limits *entities.QueryLimit, txn *datastore.Txn) (data []*entities.Subscription, err error) {
 	defer utils.TrackExecutionTime(time.Now(), "GetSubscriptions::")
 
 	ds :=  stores.StateStore
 	var rsl query.Results
 	if limits == nil {
-		limits = &QueryLimit{}
+		limits = &entities.QueryLimit{}
 	}
 	key := filter.SubscriberKey()
 	if filter.Status != nil {
@@ -59,12 +59,14 @@ func GetSubscriptions( filter entities.Subscription, limits *QueryLimit, txn *da
 			Prefix: key,
 			Limit:  limits.Limit,
 			Offset: limits.Offset,
+			Orders: []query.Order{query.OrderByKeyDescending{}},
 		})
 	} else {
 		rsl,  err = ds.Query(context.Background(), query.Query{
 			Prefix: key,
 			Limit:  limits.Limit,
 			Offset: limits.Offset,
+			Orders: []query.Order{query.OrderByKeyDescending{}},
 		})
 	}
 	if err != nil {
@@ -243,10 +245,10 @@ func CreateSubscriptionState(newState *entities.Subscription, tx *datastore.Txn)
 // }
 
 
-func GetSubscriptionStates(subnet string, topic string, subscriber entities.DeviceString, limits QueryLimit) (rsl []*entities.Subscription, err error) {
+func GetSubscriptionStates(subnet string, topic string, subscriber entities.AddressString, limits entities.QueryLimit) (rsl []*entities.Subscription, err error) {
 	ds :=  stores.StateStore
 	result,  err := ds.Query(context.Background(), query.Query{
-		Prefix: (&entities.Subscription{Subnet: subnet, Topic: topic, Subscriber: entities.DIDString(subscriber)}).SubscriberKey(),
+		Prefix: (&entities.Subscription{Subnet: subnet, Topic: topic, Subscriber: subscriber}).SubscriberKey(),
 		Limit:  limits.Limit,
 		Offset: limits.Offset,
 	})

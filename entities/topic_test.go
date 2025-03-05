@@ -15,7 +15,7 @@ func TestEncodeTopicBytes(t *testing.T) {
 	topicIds := "*"
 	ts := uint64(1705392177894)
 	privilege := constants.AdminPriviledge
-    auth := Authority{Agent: agent, TopicIds: topicIds, Timestamp: ts,  Priviledge: privilege, }
+    auth := Authorization{Agent: StringToDeviceString(agent), TopicIds: topicIds, Timestamp: ts,  Priviledge: privilege, }
 	hash := hex.EncodeToString(auth.GetHash())
 	expected := "7da1e026b7a8dc545e2f84cca2eea963807e701aa03ad4b64b1ab447304460e9"
     if hash != expected {

@@ -22,6 +22,7 @@ import (
 
 const DataKey = "data/%s/%s"
 type Subnet struct {
+	Version float32 `json:"_v"`
 	ID            string        `json:"id" gorm:"type:uuid;primaryKey;not null"`
 	Meta          string        `json:"meta,omitempty"`
 	Ref           string        `json:"ref,omitempty" binding:"required"  gorm:"unique;type:varchar(64);default:null"`
@@ -32,7 +33,7 @@ type Subnet struct {
 	Timestamp     uint64        `json:"ts,omitempty" binding:"required"`
 	Balance       uint64        `json:"bal" gorm:"default:0"`
 	// Readonly
-	Account DIDString    `json:"acct,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	Account AccountString    `json:"acct,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 	
 
 	// CreateTopicPrivilege   *constants.AuthorizationPrivilege `json:"cTopPriv"` //
@@ -59,11 +60,11 @@ func (d Subnet) GetSignature() (string) {
 	// hash, _ := d.GetHash()
 	// return hex.EncodeToString(hash)
 	if d.SignatureData.Type == TendermintsSecp256k1PubKey {
-		val, _ := base64.StdEncoding.DecodeString(d.SignatureData.Signature)
+		val, _ := base64.StdEncoding.DecodeString(string(d.SignatureData.Signature))
 		 return hex.EncodeToString(val)
 	}
 	if d.SignatureData.Type == EthereumPubKey {
-		return strings.ReplaceAll(d.SignatureData.Signature, "0x", "")
+		return strings.ReplaceAll(string(d.SignatureData.Signature), "0x", "")
 	}
 	return ""
 }  
@@ -115,7 +116,7 @@ func (item *Subnet) RefKey() string {
 
 
 func (g *Subnet) AccountSubnetsKey() string {
-	return fmt.Sprintf("%s/acct/%s", SubnetModel, g.Account)
+	return fmt.Sprintf("/%s/acct/%s/", SubnetModel, g.Account)
 }
 
 
@@ -156,12 +157,12 @@ func UnpackSubnet(b []byte) (Subnet, error) {
 	return item, err
 }
 
-func (p *Subnet) CanSend(channel string, sender DIDString) bool {
+func (p *Subnet) CanSend(channel string, sender AccountString) bool {
 	// check if user can send
 	return true
 }
 
-func (p *Subnet) IsMember(channel string, sender DIDString) bool {
+func (p *Subnet) IsMember(channel string, sender AccountString) bool {
 	// check if user can send
 	return true
 }
@@ -206,7 +207,7 @@ func (item Subnet) EncodeBytes() ([]byte, error) {
 		cats = append(cats, b...)
 	}
 	return encoder.EncodeBytes(
-		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: item.Account},
+		encoder.EncoderParam{Type: encoder.AddressEncoderDataType, Value: item.Account},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: utils.SafePointerValue(item.DefaultAuthPrivilege, 0)},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: item.Meta},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: item.Ref},

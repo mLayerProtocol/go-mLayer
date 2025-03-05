@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
+
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -34,6 +35,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p/notifee"
 	"github.com/mlayerprotocol/go-mlayer/pkg/log"
 	"github.com/multiformats/go-multiaddr"
+	"golang.org/x/exp/rand"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -48,6 +50,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	webtransport "github.com/libp2p/go-libp2p/p2p/transport/webtransport"
+	mlcrypto "github.com/mlayerprotocol/go-mlayer/internal/crypto"
 
 	noise "github.com/libp2p/go-libp2p/p2p/security/noise"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
@@ -66,6 +69,7 @@ var peerDiscoveryMutex= sync.Mutex{}
 // var config configs.MainConfiguration
 type P2pChannelFlow int8
 var connectedPeer = map[string]bool{}
+var Initialized = false
 
 const (
 	P2pChannelOut P2pChannelFlow = 1
@@ -88,6 +92,7 @@ const (
 	WalletChannel        string = "ml-wallet-channel"
 	MessageChannel       string = "ml-message-channel"
 	SubscriptionChannel         = "ml-subscription-channel"
+	InterestChannel         	= "ml-interest-channel"
 	// UnSubscribeChannel                = "ml-unsubscribe-channel"
 	// ApproveSubscriptionChannel        = "ml-approve-subscription-channel"
 	BatchChannel         = "ml-batch-channel"
@@ -162,7 +167,7 @@ func discover(ctx context.Context, h host.Host, kdht *dht.IpfsDHT, rendezvous st
 			}
 			
 			for p := range peers {
-			
+				logger.Println("Finding Peer at", p.ID)
 				if p.ID.String() == h.ID().String() {
 					continue
 				}
@@ -206,7 +211,7 @@ func Run(mainCtx *context.Context) {
 	} else {
 		logger.Debugf("LoadedChainInfo: %v", string(info))
 	}
-	
+
 	ctx, cancel := context.WithCancel(*mainCtx)
 	MainContext = &ctx
 	defer cancel()
@@ -338,7 +343,7 @@ func Run(mainCtx *context.Context) {
 			logger.Debugf("BootStrapPeers %v", bootstrapPeers)
 			var dhtOptions []dht.Option
 			dhtOptions = append(dhtOptions,
-				
+				dht.Mode(utils.IfThenElse(cfg.Validator, dht.ModeServer, dht.ModeClient)),
 				dht.BootstrapPeers(bootstrapPeers...),
 				dht.ProtocolPrefix(protocol.ID(p2pProtocolId)),
 				dht.ProtocolPrefix(protocol.ID(handShakeProtocolId)),
@@ -348,9 +353,9 @@ func Run(mainCtx *context.Context) {
 				dht.NamespacedValidator("ipns", record.PublicKeyValidator{}),
 				dht.NamespacedValidator("ml", &DhtValidator{config: cfg}),
 			)
-			if !cfg.BootstrapNode {
-				dhtOptions = append(dhtOptions, dht.Mode(dht.ModeAutoServer))
-			}
+			// if !cfg.BootstrapNode {
+			// 	dhtOptions = append(dhtOptions, dht.Mode(dht.ModeAutoServer))
+			// }
 			// dhtOptions = append(dhtOptions,  dht.Datastore(syncDatastore))
 
 			kdht, err := dht.New(ctx, h,
@@ -375,7 +380,9 @@ func Run(mainCtx *context.Context) {
 			// if cfg.BootstrapNode {
 			
 			// }
-
+			if err = kdht.Bootstrap(ctx); err != nil {
+				logger.Fatalf("Error starting bootstrap node %o", err)
+			}
 			idht = kdht
 
 			// for _, addr := range cfg.BootstrapPeers {
@@ -427,9 +434,11 @@ func Run(mainCtx *context.Context) {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	if err = idht.Bootstrap(ctx); err != nil {
-		logger.Fatalf("Error starting bootstrap node %o", err)
-	}
+
+
+
+	
+	
 	
 	// gater := NetworkGater{host: h, config: config, blockPeers: make(map[peer.ID]struct{})}
 	go discover(ctx, Host, idht, discoveryService)
@@ -452,13 +461,14 @@ func Run(mainCtx *context.Context) {
 	if err != nil {
 		logger.Fatal(err)
 	}
+
 	// connect to bootstrap peers
-	time.Sleep(10 * time.Second)
-	// for _, addr := range cfg.BootstrapPeers {
-	// 	logger.Infof("Connecting to bootStrapPeer: %s", addr)
-	// 	addr, _ := multiaddr.NewMultiaddr(addr)
-	// 	connectToNode(addr, *mainCtx)
-	// }
+	time.Sleep(5 * time.Second)
+	for _, addr := range cfg.BootstrapPeers {
+		logger.Infof("Connecting to bootStrapPeer: %s", addr)
+		addr, _ := multiaddr.NewMultiaddr(addr)
+		connectToNode(addr, *mainCtx)
+	}
 	// node = &h
 
 	// The last step to get fully up and running would be to connect to
@@ -483,10 +493,12 @@ func Run(mainCtx *context.Context) {
 		logger.Println("- RPC server started on: ", cfg.RPCHost+":"+cfg.RPCPort)
 		logger.Println("- HTTP/REST server started on: ", cfg.RestAddress)
 		logger.Println("- Websocket server listening on: ", fmt.Sprintf("%s/ws", cfg.WSAddress))
-		logger.Println("- QUIC server started on: ", cfg.QuicHost)
+		logger.Println("- QUIC server started on: ", cfg.QuicPort)
 	}
 	fmt.Println("---------------------------------------------------------------------------")
-
+	if !Initialized {
+		Initialized = true
+	}
 	// Subscrbers
 	authPubSub, err := entities.JoinChannel(ctx, ps, Host.ID(), defaultNick(Host.ID()), AuthorizationChannel, cfg.ChannelMessageBufferSize)
 	if err != nil {
@@ -518,6 +530,12 @@ func Run(mainCtx *context.Context) {
 	}
 	entities.SubscriptionPubSub = *subscriptionPubSub
 
+	interestPubSub, err := entities.JoinChannel(ctx, ps, Host.ID(), defaultNick(Host.ID()), InterestChannel, cfg.ChannelMessageBufferSize)
+	if err != nil {
+		panic(err)
+	}
+	entities.SystemMessagePubSub = *interestPubSub
+
 	messagePubSub, err := entities.JoinChannel(ctx, ps, Host.ID(), defaultNick(Host.ID()), MessageChannel, cfg.ChannelMessageBufferSize)
 	if err != nil {
 		panic(err)
@@ -540,6 +558,8 @@ func Run(mainCtx *context.Context) {
 	go publishChannelEventToNetwork(channelpool.SubnetEventPublishC, &entities.SubnetPubSub, mainCtx)
 	go publishChannelEventToNetwork(channelpool.WalletEventPublishC, &entities.WalletPubSub, mainCtx)
 	go publishChannelEventToNetwork(channelpool.SubscriptionEventPublishC, &entities.SubscriptionPubSub, mainCtx)
+	go publishChannelEventToNetwork(channelpool.SystemMessagePublishC, &entities.SystemMessagePubSub, mainCtx)
+	
 	go publishChannelEventToNetwork(channelpool.MessageEventPublishC, &entities.MessagePubSub, mainCtx)
 	// go PublishChannelEventToNetwork(channelpool.UnSubscribeEventPublishC, unsubscribePubSub, mainCtx)
 	// go PublishChannelEventToNetwork(channelpool.ApproveSubscribeEventPublishC, approveSubscriptionPubSub, mainCtx)
@@ -548,8 +568,10 @@ func Run(mainCtx *context.Context) {
 		
 		
 			
-	storeAddress(mainCtx, &Host)
-
+		
+	storeAddress( cfg, &Host)
+	
+	// AnnounceSelf(mad, cfg)
 	
 	// }
 	defer forever()
@@ -563,6 +585,43 @@ func forever() {
 	}
 }
 
+
+func AnnounceSelf(nma *NodeMultiAddressData,  cfg *configs.MainConfiguration) error {
+	message := entities.SystemMessage{
+		Data: nma.MsgPack(),
+		Type: entities.AnnounceSelf,
+		Timestamp: uint64(time.Now().UnixMilli()),
+	}
+	event := entities.Event{
+		Payload:           entities.ClientPayload{
+			Data: message,
+			Validator: cfg.OwnerAddress.String(),
+		},
+		Timestamp:         uint64(time.Now().UnixMilli()),
+		Validator:         entities.PublicKeyString(cfg.PublicKeyEDDHex),
+		EventType: constants.SystemMessage,
+		BlockNumber:       chain.NetworkInfo.CurrentBlock.Uint64(),
+		Cycle: 				chain.NetworkInfo.CurrentCycle.Uint64(),
+		Epoch: 				chain.NetworkInfo.CurrentEpoch.Uint64(),	
+	}
+	b, err := event.EncodeBytes()
+
+	if err != nil {
+		return err
+	}
+	event.Hash = hex.EncodeToString(mlcrypto.Sha256(b))
+	
+	_, event.Signature = mlcrypto.SignEDD(b, cfg.PrivateKeyEDD)
+	event.ID, err = event.GetId()
+	if err != nil {
+		return err
+	}
+	PublishEvent(event) 
+	return err
+}
+
+// 226e6350417464426f533071356344552f4b744e5736457146476f456c5049412f774d707a734c662b7332493d22
+// 9dc3c0b5d0684b4ab970353f2ad356e84a851a81253c803fc0ca73b0b7feb362
 // func handleHandshake(stream network.Stream) {
 
 // 	// // if len(PeerStreams[stream.ID()]) == 0 {
@@ -780,10 +839,7 @@ func SyncNode(cfg *configs.MainConfiguration, endBlock *big.Int, hostMaddr multi
 	if cfg.NoSync {
 		return nil
 	}
-	one := 1
-	if one == 1 {
-		return nil
-	}
+
 	// hostQuicAddress, _, _ := extractQuicAddress(cfg, []multiaddr.Multiaddr{hostMaddr})
 	// if !strings.Contains(hostQuicAddress, ":") {
 	// 	hostQuicAddress = fmt.Sprintf("%s%s", hostQuicAddress, cfg.QuicHost[strings.Index(cfg.QuicHost,":"):])
@@ -857,14 +913,14 @@ func SyncNode(cfg *configs.MainConfiguration, endBlock *big.Int, hostMaddr multi
 // 	}
 // }
 
-func storeAddress(ctx *context.Context, h *host.Host) {
+func storeAddress( cfg *configs.MainConfiguration, h *host.Host)  {
 	for {
-		peers := idht.RoutingTable().ListPeers()
-		if len(peers) < 1 {
-			time.Sleep(5 * time.Second)
-			continue
-		}
-
+		//peers := idht.RoutingTable().ListPeers()
+		// if len(peers) < 1 {
+		// 	logger.Debugf("PeerrNotFound...")
+		// 	time.Sleep(5 * time.Second)
+		// 	continue
+		// }
 		mad, err := NewNodeMultiAddressData(cfg, cfg.PrivateKeySECP, GetMultiAddresses(*h), cfg.PublicKeyEDD)
 		if err != nil {
 			logger.Error("storeAddress: ", err)
@@ -873,7 +929,8 @@ func storeAddress(ctx *context.Context, h *host.Host) {
 		keySecP := "/ml/val/" + cfg.PublicKeySECPHex
 		
 		packed :=  mad.MsgPack()
-		err = idht.PutValue(*ctx, key, packed)
+		err = idht.PutValue(*cfg.Context, key, packed)
+		
 		
 		if err != nil {
 			logger.Errorf("DHT_PUT_ERROR: %v", err)
@@ -882,9 +939,9 @@ func storeAddress(ctx *context.Context, h *host.Host) {
 		} else {
 			logger.Debugf("Successfully saved network key to DHT: %s", key)
 		}
-
+		AnnounceSelf(mad, cfg)
 		
-		err = idht.PutValue(*ctx, keySecP, packed)
+		err = idht.PutValue(*cfg.Context, keySecP, packed)
 		if err != nil {
 			logger.Errorf("DHT_PUT_ERROR: %v", err)
 			time.Sleep(2 * time.Second)
@@ -892,7 +949,7 @@ func storeAddress(ctx *context.Context, h *host.Host) {
 		} else {
 			logger.Debugf("Successfully saved chain key to DHT: %s", keySecP)
 		}
-		time.Sleep(5 * time.Minute)
+		time.Sleep(30 * time.Second)
 		// break
 		// time.Sleep(1 * time.Hour)
 		// else {
@@ -934,7 +991,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 				disconnect(pairAddr.ID)
 			}
 	}(pairAddr.ID)
-	payload := NewP2pPayload(cfg, P2pActionGetHandshake, []byte{'0'})
+	payload := NewP2pPayload(cfg, P2pActionGetHandshake, []byte{'0','1'})
 	payload.Sign(cfg.PrivateKeyEDD)
 	pubKey := (*h).Peerstore().PubKey(pairAddr.ID)
 	pubk, err := pubKey.Raw()
@@ -988,6 +1045,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 		lastSync, err := ds.GetLastSyncedBlock(MainContext)
 		
 		if err == nil {
+
 			if handshake.NodeType == constants.ValidatorNodeType {
 				if new(big.Int).SetBytes(handshake.LastSyncedBlock).Uint64() > chain.NetworkInfo.CurrentBlock.Uint64() - 60 {
 					addr := ExtractQuicMultiAddress(ToMultiAddressStrings(pairAddr.ID, pairAddr.Addrs))
@@ -1008,6 +1066,7 @@ func handleConnectV2(h *host.Host, pairAddr peer.AddrInfo) {
 					if !isBootStrap {
 						return
 					}
+					
 					
 					syncMutex.Lock()
 					defer syncMutex.Unlock()
@@ -1293,7 +1352,7 @@ func readPayload(rw *bufio.ReadWriter, peerId peer.ID, stream network.Stream) {
 			(stream).Reset()
 			return
 		}
-		response, err := processP2pPayload(cfg, payload, true)
+		response, err := ProcessP2pPayload(cfg, payload, true)
 		if err != nil {
 			logger.Debugf("readP2pPayload: %v", err)
 		}
@@ -1361,6 +1420,17 @@ func GetNodeAddress(ctx *context.Context, pubKey string) (multiaddr.Multiaddr, e
 	}
 	return ExtractQuicMultiAddress(mad.Addresses), nil
 }
+// func GetNodeMultiAddressData(ctx *context.Context, pubKey string) (remoteAddress string, err error) {
+// 	mad, err := GetNodeMultiAddressData(ctx, pubKey)
+// 	if err != nil {
+// 		logger.Error("KDHT_GET_ERROR: ", err)
+// 		return "", err
+// 	}
+// 	if mad.Hostname != "" {
+// 		return fmt.Sprintf("%s:%d", mad.Hostname, mad.QuicPort), nil
+// 	} 
+// 	return fmt.Sprintf("%s:%d", mad.IP, mad.QuicPort), nil
+// }
 
 func ExtractQuicMultiAddress(addresses []string) multiaddr.Multiaddr {
 	
@@ -1378,6 +1448,28 @@ func ExtractQuicMultiAddress(addresses []string) multiaddr.Multiaddr {
 	return multiaddr.StringCast(addr)
 }
 
+func GetRandomBootstrapPeer(addresses []string) (mu multiaddr.Multiaddr) {
+	var mus []multiaddr.Multiaddr
+	addrs, found := utils.FindMany(addresses, func (ma string) bool  {
+		return strings.Contains(ma, "/quic") && !strings.Contains(ma, "/webtransport")
+	}) 
+	if !found {
+		addrs, found = utils.FindMany(addresses, func (ma string) bool  {
+			return strings.Contains(ma, "/webtransport")
+		}) 
+	}
+	if found {
+		for _, nma := range addrs {
+			mus = append(mus, multiaddr.StringCast(nma) )
+		}
+	}
+	if len(mus) > 0 {
+		r := rand.New(rand.NewSource(uint64(time.Now().UnixNano())))
+		return mus[r.Intn(len(mus))]
+	}
+	return nil
+}
+
 func PublishEvent(event entities.Event) *models.EventInterface {
 	eventPayloadType := entities.GetModelTypeFromEventType(constants.EventType(event.EventType))
 	var model *models.EventInterface
@@ -1386,14 +1478,11 @@ func PublishEvent(event entities.Event) *models.EventInterface {
 			channelpool.SubnetEventPublishC <- &event
 			returnModel := models.EventInterface(models.SubnetEvent{Event: event})
 			model = &returnModel
-		
 		case entities.AuthModel:
-		
 			channelpool.AuthorizationEventPublishC <- &event
 			returnModel := models.EventInterface(models.AuthorizationEvent{Event: event})
 			model = &returnModel
 		case entities.TopicModel:
-
 			channelpool.TopicEventPublishC <- &event
 			var returnModel = models.EventInterface(models.TopicEvent{Event: event})
 			model = &returnModel
@@ -1402,7 +1491,6 @@ func PublishEvent(event entities.Event) *models.EventInterface {
 			logger.Infof("SubscriptionEvent: %+v", event)
 			var returnModel = models.EventInterface(models.SubscriptionEvent{Event: event})
 			model = &returnModel
-
 		case entities.MessageModel:
 			channelpool.MessageEventPublishC <- &event
 			var returnModel = models.EventInterface(models.MessageEvent{Event: event})
@@ -1411,6 +1499,11 @@ func PublishEvent(event entities.Event) *models.EventInterface {
 		case entities.WalletModel:
 			channelpool.WalletEventPublishC <- &event
 			var returnModel = models.EventInterface(models.WalletEvent{Event: event})
+			model = &returnModel
+
+		case entities.SystemModel:
+			channelpool.SystemMessagePublishC <- &event
+			var returnModel = models.EventInterface(models.MessageEvent{Event: event})
 			model = &returnModel
 
 	}

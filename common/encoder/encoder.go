@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/mlayerprotocol/go-mlayer/pkg/log"
@@ -17,16 +18,24 @@ import (
 )
 
 var logger = &log.Logger
-
+var bufPool = sync.Pool{
+	New: func() any {
+		return new(bytes.Buffer)
+	},
+}
 func MsgPackStruct(msg interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := msgpack.NewEncoder(&buf)
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset() // Reuse buffer
+	enc := msgpack.NewEncoder(buf)
 	enc.SetCustomStructTag("json")
 	err := enc.Encode(msg)
-	return buf.Bytes(), err
+	data := make([]byte, buf.Len())
+	copy(data, buf.Bytes()) // Copy to avoid modifications
+	bufPool.Put(buf)         // Return buffer to pool
+	return data, err
 }
 
-func MsgPackUnpackStruct[T interface{}](b []byte, message *T) error {
+func MsgPackUnpackStruct[T interface{}](b []byte, message T) error {
 	buf := bytes.NewBuffer(b)
 	dec := msgpack.NewDecoder(buf)
 	// dec.UseLooseInterfaceDecoding(true)
@@ -34,6 +43,16 @@ func MsgPackUnpackStruct[T interface{}](b []byte, message *T) error {
 	err := dec.Decode(message)
 	return err
 }
+
+// func MsgPackUnpackStructV2[T interface{}](b []byte, message T) error {
+// 	buf := bytes.NewBuffer(b)
+// 	dec := msgpack.NewDecoder(buf)
+// 	// dec.UseLooseInterfaceDecoding(true)
+// 	dec.SetCustomStructTag("json")
+// 	err := dec.Decode(message)
+// 	return err
+// }
+
 
 // func EncodeNumber(b []byte, message interface{}) error {
 // 	buf := bytes.NewBuffer(b)
@@ -51,6 +70,12 @@ func NumberToByte(i uint64) []byte {
 
 func NumberFromByte(buf []byte) uint64 {
 	return (binary.BigEndian.Uint64(buf))
+}
+
+func Uint64ToBytes16(num uint64) [16]byte {
+    var result [16]byte
+    binary.BigEndian.PutUint64(result[8:], num)  // Puts in last 8 bytes
+    return result
 }
 
 type EncoderDataType string
@@ -138,7 +163,7 @@ func EncodeBytes(args ...EncoderParam) (data []byte, err error) {
 			}			
 		}
 		if arg.Type == AddressEncoderDataType {
-			v := fmt.Sprintf("%v", arg.Value)
+			v := strings.ToLower(fmt.Sprintf("%v", arg.Value))
 			
 			m[i] = []byte(v)
 			// if err != nil {

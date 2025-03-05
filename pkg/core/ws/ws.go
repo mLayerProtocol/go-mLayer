@@ -33,17 +33,15 @@ type Flag string
 // }
 
 const (
-	SubescriptionRequest client.RequestType = "WRITE:__subscribe__"
+	SubscriptionRequest client.RequestType = "WRITE:__subscribe__"
 )
 
-
-
 type WsService struct {
-	Ctx                       *context.Context
-	Cfg                       *configs.MainConfiguration
+	Ctx *context.Context
+	Cfg *configs.MainConfiguration
 	// ClientHandshakeChannel    *chan *entities.ClientHandshake
 	// ClientSubscriptionChannel *chan *entities.ClientWsSubscription
-	RequestProcess            *client.ClientRequestProcessor
+	RequestProcess *client.ClientRequestHandler
 }
 
 type WsPayload struct {
@@ -65,10 +63,10 @@ func NewWsService(mainCtx *context.Context) *WsService {
 	cfg, _ := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 	//clientVerificationc, _ := (*mainCtx).Value(constants.ClientHandShackChId).(*chan *entities.ClientHandshake)
 	return &WsService{
-		Ctx:                    mainCtx,
-		Cfg:                    cfg,
+		Ctx: mainCtx,
+		Cfg: cfg,
 		// ClientHandshakeChannel: clientVerificationc,
-		RequestProcess:         client.NewClientRequestProcess(mainCtx),
+		RequestProcess: client.NewClientRequestHandler(mainCtx),
 	}
 }
 
@@ -126,11 +124,11 @@ func (p *WsService) HandleConnection(w http.ResponseWriter, r *http.Request) {
 		// 	if len(message) > 0 {
 		// 		b.Write(message)
 		// 	}
-		
+
 		// 	if err != nil  {
 		// 		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 		// 			// remove from subscribers
-		// 		} 
+		// 		}
 		// 		logger.Println("read:", err)
 		// 		break
 
@@ -138,135 +136,189 @@ func (p *WsService) HandleConnection(w http.ResponseWriter, r *http.Request) {
 		// }
 		// logger.Debug("READWSMESSAGE", b.String())
 
-			
-			
-		
-			// err = json.Unmarshal(b.Bytes(), &payload)
-			// if err != nil {
-			// 	err = c.WriteJSON(entities.ClientResponse{
-			// 		Error:        err.Error(),
-			// 		ResponseCode: int(apperror.BadRequestError),
-			// 		Id:           payload.Id,
-			// 	})
-			// 	if err != nil {
-			// 		logger.Error(err)
-			// 	}
-			// 	continue
-			// }
-			payload := WsPayload{}
-			err = c.ReadJSON(&payload)
+		// err = json.Unmarshal(b.Bytes(), &payload)
+		// if err != nil {
+		// 	err = c.WriteJSON(entities.ClientResponse{
+		// 		Error:        err.Error(),
+		// 		ResponseCode: int(apperror.BadRequestError),
+		// 		Id:           payload.Id,
+		// 	})
+		// 	if err != nil {
+		// 		logger.Error(err)
+		// 	}
+		// 	continue
+		// }
+		payload := WsPayload{}
+		err = c.ReadJSON(&payload)
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) || strings.Contains(err.Error(), "close 1006") {
+				// remove from subscribers
+				return
+			}
+			logger.Println("ReadERROR:", err, payload)
+		}
+
+		clientPayload := entities.ClientPayload{}
+		pBytes, err := json.Marshal(payload.ClientPayload)
+		if err != nil {
+			err = c.WriteJSON(entities.ClientResponse{
+				Error:        err.Error(),
+				ResponseCode: int(apperror.BadRequestError),
+				Id:           payload.Id,
+			})
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, ) || strings.Contains(err.Error(), "close 1006") {
-					// remove from subscribers
+				logger.Error("HandleConnection/WriteJSON: ", err)
+			}
+			continue
+		}
+		logger.Debugf("Received PAYLOAD %v", payload)
+		err = json.Unmarshal(pBytes, &clientPayload)
+		if err != nil {
+			err = c.WriteJSON(entities.ClientResponse{
+				Error:        err.Error(),
+				ResponseCode: int(apperror.BadRequestError),
+				Id:           payload.Id,
+			})
+			if err != nil {
+				logger.Error("HandleConnection/WriteJSON2: ", err)
+			}
+			continue
+		}
+
+		// check if the user is trying to request
+
+		if payload.RequestType == SubscriptionRequest {
+			logger.Debugf("WsSubscription: %v", payload.Params["_v"] )
+			if fmt.Sprint(payload.Params["_v"]) == "2" {
+				logger.Debugf("WebsocketVersion: %v", payload.Params["_v"])
+				fs, ok := payload.Params["fs"].([]interface{})
+				if !ok {
+					fmt.Println("fs is not of type []interface{}")
 					return
-				} 
-				logger.Println("ReadERROR:", err, payload)
-			}
-		
-			clientPayload := entities.ClientPayload{}
-			pBytes, err := json.Marshal(payload.ClientPayload)
-			if err != nil {
-				err = c.WriteJSON(entities.ClientResponse{
-					Error:        err.Error(),
-					ResponseCode: int(apperror.BadRequestError),
-					Id:           payload.Id,
-				})
-				if err != nil {
-					logger.Error("HandleConnection/WriteJSON: ", err)
 				}
-				continue
-			}
-			logger.Debugf("Received PAYLOAD %v", payload)
-			err = json.Unmarshal(pBytes, &clientPayload)
-			if err != nil {
-				err = c.WriteJSON(entities.ClientResponse{
-					Error:        err.Error(),
-					ResponseCode: int(apperror.BadRequestError),
-					Id:           payload.Id,
-				})
-				if err != nil {
-					logger.Error("HandleConnection/WriteJSON2: ",err)
+				var filters []map[string]interface{}
+				for _, item := range fs {
+					if m, ok := item.(map[string]interface{}); ok {
+						filters = append(filters, m)
+					} else {
+						fmt.Println("Element in fs is not a map[string]interface{}")
+						return
+					}
 				}
-				continue
-			}
-		
-			// check if the user is trying to request
-			
-			if payload.RequestType == SubescriptionRequest {
-			
+				// x := map[string]string{}
+				
+				
+				for _, iFilter := range filters {
+					
+						filter := make(map[string]map[string]string)
+						
+						if temp, ok := iFilter["f"].(map[string]interface{}); ok {
+							filter[fmt.Sprint(iFilter["t"])] = make(map[string]string)
+							for k, v := range temp {
+								filter[fmt.Sprint(iFilter["t"])][k] = fmt.Sprint(v)
+							}
+						}
+						
+						filter[fmt.Sprint(iFilter["t"])]["snet"] = fmt.Sprint(iFilter["snet"])
+						logger.Debugf("NewWebsocketSubscriptionFilter for %v:  %+v",  payload.Id, filter)
+					channelpool.ClientWsSubscriptionChannelV2 <- &entities.ClientWsSubscriptionV2{
+						Conn:    c,
+						Filter:  filter,
+						Id:      payload.Id,
+						Account: string(handshake.Account),
+					}
+
+				}
+				// for key, val := range filters {
+				// 	if strings.EqualFold(key,"_v") {
+				// 		continue
+				// 	}
+				// 	logger.Debugf("WebsocketSubscriptionKey:  %v, %+v", key, filter[key])
+				// 	d, _ := json.Marshal(val)
+					
+				// 	json.Unmarshal(d, &x)
+				// 	filter[key] = x
+					
+				// }
+				
+			} else {
 				filter := map[string][]string{}
 				for key, value := range payload.Params {
+					if strings.EqualFold(key,"_v") {
+						continue
+					}
 					filter[key] = []string{}
 					for _, val := range value.([]interface{}) {
 						filter[key] = append(filter[key], fmt.Sprintf("%s", val))
 					}
-					
 				}
-				
+
 				channelpool.ClientWsSubscriptionChannel <- &entities.ClientWsSubscription{
-					Conn:   c,
-					Filter: filter,
-					Id: payload.Id,
+					Conn:    c,
+					Filter:  filter,
+					Id:      payload.Id,
 					Account: string(handshake.Account),
 				}
 
-				resp := entities.ClientResponse{
-					ResponseCode: 200,
+			}
+
+			resp := entities.ClientResponse{
+				ResponseCode: 200,
+				Id:           payload.Id,
+			}
+			err = c.WriteJSON(resp)
+			if err != nil {
+				resp = entities.ClientResponse{
+					Error:        err.Error(),
+					ResponseCode: int(apperror.BadRequestError),
 					Id:           payload.Id,
 				}
-				err = c.WriteJSON(resp)
-				if err != nil {
-					resp = entities.ClientResponse{
-						Error:        err.Error(),
-						ResponseCode: int(apperror.BadRequestError),
-						Id:           payload.Id,
-					}
-					c.WriteJSON(resp)
-					continue
-				}
+				c.WriteJSON(resp)
 				continue
 			}
-			response, err := p.RequestProcess.Process(payload.RequestType, payload.Params, clientPayload)
-			if err != nil {
-				c.WriteJSON(entities.ClientResponse{
-					ResponseCode: int(apperror.BadRequestError),
-					Error:           err.Error(),
-					Id:        payload.Id,
-				})
-				continue
-			}
-			logger.Debugf("Sending PAYLOAD %v", entities.ClientResponse{
-				ResponseCode: 200,
-				Id:           payload.Id,
-				Data:         response,
-			})
+			continue
+		}
+		response, err := p.RequestProcess.Process(payload.RequestType, payload.Params, clientPayload)
+		if err != nil {
 			c.WriteJSON(entities.ClientResponse{
-				ResponseCode: 200,
+				ResponseCode: int(apperror.BadRequestError),
+				Error:        err.Error(),
 				Id:           payload.Id,
-				Data:         response,
 			})
-			// else {
-			// 	err = c.WriteMessage(mt, (append(message, []byte("recieved Signature")...)))
-			// 	if err != nil {
-			// 		logger.Println("Error:", err)
-			// 	} else {
-			// 		if(!isVerifed) {
-			// 			verifiedRequest, err := service.ConnectClient(message, constants.WS, c,)
-			// 			if (err != nil) {
-			// 				c.Close()
-			// 				continue
-			// 			}
-			// 			*p.ClientHandshakeChannel <- verifiedRequest
+			continue
+		}
+		logger.Debugf("Sending PAYLOAD %v", entities.ClientResponse{
+			ResponseCode: 200,
+			Id:           payload.Id,
+			Data:         response,
+		})
+		c.WriteJSON(entities.ClientResponse{
+			ResponseCode: 200,
+			Id:           payload.Id,
+			Data:         response,
+		})
+		// else {
+		// 	err = c.WriteMessage(mt, (append(message, []byte("recieved Signature")...)))
+		// 	if err != nil {
+		// 		logger.Println("Error:", err)
+		// 	} else {
+		// 		if(!isVerifed) {
+		// 			verifiedRequest, err := service.ConnectClient(message, constants.WS, c,)
+		// 			if (err != nil) {
+		// 				c.Close()
+		// 				continue
+		// 			}
+		// 			*p.ClientHandshakeChannel <- verifiedRequest
 
-			// 			logger.Debugf("message:", string(message))
-			// 			logger.Debugf("recv: %s - %d - %s\n", message, mt, c.RemoteAddr())
-			// 			continue
-			// 		}
-			// 		// process message
-			// 	}
+		// 			logger.Debugf("message:", string(message))
+		// 			logger.Debugf("recv: %s - %d - %s\n", message, mt, c.RemoteAddr())
+		// 			continue
+		// 		}
+		// 		// process message
+		// 	}
 
-			 }
-		
+	}
+
 	//}
 
 }

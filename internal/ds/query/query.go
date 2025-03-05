@@ -40,10 +40,7 @@ type CreateStateParam struct {
 	EventHash    string
 	RestKeyValue []byte
 }
-type QueryLimit struct {
-	Limit  int
-	Offset int
-}
+
 
 func InitTx(ds *ds.Datastore, tx *datastore.Txn) (datastore.Txn, error) {
 	if tx != nil {
@@ -52,7 +49,7 @@ func InitTx(ds *ds.Datastore, tx *datastore.Txn) (datastore.Txn, error) {
 	return ds.NewTransaction(context.Background(), false)
 }
 
-var DefaultQueryLimit = &QueryLimit{Limit: 100, Offset: 0}
+var DefaultQueryLimit = &entities.QueryLimit{Limit: 100, Offset: 0}
 
 func EntityKey(model entities.EntityModel, id string) string {
 	return fmt.Sprintf("%s/id/%s", model, id)
@@ -124,7 +121,7 @@ func CreateState(newState CreateStateParam, tx *datastore.Txn) (err error) {
 
 	// return txn.Set(key.Bytes(), value)
 	for _, key := range keys {
-		// logger.Infof("NewStateKey: %v, %v", key, newState.EventHash)
+		logger.Infof("NewStateKey: %v, %v", key, newState.EventHash)
 		if strings.EqualFold(key, newState.DataKey) {
 			if err := txn.Put(context.Background(), datastore.NewKey(key), stateBytes); err != nil {
 				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, err)
@@ -152,7 +149,7 @@ func CreateState(newState CreateStateParam, tx *datastore.Txn) (err error) {
 			}
 			if err := txn.Put(context.Background(), datastore.NewKey(*newState.RefKey), []byte(newState.ID)); err != nil {
 				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, err)
-				logger.Errorf("error updateing subnet ref: %v", err)
+				logger.Errorf("error updating subnet ref: %v", err)
 				return err
 			}
 			continue
@@ -183,7 +180,7 @@ func UpdateState(id string, newState NewStateParam, tx *datastore.Txn) error {
 	if tx == nil {
 		defer txn.Discard(context.Background())
 	}
-
+	// logger.Debugf("UpdatingState for %s, %v", id, newState)
 	// state.ID, err = entities.GetId(state)
 	// if err != nil {
 	// 	return  nil, err
@@ -205,7 +202,7 @@ func UpdateState(id string, newState NewStateParam, tx *datastore.Txn) error {
 		logger.Errorf("error updateing state key: %v", err)
 		return err
 	}
-
+	
 	if newState.RefKey != nil {
 		err := txn.Delete(context.Background(), datastore.NewKey(*newState.OldRefKey))
 		if err != nil {

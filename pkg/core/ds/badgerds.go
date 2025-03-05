@@ -25,6 +25,8 @@ type badgerLog struct {
 	ipfsLogger.ZapEventLogger
 }
 
+const MAX_PREFIX = "~~~~~99999"
+
 func (b *badgerLog) Warningf(format string, args ...interface{}) {
 	b.Warnf(format, args...)
 }
@@ -32,6 +34,7 @@ func (b *badgerLog) Warningf(format string, args ...interface{}) {
  var log = ipfsLogger.Logger("badger")
 
 var ErrClosed = errors.New("datastore closed")
+var ErrKeyExists = errors.New("Key already exists")
 
 type Datastore struct {
 	DB *badger.DB
@@ -65,7 +68,12 @@ type txn struct {
 	// method invocation.
 	implicit bool
 }
+type Batch interface {
+	// Set (ctx context.Context, key ds.Key, value []byte) error 
+	ds.Batch
 
+	Set(ctx context.Context, key  ds.Key, value []byte, update bool) error
+}
 // Options are the badger datastore options, reexported here for convenience.
 type Options struct {
 	// Please refer to the Badger docs to see what this is for
@@ -280,7 +288,7 @@ func (d *Datastore) Set(ctx context.Context, key ds.Key, value []byte, replace b
 		has, err := txn.has(key)
 		log.Infof("REPLACING.... %v", err)
 		if has && err == nil {
-			return errors.New("Key already exists")
+			return ErrKeyExists
 		}
 	}
 	
@@ -486,8 +494,17 @@ func (b *batch) Put(ctx context.Context, key ds.Key, value []byte) error {
 	if b.ds.closed {
 		return ErrClosed
 	}
-	return b.ds.Set(ctx, key, value, true)
+	return b.put(key, value)
 }
+
+// func (b *batch) Set(ctx context.Context, key ds.Key, value []byte) error {
+// 	b.ds.closeLk.RLock()
+// 	defer b.ds.closeLk.RUnlock()
+// 	if b.ds.closed {
+// 		return ErrClosed
+// 	}
+// 	return b.ds.Set(ctx, key, value, true)
+// }
 
 func (b *batch) put(key ds.Key, value []byte) error {
 	return b.writeBatch.Set(key.Bytes(), value)
@@ -732,11 +749,17 @@ func (t *txn) Query(ctx context.Context, q dsq.Query) (dsq.Results, error) {
 func (t *txn) query(q dsq.Query) (dsq.Results, error) {
 	opt := badger.DefaultIteratorOptions
 	opt.PrefetchValues = !q.KeysOnly
+
 	prefix := ds.NewKey(q.Prefix).String()
+	
+	if !strings.HasSuffix(prefix, "/") {
+		prefix = prefix + "/"
+	}
 	if prefix != "/" {
-		opt.Prefix = []byte(prefix + "/")
+		opt.Prefix = []byte(prefix)
 	}
 
+	opt.PrefetchSize = q.Limit
 	// Handle ordering
 	if len(q.Orders) > 0 {
 		switch q.Orders[0].(type) {
@@ -745,6 +768,7 @@ func (t *txn) query(q dsq.Query) (dsq.Results, error) {
 		case dsq.OrderByKeyDescending, *dsq.OrderByKeyDescending:
 			// Reverse order by key
 			opt.Reverse = true
+			
 		default:
 			// Ok, we have a weird order we can't handle. Let's
 			// perform the _base_ query (prefix, filter, etc.), then
@@ -807,22 +831,33 @@ func (t *txn) query(q dsq.Query) (dsq.Results, error) {
 		defer it.Close()
 
 		// All iterators must be started by rewinding.
-		it.Rewind()
-
+		// it.Rewind()
+		
 		// skip to the offset
-		for skipped := 0; skipped < q.Offset && it.Valid(); it.Next() {
+		// skipped := 0
+		var prefixByte []byte
+		if opt.Reverse {
+			prefixByte = []byte(prefix + MAX_PREFIX)
+		} else {
+			prefixByte = []byte(prefix)
+		}
+		validForPrefixByte := []byte(prefix)
+		it.Seek(prefixByte); 
+		for skipped := 0; skipped < q.Offset && it.ValidForPrefix(validForPrefixByte); it.Next() { 
+		// for skipped := 0; skipped < q.Offset && it.Valid(); it.Next() {
 			// On the happy path, we have no filters and we can go
 			// on our way.
 			if len(q.Filters) == 0 {
 				skipped++
 				continue
 			}
-
+			// if skipped > q.Offset {
+			// 	break;
+			// }
 			// On the sad path, we need to apply filters before
 			// counting the item as "skipped" as the offset comes
 			// _after_ the filter.
 			item := it.Item()
-
 			matches := true
 			check := func(value []byte) error {
 				e := dsq.Entry{

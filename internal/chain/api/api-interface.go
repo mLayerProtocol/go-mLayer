@@ -22,7 +22,8 @@ type ChainInfo struct {
 	ValidatorActiveLicenseCount *big.Int
 	SentryLicenseCount *big.Int
 	SentryActiveLicenseCount *big.Int
-	
+	ValidatorOperatorCount *big.Int
+	SentryOperatorCount *big.Int
 }
 type OperatorInfo struct {
 	PublicKey  []byte
@@ -63,7 +64,7 @@ type IChainAPI interface {
 	GetSentryLicenseOwnerAddress(publicKey []byte) ([]byte, error)
 	
 	
-	// GetStakeBalance(address entities.DIDString) big.Int
+	// GetStakeBalance(address entities.AccountString) big.Int
 
 	// subnet
 	GetSubnetBalance(id [16]byte) (*big.Int, error)
@@ -75,11 +76,13 @@ type IChainAPI interface {
 	GetMinStakeAmountForSentry() (*big.Int, error)
 	GetCurrentMessagePrice() (*big.Int, error)
 	GetMessagePrice(cycle *big.Int) (*big.Int, error)
-	// GetChannelBalance(address entities.DIDString) *big.Int
+	// GetChannelBalance(address entities.AccountString) *big.Int
 	ClaimReward(claim *entities.ClaimData) ([]byte, error) 
 	Claimed(validator []byte, cycle *big.Int, index *big.Int) (bool, error) 
 	GetSentryLicenses(operator []byte, cycle *big.Int)  ([]*big.Int, error)
 	GetValidatorLicenses(operator []byte, cycle *big.Int)  ([]*big.Int, error)
+	GetValidatorOperatorCount(cycle *big.Int) (*big.Int, error)
+	GetSentryOperatorCount(cycle *big.Int) (*big.Int, error)
 }
 
 

@@ -156,7 +156,7 @@ func ValidateWalletPayload(payload entities.ClientPayload, authState *models.Aut
 	}
 
 	payload.Data = payloadData
-	if payload.EventType == uint16(constants.CreateWalletEvent) {
+	if payload.EventType == constants.CreateWalletEvent {
 		// dont worry validating the AuthHash for Authorization requests
 		if uint64(payloadData.Timestamp) > uint64(time.Now().UnixMilli())+15000 {
 			return nil, nil, errors.New("Authorization timestamp exceeded")

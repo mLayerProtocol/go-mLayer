@@ -1,16 +1,18 @@
 package constants
 
-import "html/template"
-
-
-
-const (
-	NETWORK_NAME = "mlayer" // time interval within which to accept a handshake
+import (
+	"html/template"
+	"time"
 )
 
+
 const (
+    NETWORK_NAME = "mlayer" // time interval within which to accept a handshake
 	VALID_HANDSHAKE_SECONDS = 15 // time interval within which to accept a handshake
+    TOPIC_INTEREST_TTL = 12 * time.Hour // duration a node is considered still interested in a topic after initialy showing interest
 )
+
+
 
 var VALID_PROTOCOLS = []string{"/mlayer/1.0.0"}
 
@@ -23,7 +25,7 @@ const (
 	DefaultRestAddress        string = ":9531"
 	DefaultDataDir            string = "./data"
 	DefaultMLBlockchainAPIUrl string = ":9520"
-    DefaultQuickHost        string = "127.0.0.1:9533"
+    DefaultQuicPort        uint16 = 9533
 	DefaultProtocolVersion           string = "/mlayer/1.0.0"
 )
 

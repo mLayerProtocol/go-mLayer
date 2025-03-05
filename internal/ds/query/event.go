@@ -26,6 +26,9 @@ var ErrorNotFound = datastore.ErrNotFound
 var ErrorKeyNotFound = badger.ErrKeyNotFound
 var ErrorKeyExist = fmt.Errorf("key exists")
 
+// var topicCounterCache = cache.NewShardedCache("topicCounter", cache.CacheOptions{NumShards: 10, TTL: 10 * time.Minute, CleanInterval: 12 * time.Minute })
+
+
 func IsErrorNotFound(e error) bool {
 	return e == datastore.ErrNotFound || e == badger.ErrKeyNotFound
 }
@@ -63,67 +66,110 @@ func GetEventByIdTxn(id string, modelType entities.EntityModel, txn *datastore.T
 	return event, err
 }
 
-func createEvent(event *entities.Event, tx *datastore.Txn) (err error) {
+func createEvent(event *entities.Event, tx *datastore.Txn, wbParam *badger.WriteBatch ) (err error) {
 	defer utils.TrackExecutionTime(time.Now(), "DSQUERY::CreateEvent::")
 	ds := stores.EventStore
+	
 	event.ID, err = event.GetId()
 	if err != nil {
 		return err
 	}
-	
+	var txn datastore.Txn
 	eventBytes := event.MsgPack()
 	keys := event.GetKeys()
 	// logger.Debugf("Creating Event: %+v", event)
-	txn, err := InitTx(ds, tx)
-	if tx == nil {
-		defer txn.Discard(context.Background())
+
+	// txn, err := InitTx(ds, tx)
+	// if tx == nil {
+	// 	defer txn.Discard(context.Background())
+	// }
+	var wb *badger.WriteBatch = wbParam
+	if tx == nil && wb == nil {
+		wb = ds.DB.NewWriteBatch()
+		defer wb.Cancel()
+		logger.Infof("UseringWriteBatch")
+	} 
+	if tx != nil {
+		logger.Infof("UsingTXN")
+		txn = *tx
 	}
-	
+	logger.Debugf("CreatingEventWithKey: %v", event)
 	for _, key := range keys {
 		logger.Debugf("SavingEventWithKey: %s, %v", key, event.ID)
-		if strings.EqualFold(key, event.BlockKey()) {
+		if key == event.BlockKey() {
 			if event.Synced == nil || !*event.Synced {
 				continue
 			}
+			if txn == nil {
+				err = wb.Set([]byte(key), []byte{})
+				return err
+			} 
 			if err := txn.Put(context.Background(), datastore.NewKey(key), []byte{}); err != nil {
 				return err
 			}
 			continue
 		}
-		if strings.EqualFold(key, event.DataKey()) {
-			logger.Debugf("SavingEventId: %s, %v", key, event.ID)
-			if err := txn.Put(context.Background(), datastore.NewKey(key), eventBytes); err != nil {
-				return err
+		if key == event.DataKey() {
+			// logger.Debugf("SavingEventId: %s, %v", key, event.ID)
+			if txn == nil {
+				err = wb.Set([]byte(key), eventBytes)
+				
+			} else {
+				err = txn.Put(context.Background(), datastore.NewKey(key), eventBytes)
 			}
+				if  err != nil {
+					return err
+				}
+			
 		} else {
-			if err := txn.Put(context.Background(), datastore.NewKey(key), utils.UuidToBytes(event.ID)); err != nil {
+			if txn == nil {
+				err = wb.Set([]byte(key), utils.UuidToBytes(event.ID))
+			} else {
+				err = txn.Put(context.Background(), datastore.NewKey(key), utils.UuidToBytes(event.ID))
+			}
+			if  err != nil {
 				return err
 			}
 		}
 
 	}
-	if tx == nil {
-		if err = txn.Commit(context.Background()); err != nil {
-			return (err)
-		}
+	if tx == nil && wbParam == nil {
+		// if err = wb.Flush(); err != nil {
+		// 	return (err)
+		// }
+		return wb.Flush()
 	}
 	return nil
 
 }
 
-func UpdateEvent(event *entities.Event, tx *datastore.Txn, create bool) error {
-	txn, err := InitTx(stores.EventStore, tx)
-	if err != nil {
-		return err
+func UpdateEvent(event *entities.Event, tx *datastore.Txn, wbParam *badger.WriteBatch, create bool) (err error) {
+	wb := wbParam
+	var txn datastore.Txn
+	if tx == nil && wbParam == nil {
+		wb = stores.EventStore.DB.NewWriteBatch()
 	}
-	if tx == nil {
+	if tx != nil {
+		txn, err = InitTx(stores.EventStore, tx)
+		if err != nil {
+			return err
+		}
+	}
+	
+	if tx != nil {
 		defer txn.Discard(context.Background())
 	}
-	_, err = txn.Get(context.Background(), datastore.NewKey(event.BlockKey()))
-	logger.Infof("ERRORGETINGEVENT: %v, %s", err, event.BlockKey())
+	_, err = stores.EventStore.Get(context.Background(), datastore.NewKey(event.BlockKey()))
+	// logger.Infof("ERRORGETINGEVENT: %v, %s", err, event.BlockKey())
 	if create {
 	  if IsErrorNotFound(err) {
-		return createEvent(event, tx)
+		err = createEvent(event, tx, wb)
+		if err != nil {
+			return err
+		}
+		if tx == nil && wbParam == nil {
+			return wb.Flush()
+		}
 	  } 
 	}  else {
 		if IsErrorNotFound(err) {
@@ -133,24 +179,68 @@ func UpdateEvent(event *entities.Event, tx *datastore.Txn, create bool) error {
 	if event.GetDataModelType() == entities.MessageModel {
 		message := event.Payload.Data.(entities.Message)
 		vecKey :=  datastore.NewKey(event.VectorKey(message.Topic))
-		vec , err := txn.Get(context.Background(), vecKey)
+		// var vec []byte
+		// v, found := topicCounterCache.Get(vecKey.String())
 		c := 0
-		if err != nil {
-			if !IsErrorNotFound(err) {
-				return err
-			}
-		} else {
-			c, err = strconv.Atoi(string(vec))
+		errGet := stores.EventStore.DB.Update(func(txn *badger.Txn) error {
+			item , err := txn.Get(vecKey.Bytes())
 			if err != nil {
 				return err
 			}
+			item.Value(func(val []byte) error {
+				c, err = strconv.Atoi(string(val))
+				if err == nil {
+					if c < int(event.Index) {
+						txn.Set(vecKey.Bytes(), []byte(fmt.Sprint(event.Index)))
+					}
+				}
+				return err
+			})
+			return nil
+		})
+
+		if errGet != nil && errGet != badger.ErrKeyNotFound{
+			return errGet
 		}
-		if c < int(event.Index) {
-			txn.Put(context.Background(), vecKey, []byte(fmt.Sprint(event.Index)))
-		}
+
+
+		// if !found {
+		// 	if txn != nil {
+		// 		vec , err = txn.Get(context.Background(), vecKey)
+		// 	} else {
+		// 		vec , err = stores.EventStore.Get(context.Background(), vecKey)
+		// 	}
+		
+		// 	if err != nil {
+		// 		if !IsErrorNotFound(err) {
+		// 			return err
+		// 		}
+		// 	} else {
+		// 		c, err = strconv.Atoi(string(vec))
+		// 		if err != nil {
+		// 			return err
+		// 		}
+		// 	}
+		// }
+
+		
+	
+		
+		// if c < int(event.Index) {
+		// 	if txn != nil {
+		// 	txn.Put(context.Background(), vecKey, []byte(fmt.Sprint(event.Index)))
+		// 	} else {
+		// 		wb.Set(vecKey.Bytes(), []byte(fmt.Sprint(event.Index)) )
+		// 	}
+		// }
 	}
 	eventBytes := event.MsgPack()
-	if err := txn.Put(context.Background(), datastore.NewKey(event.DataKey()), eventBytes); err != nil {
+	if txn == nil {
+		err = wb.Set([]byte(event.DataKey()), eventBytes)
+	} else {
+		err = txn.Put(context.Background(), datastore.NewKey(event.DataKey()), eventBytes)
+	}
+	if err != nil {
 		logger.Infof("PUTEVENT %v", err)
 		return err
 	}
@@ -158,28 +248,35 @@ func UpdateEvent(event *entities.Event, tx *datastore.Txn, create bool) error {
 	
 	if event.Synced != nil && *event.Synced {
 		blockKey := datastore.NewKey(event.BlockKey())
-		
-		_, getError := txn.Get(context.Background(), blockKey)
-		if getError != nil {
-			if IsErrorNotFound(getError) {
-				// logger.Infof("CREATING: %s", blockKey.String())
-				err := txn.Put(context.Background(), blockKey, []byte{})
-				if err != nil {
-					return err
-				}
-			} else {
-				logger.Infof("GetPUTEVENT %v", getError)
-				return getError
-			}
+		if txn == nil {
+			err = wb.Set(blockKey.Bytes(), []byte{})
+		} else {
+			err =  txn.Put(context.Background(), blockKey, []byte{})
 		}
+		
+		// _, getError := txn.Get(context.Background(), blockKey)
+		// if getError != nil {
+		// 	if IsErrorNotFound(getError) {
+		// 		// logger.Infof("CREATING: %s", blockKey.String())
+		// 		err := txn.Put(context.Background(), blockKey, []byte{})
+		// 		if err != nil {
+		// 			return err
+		// 		}
+		// 	} else {
+		// 		logger.Infof("GetPUTEVENT %v", getError)
+		// 		return getError
+		// 	}
+		// }
 		// if *event.Synced {
 		// 	txn.Delete(context.Background(), datastore.NewKey(strings.Replace(event.BlockKey(), "/1/", "/0/", 1)))
 		// }
 	
-		if tx == nil {
-			if err = txn.Commit(context.Background()); err != nil {
-				return (err)
-			}
+		if tx == nil && wbParam == nil {
+			logger.Infof("Flushing write batch")
+			return wb.Flush()
+			// if err = txn.Commit(context.Background()); err != nil {
+			// 	return (err)
+			// }
 		}
 	}
 	logger.Debugf("UpdatedEventSuccessfully: %s, error: %s", event.ID, event.Error)
@@ -276,7 +373,7 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 	return nil
 }
 
-func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *bool, subnet *string, limit *QueryLimit) ([]models.EventCounter, error) {
+func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *bool, subnet *string, limit *entities.QueryLimit) ([]models.EventCounter, error) {
 	rsl, err := stores.NetworkStatsStore.Query(context.Background(), query.Query{
 		Prefix: entities.CycleCounterKey(cycle, &validator, claimed, subnet),
 		Limit:  limit.Limit,
@@ -307,7 +404,7 @@ func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *b
 	return counts, err
 }
 
-func GetNetworkCounts(subnet *string, limit *QueryLimit) ([]models.EventCounter, error) {
+func GetNetworkCounts(subnet *string, limit *entities.QueryLimit) ([]models.EventCounter, error) {
 	counts := []models.EventCounter{}
 	if subnet == nil {
 		rsl, err := stores.NetworkStatsStore.Get(context.Background(), datastore.NewKey(entities.NetworkCounterKey(subnet)))

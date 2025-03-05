@@ -53,7 +53,7 @@ type RegistrationData struct {
 
 // ValidatorContractMetaData contains all meta data concerning the ValidatorContract contract.
 var ValidatorContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"AccessControlBadConfirmation\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"neededRole\",\"type\":\"bytes32\"}],\"name\":\"AccessControlUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidInitialization\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotInitializing\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"version\",\"type\":\"uint64\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"}],\"name\":\"PurchaseEvent\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"Received\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"stateMutability\":\"payable\",\"type\":\"fallback\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"accountInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes[]\",\"name\":\"operators\",\"type\":\"bytes[]\"},{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"internalType\":\"structAccountInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"accountLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"activeLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"activeLicensesIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"authorizeAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"calibrator\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"name\":\"deRegisterNodeOperator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"fillLicenseCountGap\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"cycle\",\"type\":\"uint256\"}],\"name\":\"getCycleActiveLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"cycle\",\"type\":\"uint256\"}],\"name\":\"getCycleLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"operator\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"cycle\",\"type\":\"uint256\"}],\"name\":\"getOperatorCycleLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"operator\",\"type\":\"bytes\"}],\"name\":\"getOperatorLicenses\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"page\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"perPage\",\"type\":\"uint256\"}],\"name\":\"getOperators\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes\",\"name\":\"pubKey\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"eddKey\",\"type\":\"bytes32\"}],\"internalType\":\"structOperatorInfo[]\",\"name\":\"opr\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"getRegistrationData\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes\",\"name\":\"publicKey\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"commitment\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"eddKey\",\"type\":\"bytes32\"}],\"internalType\":\"structRegistrationData\",\"name\":\"regData\",\"type\":\"tuple\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_network\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_licenseContract\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_otherLicenseContract\",\"type\":\"address\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"license\",\"type\":\"uint256\"}],\"name\":\"isActive\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"licenseContract\",\"outputs\":[{\"internalType\":\"contractILicenseContract\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"licenseOperator\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"licenseOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"promoCode\",\"type\":\"string\"}],\"name\":\"licensePrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"locked\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"network\",\"outputs\":[{\"internalType\":\"contractINetwork\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"nodesOwned\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"operatorCycleLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"operatorLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"operatorLicenses\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"operators\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"operatorsEddKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"operatorsOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"otherLicenseContract\",\"outputs\":[{\"internalType\":\"contractILicenseContract\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"promoCode\",\"type\":\"string\"}],\"name\":\"purchaseLicense\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"promoCode\",\"type\":\"string\"}],\"name\":\"purchaseLicenseFor\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes\",\"name\":\"publicKey\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"commitment\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"eddKey\",\"type\":\"bytes32\"}],\"internalType\":\"structRegistrationData\",\"name\":\"regData\",\"type\":\"tuple\"},{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"name\":\"registerOperator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"regDataBytes\",\"type\":\"bytes\"},{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"name\":\"registerOperatorBytes\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"callerConfirmation\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setLicenseContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setOtherLicenseContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalAccounts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"withdrawEthers\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
+	ABI: "[{\"inputs\":[],\"name\":\"AccessControlBadConfirmation\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"neededRole\",\"type\":\"bytes32\"}],\"name\":\"AccessControlUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidInitialization\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotInitializing\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"version\",\"type\":\"uint64\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"index\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"}],\"name\":\"PurchaseEvent\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"Received\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\"}],\"name\":\"RoleAdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleGranted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"RoleRevoked\",\"type\":\"event\"},{\"stateMutability\":\"payable\",\"type\":\"fallback\"},{\"inputs\":[],\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"accountInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes[]\",\"name\":\"operators\",\"type\":\"bytes[]\"},{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"internalType\":\"structAccountInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"accountLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"activeLicenseByIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"activeLicensesIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"authorizeAdmin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"calibrator\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"cycleOperatorCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"name\":\"deRegisterNodeOperator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"fillLicenseCountGap\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getActiveLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"cycle\",\"type\":\"uint256\"}],\"name\":\"getCycleActiveLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"cycle\",\"type\":\"uint256\"}],\"name\":\"getCycleLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"operator\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"cycle\",\"type\":\"uint256\"}],\"name\":\"getOperatorCycleLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"operator\",\"type\":\"bytes\"}],\"name\":\"getOperatorLicenses\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"page\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"perPage\",\"type\":\"uint256\"}],\"name\":\"getOperators\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes\",\"name\":\"pubKey\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"eddKey\",\"type\":\"bytes32\"}],\"internalType\":\"structOperatorInfo[]\",\"name\":\"opr\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"getRegistrationData\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes\",\"name\":\"publicKey\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"commitment\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"eddKey\",\"type\":\"bytes32\"}],\"internalType\":\"structRegistrationData\",\"name\":\"regData\",\"type\":\"tuple\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"}],\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"grantRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"inactiveLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_network\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_licenseContract\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_otherLicenseContract\",\"type\":\"address\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"license\",\"type\":\"uint256\"}],\"name\":\"isActive\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"lastCycleWithNewOperator\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"licenseContract\",\"outputs\":[{\"internalType\":\"contractILicenseContract\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"licenseOperator\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"name\":\"licenseOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"promoCode\",\"type\":\"string\"}],\"name\":\"licensePrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"locked\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"network\",\"outputs\":[{\"internalType\":\"contractINetwork\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"nodesOwned\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"operatorLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"operatorLicenses\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"operators\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"operatorsCyleInactiveLicenseCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"operatorsEddKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"operatorsOwner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"otherLicenseContract\",\"outputs\":[{\"internalType\":\"contractILicenseContract\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"promoCode\",\"type\":\"string\"}],\"name\":\"purchaseLicense\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"\",\"type\":\"uint256[]\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"promoCode\",\"type\":\"string\"}],\"name\":\"purchaseLicenseFor\",\"outputs\":[{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes\",\"name\":\"publicKey\",\"type\":\"bytes\"},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"commitment\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"eddKey\",\"type\":\"bytes32\"}],\"internalType\":\"structRegistrationData\",\"name\":\"regData\",\"type\":\"tuple\"},{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"name\":\"registerOperator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"regDataBytes\",\"type\":\"bytes\"},{\"internalType\":\"uint256[]\",\"name\":\"licenses\",\"type\":\"uint256[]\"}],\"name\":\"registerOperatorBytes\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"callerConfirmation\",\"type\":\"address\"}],\"name\":\"renounceRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"revokeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setLicenseContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setOtherLicenseContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalAccounts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"withdraw\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"withdrawEthers\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
 }
 
 // ValidatorContractABI is the input ABI used to generate the binding from.
@@ -295,12 +295,12 @@ func (_ValidatorContract *ValidatorContractCallerSession) AccountLicenseCount(ar
 	return _ValidatorContract.Contract.AccountLicenseCount(&_ValidatorContract.CallOpts, arg0)
 }
 
-// ActiveLicenseCount is a free data retrieval call binding the contract method 0x4104991d.
+// ActiveLicenseByIndex is a free data retrieval call binding the contract method 0xe189e368.
 //
-// Solidity: function activeLicenseCount() view returns(uint256)
-func (_ValidatorContract *ValidatorContractCaller) ActiveLicenseCount(opts *bind.CallOpts) (*big.Int, error) {
+// Solidity: function activeLicenseByIndex(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCaller) ActiveLicenseByIndex(opts *bind.CallOpts, arg0 *big.Int) (*big.Int, error) {
 	var out []interface{}
-	err := _ValidatorContract.contract.Call(opts, &out, "activeLicenseCount")
+	err := _ValidatorContract.contract.Call(opts, &out, "activeLicenseByIndex", arg0)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -312,18 +312,18 @@ func (_ValidatorContract *ValidatorContractCaller) ActiveLicenseCount(opts *bind
 
 }
 
-// ActiveLicenseCount is a free data retrieval call binding the contract method 0x4104991d.
+// ActiveLicenseByIndex is a free data retrieval call binding the contract method 0xe189e368.
 //
-// Solidity: function activeLicenseCount() view returns(uint256)
-func (_ValidatorContract *ValidatorContractSession) ActiveLicenseCount() (*big.Int, error) {
-	return _ValidatorContract.Contract.ActiveLicenseCount(&_ValidatorContract.CallOpts)
+// Solidity: function activeLicenseByIndex(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractSession) ActiveLicenseByIndex(arg0 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.ActiveLicenseByIndex(&_ValidatorContract.CallOpts, arg0)
 }
 
-// ActiveLicenseCount is a free data retrieval call binding the contract method 0x4104991d.
+// ActiveLicenseByIndex is a free data retrieval call binding the contract method 0xe189e368.
 //
-// Solidity: function activeLicenseCount() view returns(uint256)
-func (_ValidatorContract *ValidatorContractCallerSession) ActiveLicenseCount() (*big.Int, error) {
-	return _ValidatorContract.Contract.ActiveLicenseCount(&_ValidatorContract.CallOpts)
+// Solidity: function activeLicenseByIndex(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCallerSession) ActiveLicenseByIndex(arg0 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.ActiveLicenseByIndex(&_ValidatorContract.CallOpts, arg0)
 }
 
 // ActiveLicensesIndex is a free data retrieval call binding the contract method 0xaee5a56c.
@@ -386,6 +386,68 @@ func (_ValidatorContract *ValidatorContractSession) Calibrator() (*big.Int, erro
 // Solidity: function calibrator() view returns(uint256)
 func (_ValidatorContract *ValidatorContractCallerSession) Calibrator() (*big.Int, error) {
 	return _ValidatorContract.Contract.Calibrator(&_ValidatorContract.CallOpts)
+}
+
+// CycleOperatorCount is a free data retrieval call binding the contract method 0xe0fe5604.
+//
+// Solidity: function cycleOperatorCount(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCaller) CycleOperatorCount(opts *bind.CallOpts, arg0 *big.Int) (*big.Int, error) {
+	var out []interface{}
+	err := _ValidatorContract.contract.Call(opts, &out, "cycleOperatorCount", arg0)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// CycleOperatorCount is a free data retrieval call binding the contract method 0xe0fe5604.
+//
+// Solidity: function cycleOperatorCount(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractSession) CycleOperatorCount(arg0 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.CycleOperatorCount(&_ValidatorContract.CallOpts, arg0)
+}
+
+// CycleOperatorCount is a free data retrieval call binding the contract method 0xe0fe5604.
+//
+// Solidity: function cycleOperatorCount(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCallerSession) CycleOperatorCount(arg0 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.CycleOperatorCount(&_ValidatorContract.CallOpts, arg0)
+}
+
+// GetActiveLicenseCount is a free data retrieval call binding the contract method 0x10876926.
+//
+// Solidity: function getActiveLicenseCount() view returns(uint256)
+func (_ValidatorContract *ValidatorContractCaller) GetActiveLicenseCount(opts *bind.CallOpts) (*big.Int, error) {
+	var out []interface{}
+	err := _ValidatorContract.contract.Call(opts, &out, "getActiveLicenseCount")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// GetActiveLicenseCount is a free data retrieval call binding the contract method 0x10876926.
+//
+// Solidity: function getActiveLicenseCount() view returns(uint256)
+func (_ValidatorContract *ValidatorContractSession) GetActiveLicenseCount() (*big.Int, error) {
+	return _ValidatorContract.Contract.GetActiveLicenseCount(&_ValidatorContract.CallOpts)
+}
+
+// GetActiveLicenseCount is a free data retrieval call binding the contract method 0x10876926.
+//
+// Solidity: function getActiveLicenseCount() view returns(uint256)
+func (_ValidatorContract *ValidatorContractCallerSession) GetActiveLicenseCount() (*big.Int, error) {
+	return _ValidatorContract.Contract.GetActiveLicenseCount(&_ValidatorContract.CallOpts)
 }
 
 // GetCycleActiveLicenseCount is a free data retrieval call binding the contract method 0xd01b1fd3.
@@ -636,6 +698,37 @@ func (_ValidatorContract *ValidatorContractCallerSession) HasRole(role [32]byte,
 	return _ValidatorContract.Contract.HasRole(&_ValidatorContract.CallOpts, role, account)
 }
 
+// InactiveLicenseCount is a free data retrieval call binding the contract method 0xc825288e.
+//
+// Solidity: function inactiveLicenseCount(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCaller) InactiveLicenseCount(opts *bind.CallOpts, arg0 *big.Int) (*big.Int, error) {
+	var out []interface{}
+	err := _ValidatorContract.contract.Call(opts, &out, "inactiveLicenseCount", arg0)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// InactiveLicenseCount is a free data retrieval call binding the contract method 0xc825288e.
+//
+// Solidity: function inactiveLicenseCount(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractSession) InactiveLicenseCount(arg0 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.InactiveLicenseCount(&_ValidatorContract.CallOpts, arg0)
+}
+
+// InactiveLicenseCount is a free data retrieval call binding the contract method 0xc825288e.
+//
+// Solidity: function inactiveLicenseCount(uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCallerSession) InactiveLicenseCount(arg0 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.InactiveLicenseCount(&_ValidatorContract.CallOpts, arg0)
+}
+
 // IsActive is a free data retrieval call binding the contract method 0x82afd23b.
 //
 // Solidity: function isActive(uint256 license) view returns(bool)
@@ -665,6 +758,37 @@ func (_ValidatorContract *ValidatorContractSession) IsActive(license *big.Int) (
 // Solidity: function isActive(uint256 license) view returns(bool)
 func (_ValidatorContract *ValidatorContractCallerSession) IsActive(license *big.Int) (bool, error) {
 	return _ValidatorContract.Contract.IsActive(&_ValidatorContract.CallOpts, license)
+}
+
+// LastCycleWithNewOperator is a free data retrieval call binding the contract method 0x8594c661.
+//
+// Solidity: function lastCycleWithNewOperator() view returns(uint256)
+func (_ValidatorContract *ValidatorContractCaller) LastCycleWithNewOperator(opts *bind.CallOpts) (*big.Int, error) {
+	var out []interface{}
+	err := _ValidatorContract.contract.Call(opts, &out, "lastCycleWithNewOperator")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// LastCycleWithNewOperator is a free data retrieval call binding the contract method 0x8594c661.
+//
+// Solidity: function lastCycleWithNewOperator() view returns(uint256)
+func (_ValidatorContract *ValidatorContractSession) LastCycleWithNewOperator() (*big.Int, error) {
+	return _ValidatorContract.Contract.LastCycleWithNewOperator(&_ValidatorContract.CallOpts)
+}
+
+// LastCycleWithNewOperator is a free data retrieval call binding the contract method 0x8594c661.
+//
+// Solidity: function lastCycleWithNewOperator() view returns(uint256)
+func (_ValidatorContract *ValidatorContractCallerSession) LastCycleWithNewOperator() (*big.Int, error) {
+	return _ValidatorContract.Contract.LastCycleWithNewOperator(&_ValidatorContract.CallOpts)
 }
 
 // LicenseContract is a free data retrieval call binding the contract method 0xe2c52b9d.
@@ -884,37 +1008,6 @@ func (_ValidatorContract *ValidatorContractCallerSession) NodesOwned(arg0 common
 	return _ValidatorContract.Contract.NodesOwned(&_ValidatorContract.CallOpts, arg0, arg1)
 }
 
-// OperatorCycleLicenseCount is a free data retrieval call binding the contract method 0x33bf29f2.
-//
-// Solidity: function operatorCycleLicenseCount(bytes , uint256 ) view returns(uint256)
-func (_ValidatorContract *ValidatorContractCaller) OperatorCycleLicenseCount(opts *bind.CallOpts, arg0 []byte, arg1 *big.Int) (*big.Int, error) {
-	var out []interface{}
-	err := _ValidatorContract.contract.Call(opts, &out, "operatorCycleLicenseCount", arg0, arg1)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
-}
-
-// OperatorCycleLicenseCount is a free data retrieval call binding the contract method 0x33bf29f2.
-//
-// Solidity: function operatorCycleLicenseCount(bytes , uint256 ) view returns(uint256)
-func (_ValidatorContract *ValidatorContractSession) OperatorCycleLicenseCount(arg0 []byte, arg1 *big.Int) (*big.Int, error) {
-	return _ValidatorContract.Contract.OperatorCycleLicenseCount(&_ValidatorContract.CallOpts, arg0, arg1)
-}
-
-// OperatorCycleLicenseCount is a free data retrieval call binding the contract method 0x33bf29f2.
-//
-// Solidity: function operatorCycleLicenseCount(bytes , uint256 ) view returns(uint256)
-func (_ValidatorContract *ValidatorContractCallerSession) OperatorCycleLicenseCount(arg0 []byte, arg1 *big.Int) (*big.Int, error) {
-	return _ValidatorContract.Contract.OperatorCycleLicenseCount(&_ValidatorContract.CallOpts, arg0, arg1)
-}
-
 // OperatorLicenseCount is a free data retrieval call binding the contract method 0x7e297e2f.
 //
 // Solidity: function operatorLicenseCount(bytes ) view returns(uint256)
@@ -1006,6 +1099,37 @@ func (_ValidatorContract *ValidatorContractSession) Operators(arg0 *big.Int) ([]
 // Solidity: function operators(uint256 ) view returns(bytes)
 func (_ValidatorContract *ValidatorContractCallerSession) Operators(arg0 *big.Int) ([]byte, error) {
 	return _ValidatorContract.Contract.Operators(&_ValidatorContract.CallOpts, arg0)
+}
+
+// OperatorsCyleInactiveLicenseCount is a free data retrieval call binding the contract method 0xae65c559.
+//
+// Solidity: function operatorsCyleInactiveLicenseCount(bytes , uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCaller) OperatorsCyleInactiveLicenseCount(opts *bind.CallOpts, arg0 []byte, arg1 *big.Int) (*big.Int, error) {
+	var out []interface{}
+	err := _ValidatorContract.contract.Call(opts, &out, "operatorsCyleInactiveLicenseCount", arg0, arg1)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// OperatorsCyleInactiveLicenseCount is a free data retrieval call binding the contract method 0xae65c559.
+//
+// Solidity: function operatorsCyleInactiveLicenseCount(bytes , uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractSession) OperatorsCyleInactiveLicenseCount(arg0 []byte, arg1 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.OperatorsCyleInactiveLicenseCount(&_ValidatorContract.CallOpts, arg0, arg1)
+}
+
+// OperatorsCyleInactiveLicenseCount is a free data retrieval call binding the contract method 0xae65c559.
+//
+// Solidity: function operatorsCyleInactiveLicenseCount(bytes , uint256 ) view returns(uint256)
+func (_ValidatorContract *ValidatorContractCallerSession) OperatorsCyleInactiveLicenseCount(arg0 []byte, arg1 *big.Int) (*big.Int, error) {
+	return _ValidatorContract.Contract.OperatorsCyleInactiveLicenseCount(&_ValidatorContract.CallOpts, arg0, arg1)
 }
 
 // OperatorsEddKey is a free data retrieval call binding the contract method 0x2555a068.
@@ -1949,6 +2073,7 @@ func (it *ValidatorContractPurchaseEventIterator) Close() error {
 
 // ValidatorContractPurchaseEvent represents a PurchaseEvent event raised by the ValidatorContract contract.
 type ValidatorContractPurchaseEvent struct {
+	Index     common.Address
 	Account   common.Address
 	Price     *big.Int
 	Quantity  *big.Int
@@ -1956,34 +2081,24 @@ type ValidatorContractPurchaseEvent struct {
 	Raw       types.Log // Blockchain specific contextual infos
 }
 
-// FilterPurchaseEvent is a free log retrieval operation binding the contract event 0x4d28b0527b61511e95e214c4b5dc5ef6a46f03f9484a44eb6168f446530a239b.
+// FilterPurchaseEvent is a free log retrieval operation binding the contract event 0xf7e3fd42ffa7d46e9d8736883f8e0a6381093f4c82b11714f859694a6af9fd4f.
 //
-// Solidity: event PurchaseEvent(address indexed account, uint256 price, uint256 quantity, uint256 timestamp)
-func (_ValidatorContract *ValidatorContractFilterer) FilterPurchaseEvent(opts *bind.FilterOpts, account []common.Address) (*ValidatorContractPurchaseEventIterator, error) {
+// Solidity: event PurchaseEvent(address index, address account, uint256 price, uint256 quantity, uint256 timestamp)
+func (_ValidatorContract *ValidatorContractFilterer) FilterPurchaseEvent(opts *bind.FilterOpts) (*ValidatorContractPurchaseEventIterator, error) {
 
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
-	}
-
-	logs, sub, err := _ValidatorContract.contract.FilterLogs(opts, "PurchaseEvent", accountRule)
+	logs, sub, err := _ValidatorContract.contract.FilterLogs(opts, "PurchaseEvent")
 	if err != nil {
 		return nil, err
 	}
 	return &ValidatorContractPurchaseEventIterator{contract: _ValidatorContract.contract, event: "PurchaseEvent", logs: logs, sub: sub}, nil
 }
 
-// WatchPurchaseEvent is a free log subscription operation binding the contract event 0x4d28b0527b61511e95e214c4b5dc5ef6a46f03f9484a44eb6168f446530a239b.
+// WatchPurchaseEvent is a free log subscription operation binding the contract event 0xf7e3fd42ffa7d46e9d8736883f8e0a6381093f4c82b11714f859694a6af9fd4f.
 //
-// Solidity: event PurchaseEvent(address indexed account, uint256 price, uint256 quantity, uint256 timestamp)
-func (_ValidatorContract *ValidatorContractFilterer) WatchPurchaseEvent(opts *bind.WatchOpts, sink chan<- *ValidatorContractPurchaseEvent, account []common.Address) (event.Subscription, error) {
+// Solidity: event PurchaseEvent(address index, address account, uint256 price, uint256 quantity, uint256 timestamp)
+func (_ValidatorContract *ValidatorContractFilterer) WatchPurchaseEvent(opts *bind.WatchOpts, sink chan<- *ValidatorContractPurchaseEvent) (event.Subscription, error) {
 
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
-	}
-
-	logs, sub, err := _ValidatorContract.contract.WatchLogs(opts, "PurchaseEvent", accountRule)
+	logs, sub, err := _ValidatorContract.contract.WatchLogs(opts, "PurchaseEvent")
 	if err != nil {
 		return nil, err
 	}
@@ -2015,9 +2130,9 @@ func (_ValidatorContract *ValidatorContractFilterer) WatchPurchaseEvent(opts *bi
 	}), nil
 }
 
-// ParsePurchaseEvent is a log parse operation binding the contract event 0x4d28b0527b61511e95e214c4b5dc5ef6a46f03f9484a44eb6168f446530a239b.
+// ParsePurchaseEvent is a log parse operation binding the contract event 0xf7e3fd42ffa7d46e9d8736883f8e0a6381093f4c82b11714f859694a6af9fd4f.
 //
-// Solidity: event PurchaseEvent(address indexed account, uint256 price, uint256 quantity, uint256 timestamp)
+// Solidity: event PurchaseEvent(address index, address account, uint256 price, uint256 quantity, uint256 timestamp)
 func (_ValidatorContract *ValidatorContractFilterer) ParsePurchaseEvent(log types.Log) (*ValidatorContractPurchaseEvent, error) {
 	event := new(ValidatorContractPurchaseEvent)
 	if err := _ValidatorContract.contract.UnpackLog(event, "PurchaseEvent", log); err != nil {

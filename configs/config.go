@@ -100,6 +100,8 @@ type MainConfiguration struct {
 	// EVMRPCWss                string         `toml:"evm_rpc_wss"`
 	ProtocolVersion          string         `toml:"protocol_version"`
 	ChannelMessageBufferSize uint           `toml:"channel_message_buffer_size"`
+	Hostname          string         `toml:"hostname"`
+	IP          string         `toml:"ip"`
 	Ipfs                     IpfsConfig     `toml:"ipfs"`
 	LogLevel                 string         `toml:"log_level"`
 	BootstrapPeers           []string       `toml:"bootstrap_peers"`
@@ -117,7 +119,8 @@ type MainConfiguration struct {
 	MLBlockchainAPIUrl       string         `toml:"mlayer_api_url"`
 	PrivateKey               string         `toml:"private_key"`
 	EvmRpcConfig			 map[string]EthConfig `toml:"evm_rpc"`
-	QuicHost                 string         `toml:"quic_host"`
+	QuicPort                uint16         `toml:"quic_port"`
+	QuicHost				string
 	// PublicKey        string
 	OperatorAddress          string
 	
@@ -137,6 +140,8 @@ type MainConfiguration struct {
 	SyncHost string
 
 }
+
+
 
 type MLChainAPI struct {
 	url string `mapstructure:"ml_api_url"`

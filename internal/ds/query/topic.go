@@ -2,8 +2,10 @@ package query
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	"github.com/mlayerprotocol/go-mlayer/entities"
@@ -17,6 +19,7 @@ func GetTopicById(did string) (*entities.Topic, error) {
 	if err != nil {
 		return nil, err
 	}
+	
 	data, err := entities.UnpackTopic(stateData)
 	if err != nil {
 		return nil, err
@@ -24,7 +27,7 @@ func GetTopicById(did string) (*entities.Topic, error) {
 	return &data, err
 }
 
-func GetAccountTopics( topic entities.Topic, limits *QueryLimit, txn *datastore.Txn) (data []*entities.Topic, err error) {
+func GetAccountTopics( topic entities.Topic, limits *entities.QueryLimit, txn *datastore.Txn) (data []*entities.Topic, err error) {
 	ds :=  stores.StateStore
 	var rsl query.Results
 	if limits == nil {
@@ -35,12 +38,14 @@ func GetAccountTopics( topic entities.Topic, limits *QueryLimit, txn *datastore.
 			Prefix: topic.GetAccountTopicsKey(),
 			Limit:  limits.Limit,
 			Offset: limits.Offset,
+			Orders: []query.Order{query.OrderByKeyDescending{}},
 		})
 	} else {
 		rsl,  err = ds.Query(context.Background(), query.Query{
 			Prefix: topic.GetAccountTopicsKey(),
 			Limit:  limits.Limit,
 			Offset: limits.Offset,
+			Orders: []query.Order{query.OrderByKeyDescending{}},
 		})
 	}
 
@@ -83,6 +88,7 @@ func CreateTopicState(newState *entities.Topic, tx *datastore.Txn) (sub *entitie
 		logger.Errorf("ERRORRRRR: %v", err)
 		return nil, err
 	}
+	logger.Infof("REFKEEEEE %s", refKey)
 	err = CreateState(CreateStateParam{
 		ModelType: entities.TopicModel,
 		ID: id,
@@ -147,17 +153,18 @@ func CreateTopicState(newState *entities.Topic, tx *datastore.Txn) (sub *entitie
 
 func UpdateTopicState(id string, newState *entities.Topic, tx *datastore.Txn, create bool) (*entities.Topic, error) {
 	id, err := entities.GetId(*newState, id)
+	
 	if err != nil {
 		return nil, err
 	}
 	oldTopic, err :=  GetTopicById(id)
+	
 	if err != nil {
 		if IsErrorNotFound(err) && create {
 			return CreateTopicState(newState, tx)
 		}
 		return nil, err
 	}
-	
 	err = UpdateState(id, NewStateParam{
 		OldIDKey:  fmt.Sprintf("%s/id/%s", entities.TopicModel, id),
 		DataKey: newState.DataKey(),
@@ -188,4 +195,54 @@ func GetTopicByEvent( event entities.EventPath) (*entities.Topic, error) {
 		return nil, err
 	}
 	return &data, err
+}
+
+func ToKeystoreKey (k [16]byte) []byte {
+	return []byte(hex.EncodeToString(k[:]))
+}
+
+func GetTopicSmartletData( topic *entities.Topic, id []byte) (data []byte, err error) {
+	
+
+	key := ToKeystoreKey([16]byte(id))
+	
+    err = stores.GlobalHandlerStore.DB.View(func(txn *badger.Txn) error {
+		key := append([]byte(fmt.Sprintf("/%s/%s/", topic.Subnet, topic.ID)), []byte(key)...)
+		item, err := txn.Get(key)
+		if err != nil {
+			return err
+		}
+		item.Value(func(val []byte) error {
+			data = val
+			return nil
+		})
+		// logger.Debugf("GETERRORRR %s, %v", strings.Trim(string(key), " "), err.Error())
+		// logger.Infof("SEARCHINGFORTOPICDATA.... %v",  stores.GlobalHandlerStore.DB.Opts())
+		// prefix :=  []byte("")
+        // opts := badger.DefaultIteratorOptions
+		//  opts.Prefix = prefix
+		
+		// // opts.Prefix = append([]byte(fmt.Sprintf("%s/%s", topic.Subnet, topic.ID)),  id...)
+        // it := txn.NewIterator(opts)
+        // defer it.Close()
+
+        // for it.Seek(prefix); it.Valid(); it.Next() {
+        //     item := it.Item()
+        //     key := item.Key()
+        //     err := item.Value(func(val []byte) error {
+        //         fmt.Printf(" Key: %s, Value: %s\n", key, val)
+		// 		result = val
+        //         return nil
+        //     })
+        //     if err != nil {
+        //         return err
+        //     }
+        // }
+        return nil
+    })
+
+	if err != nil {
+		return nil, err
+	}
+	return  data, err
 }

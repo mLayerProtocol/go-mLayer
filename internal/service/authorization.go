@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs.MainConfiguration, dataStates *dsquery.DataStates, validator string) (prevAuthState *models.AuthorizationState, grantorAuthState *models.AuthorizationState, subnet *models.SubnetState, err error) {
+func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs.MainConfiguration, validator string) (prevAuthState *models.AuthorizationState, grantorAuthState *models.AuthorizationState, subnet *models.SubnetState, err error) {
 	auth := clientPayload.Data.(entities.Authorization)
 	// if err != nil {
 	// 	return nil, nil, nil, err
@@ -52,11 +52,12 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs
 	// 		return nil, nil, nil, err
 	// 	}
 	// }
-	_subnet := entities.Subnet{}
-	 _, err = SyncTypedStateById(auth.Subnet, &_subnet,  cfg, validator )
+	 _subnet := entities.Subnet{}
+	_, err = SyncTypedStateById(auth.Subnet, &_subnet,  cfg, validator )
 	 if err != nil {
 		return  nil, nil, subnet, err
 	 }
+	//  _subnet := snet.(entities.Subnet)
 	 if *_subnet.Status ==  0 {
 		return nil, nil, subnet, apperror.Forbidden("Subnet is disabled")
 	}
@@ -65,9 +66,21 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs
 	if auth.Account != subnet.Account && *auth.Priviledge > *subnet.DefaultAuthPrivilege {
 		return nil, nil, subnet, apperror.Internal("invalid auth priviledge. Cannot be higher than subnets default")
 	}
-	account := entities.AddressFromString(string(auth.Account))
-	grantor := entities.AddressFromString(string(auth.Grantor))
-	agent := entities.AddressFromString(string(auth.Agent))
+	account, err := entities.AddressFromString(string(auth.Account))
+	if err != nil {
+		return nil, nil, subnet, apperror.BadRequest("account: " + err.Error())
+	}
+	if !account.IsAccount(){
+		return nil, nil, subnet, apperror.BadRequest("account: " + err.Error())
+	}
+	grantor, err := entities.AddressFromString(string(auth.Grantor))
+	if err != nil {
+		return nil, nil, subnet, apperror.BadRequest("grantor: " + err.Error())
+	}
+	agent, err := entities.AddressFromString(string(auth.Authorized))
+	if err != nil {
+		return nil, nil, subnet, apperror.BadRequest("authorized: " + err.Error())
+	}
 	if account.Addr == agent.Addr {
 		return nil, nil, subnet, apperror.Internal("cannot reassign subnet owner role")
 	}
@@ -85,11 +98,11 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs
 		return nil, nil, subnet, apperror.Unauthorized("Invalid authorization data signature")
 	}
 	if auth.Grantor != auth.Account  {
-		// grantorAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Account: entities.DIDString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()})
-		_grantorAuthState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Account: entities.DIDString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()}, dsquery.DefaultQueryLimit, nil)
+		// grantorAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Account: entities.AccountString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()})
+		_grantorAuthState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Account: entities.AccountString(account.ToString()), Subnet: auth.Subnet, Authorized: grantor.ToAddressString()}, dsquery.DefaultQueryLimit, nil)
 
 		// if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
-		// 	accAuth := entities.Authorization{Account: entities.DIDString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()}
+		// 	accAuth := entities.Authorization{Account: entities.AccountString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: grantor.ToDeviceString()}
 		// 	auth:= entities.Authorization{}
 		// 	pp, err := p2p.GetState(cfg, entities.EntityPath{Model: entities.AuthModel, Hash:  accAuth.ToAccountAuthKey(), }, nil, &auth)
 		// 	if err != nil {
@@ -137,7 +150,7 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs
 		}
 	}
 	// prevAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Agent:  agent.ToDeviceString(), Subnet: auth.Subnet})
-	_prevAuthState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Account: entities.DIDString(string(account.ToDeviceString())), Subnet: auth.Subnet, Agent: agent.ToDeviceString()}, dsquery.DefaultQueryLimit, nil)
+	_prevAuthState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Account: entities.AccountString(string(account.ToDeviceString())), Subnet: auth.Subnet, Authorized: agent.ToAddressString()}, dsquery.DefaultQueryLimit, nil)
 	if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
 		return nil, nil, subnet, err
 	}
@@ -154,16 +167,27 @@ func ValidateAuthPayloadData(clientPayload *entities.ClientPayload, cfg *configs
 
 func VerifyAuthDataSignature(auth entities.Authorization, msg []byte, chainId configs.ChainId) error {
 
-	account := entities.AddressFromString(string(auth.Account))
-	grantor := entities.AddressFromString(string(auth.Grantor))
-	agent := entities.AddressFromString(string(auth.Agent))
-
+	account, err := entities.AddressFromString(string(auth.Account))
+	if err != nil {
+		return  apperror.BadRequest("account: " + err.Error())
+	}
+	if !account.IsAccount(){
+		return  apperror.BadRequest("account: " + fmt.Sprint("invalid account"))
+	}
+	grantor, err := entities.AddressFromString(string(auth.Grantor))
+	if err != nil {
+		return  apperror.BadRequest("grantor: " + err.Error())
+	}
+	agent, err := entities.AddressFromString(string(auth.Authorized))
+	if err != nil {
+		return  apperror.BadRequest("authorized: " + err.Error())
+	}
 	valid := false
 
 	action := "write_authorization"
 	switch auth.SignatureData.Type {
 	case entities.EthereumPubKey:
-		authMsg := fmt.Sprintf(constants.SignatureMessageString, action, agent.Addr, chainId, encoder.ToBase64Padded(msg))
+		authMsg := fmt.Sprintf(constants.SignatureMessageString, action, agent.ToAddressString(), chainId, encoder.ToBase64Padded(msg))
 		logger.Debug("MSG:: ", authMsg)
 
 		msgByte := crypto.EthMessage([]byte(authMsg))
@@ -172,14 +196,14 @@ func VerifyAuthDataSignature(auth entities.Authorization, msg []byte, chainId co
 		// 	signer = agent.Addr
 		// }
 		// logger.Debug("Signer:: ", signer)
-		valid = crypto.VerifySignatureECC(signer, &msgByte, auth.SignatureData.Signature)
+		valid = crypto.VerifySignatureECC(signer, &msgByte, string(auth.SignatureData.Signature))
 
 		if !valid {
 			// check if the grantor is authorized
 			return apperror.Unauthorized("invalid auth signature")
 			// check if agent is authorized by grantor
 			// if agent.Addr != "" {
-			// 	agentAuthState, err := query.GetOneAuthorizationState(entities.Authorization{Account: entities.DIDString(grantor.ToDeviceString()), Subnet: auth.Subnet, Agent: agent.ToDeviceString()})
+			// 	agentAuthState, err := query.GetOneAuthorizationState(entities.Authorization{Account: entities.AccountString(grantor.ToDeviceString()), Subnet: auth.Subnet, Agent: agent.ToDeviceString()})
 			// 	if err == gorm.ErrRecordNotFound {
 			// 		return nil, nil, subnet, apperror.Unauthorized("Agent not authorized to act on behalf of grantor")
 			// 	}
@@ -191,11 +215,11 @@ func VerifyAuthDataSignature(auth entities.Authorization, msg []byte, chainId co
 
 	case entities.TendermintsSecp256k1PubKey:
 
-		decodedSig, err := base64.StdEncoding.DecodeString(auth.SignatureData.Signature)
+		decodedSig, err := base64.StdEncoding.DecodeString(string(auth.SignatureData.Signature))
 		if err != nil {
 			return err
 		}
-		publicKeyBytes, err := base64.RawStdEncoding.DecodeString(auth.SignatureData.PublicKey)
+		publicKeyBytes, err := base64.RawStdEncoding.DecodeString(string(auth.SignatureData.PublicKey))
 
 		if err != nil {
 			return err
@@ -234,7 +258,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 	if !ok {
 		panic("Unable to load config from context")
 	}
-	dataStates := dsquery.NewDataStates(cfg)
+	dataStates := dsquery.NewDataStates(event.ID, cfg)
 	dataStates.AddEvent(*event)
 
 	data := event.Payload.Data.(entities.Authorization)
@@ -244,7 +268,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 	data.Event = *event.GetPath()
 	hash, err := data.GetHash()
 	data.EventSignature = event.Signature
-	data.Agent = entities.AddressFromString(string(data.Agent)).ToDeviceString()
+	// data.Authorized = entities.AddressString(data.Authorized)
 	if err != nil {
 		return err
 	}
@@ -253,16 +277,14 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 
 	defer func () {
 	
-		if err != nil {
-			logger.Errorf("HandleNewPubsubAuthEvent %v", err)
-			return
-		}
-		stateUpdateError := dataStates.Commit(nil, nil, nil)
+		
+		// stateUpdateError := dataStates.Commit(nil, nil, nil, event.ID, err)
+		stateUpdateError := dataStates.Save( event.ID)
 		if stateUpdateError != nil {
 			logger.Error("HandleNewPubSubAuthEvent/Commit", err)
 			panic(stateUpdateError)
 		} else {
-			go OnFinishProcessingEvent(ctx, event,  data)
+			go OnFinishProcessingEvent(cfg, event,  data, nil)
 			
 			// go utils.WriteBytesToFile(filepath.Join(cfg.DataDir, "log.txt"), []byte("newMessage" + "\n"))
 		}
@@ -283,7 +305,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 		// either subnet does not exist or you are not uptodate
 	}
 	defer txn.Discard(context.Background())
-	_localState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Subnet: subnet, Account: entities.AddressFromString(string(data.Account)).ToString(), Agent: entities.AddressFromString(string(data.Agent)).ToDeviceString()}, dsquery.DefaultQueryLimit, &stateTxn)
+	_localState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Subnet: subnet, Account: data.Account, Authorized: data.Authorized}, dsquery.DefaultQueryLimit, &stateTxn)
 	if err != nil {
 		logger.Error("GetAccountAuthorizations:", err)
 	}
@@ -339,7 +361,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 			return err
 		}
 		if !event.IsLocal(cfg) {
-			_, _, _, err = ValidateAuthPayloadData(&event.Payload, cfg, dataStates, string(event.Validator))
+			_, _, _, err = ValidateAuthPayloadData(&event.Payload, cfg, string(event.Validator))
 		}
 		if err != nil {
 			logger.Infof("ErrorValidatingAuth %v", err)
@@ -357,7 +379,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 			} else {
 				dataStates.AddHistoricState(entities.AuthModel, data.DataKey(), data.MsgPack())
 			}
-			go dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
+			go dsquery.UpdateAccountCounter(string(event.Payload.Account))
 			// if eventIsMoreRecent && err == nil {
 			// 	// update state
 			// 	if localState.ID != "" {

@@ -2,6 +2,7 @@ package entities
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,11 +11,10 @@ import (
 	// "math"
 	"strings"
 
-	cryptoEth "github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/common/encoder"
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
+	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -40,7 +40,7 @@ CHAT MESSAGE
 */
 // type MessageHeader struct {
 // 	Length   int    `json:"l"`
-// 	Sender   DIDString `json:"s"`
+// 	Sender   AccountString `json:"s"`
 // 	Receiver string `json:"r"`
 // 	// ChainId configs.ChainId      string `json:"cId"`
 // 	// Platform      string `json:"p"`
@@ -116,17 +116,19 @@ func (a MessageAction) EncodeBytes() []byte {
 }
 
 type Message struct {
+	Version float32 `json:"_v"`
 	ID string `json:"id" gorm:"type:uuid;primaryKey;not null"`
 	// Timestamp      uint64   `json:"ts"`
 	Topic string        `json:"top,omitempty"`
 	
 	
 	// OwnerAddress  string              `json:"oA"`
-	Receiver DIDString   `json:"r,omitempty"`
-	Data     string          `json:"d"`
+	Receiver AccountString   `json:"r,omitempty"`
+	Data     string         `json:"d"`
 	DataType     constants.DataType      `json:"dTy"`
+	DataEncoding     string      `json:"enc"`
 	Actions  []MessageAction `json:"a,omitempty" gorm:"json;"`
-	Sender  DIDString `json:"s,omitempty"`
+	Sender  AccountString `json:"s,omitempty"`
 	// Length int `json:"len"`
 	
 	Nonce uint64 `json:"nonce,omitempty" binding:"required"`
@@ -156,6 +158,25 @@ type Message struct {
 func (d Message) GetSignature() (string) {
 	return d.EventSignature
 }
+
+func (d Message) GetData() (data []byte, err error) {
+	encoding := strings.ToLower(d.DataEncoding)
+	if encoding == "" {
+		data, err = hex.DecodeString(d.Data)
+			if err == nil {
+				return data, err
+			}		
+		} else {
+			if encoding == constants.BASE64_ENCODING {
+				return  base64.RawStdEncoding.DecodeString(d.Data)
+			}
+			if encoding == constants.HEX_ENCODING {
+				return hex.DecodeString(d.Data)
+			}
+		}
+		return []byte(d.Data), nil
+}
+
 func (chatMessage Message) ToString() (string, error) {
 	values := []string{}
 
@@ -196,7 +217,7 @@ func (msg Message) GetHash() ([]byte, error) {
 	if err != nil {
 		return []byte(""), err
 	}
-	return cryptoEth.Keccak256Hash(b).Bytes(), nil
+	return crypto.Sha256(b), nil
 }
 
 func (item *Message) DataKey() string {
@@ -274,7 +295,10 @@ func (msg Message) EncodeBytes() ([]byte, error) {
 		actions = append(actions, ac.EncodeBytes()...)
 	}
 
-	dataByte, _ := hex.DecodeString(msg.Data)
+	dataByte, err := msg.GetData() //hex.DecodeString(msg.Data)
+	if err != nil {
+		return nil, err
+	}
 	// logger.Debugf("DataBytes: %s %s %s %s", dataByte, msg.DataType, msg.Receiver, hex.EncodeToString(utils.UuidToBytes(msg.Topic)))
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: actions},

@@ -17,19 +17,24 @@ import (
 )
 
 type Topic struct {
+	Version float32 `json:"_v"`
 	ID string `json:"id" gorm:"type:uuid;primaryKey;not null"`
 	// Name            string        `json:"n,omitempty" binding:"required"`
 	Ref             string        `json:"ref,omitempty" binding:"required" gorm:"uniqueIndex:idx_unique_subnet_ref;type:varchar(64);default:null"`
 	Meta            string        `json:"meta,omitempty"`
 	ParentTopic string        `json:"pT,omitempty" gorm:"type:char(64)"`
 	SubscriberCount uint64        `json:"sC,omitempty"`
-	Account         DIDString `json:"acct,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	Account         AccountString `json:"acct,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 
 	Agent DeviceString `json:"agt,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 	//
 	Public   *bool `json:"pub,omitempty" gorm:"default:false"`
 
 	DefaultSubscriberRole   *constants.SubscriberRole `json:"dSubRol,omitempty"`
+
+	Invite []Subscription `json:"inv,omitempty"`
+
+	Handler json.RawMessage `json:"hdlr,omitempty"`
 
 	ReadOnly *bool `json:"rO,omitempty" gorm:"default:false"`
 	// InviteOnly bool `json:"invO" gorm:"default:false"`
@@ -129,12 +134,12 @@ func UnpackTopic(b []byte) (Topic, error) {
 	return topic, err
 }
 
-func (p *Topic) CanSend(channel string, sender DIDString) bool {
+func (p *Topic) CanSend(channel string, sender AccountString) bool {
 	// check if user can send
 	return true
 }
 
-func (p *Topic) IsMember(channel string, sender DIDString) bool {
+func (p *Topic) IsMember(channel string, sender AccountString) bool {
 	// check if user can send
 	return true
 }
@@ -173,13 +178,68 @@ func (topic Topic) EncodeBytes() ([]byte, error) {
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: utils.SafePointerValue(topic.DefaultSubscriberRole, 0)},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.ID)},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: topic.Handler},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.Meta},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.ParentTopic)},
 		encoder.EncoderParam{Type: encoder.BoolEncoderDataType, Value: utils.SafePointerValue(topic.Public, false)},
 		encoder.EncoderParam{Type: encoder.BoolEncoderDataType, Value:  utils.SafePointerValue(topic.ReadOnly, false)},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.Ref},
 		// encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *topic.DefaultSubscriptionStatus},
-		// encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.Subnet)},
+		 encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.Subnet)},
 	)
 }
 
+
+type NodeInterest struct {
+	Ids []string `json:"ids"`
+	Type EntityModel`json:"t"`
+	Hash string  `json:"h,omitempty"`
+	EventSignature  string    `json:"sig,omitempty"`
+	Expiry int `json:"exp"`
+	//PublicKey string `json:"pub"`
+	// Signature string `json:"sig"`
+	// Timestamp int64 `json:"ts"`
+}
+
+func (intr NodeInterest) EncodeBytes() ([]byte, error) {
+	topicBytes := []byte{}
+	for _, topic := range intr.Ids {
+		topicBytes = append(topicBytes, utils.UuidToBytes(topic)... )
+	}
+	return encoder.EncodeBytes(
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: topicBytes},
+		// encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: intr.PublicKey},
+		// encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: intr.Timestamp},
+	)
+}
+
+
+func (intr NodeInterest) GetHash() ([]byte, error) {
+	if len(intr.Hash) > 0 {
+		return hex.DecodeString(intr.Hash)
+	}
+	b, err := intr.EncodeBytes()
+	if err != nil {
+		return nil, err
+	}
+	return crypto.Sha256(b), nil
+}
+
+func (intr NodeInterest) ToString() (string, error) {
+	return fmt.Sprintf("%s",intr.Ids), nil
+}
+
+func (intr NodeInterest) GetSignature() (string) {
+	return intr.EventSignature
+}
+
+func (item *NodeInterest) MsgPack() []byte {
+	b, _ := encoder.MsgPackStruct(item)
+	return b
+}
+
+func UnpackNodeInterest(b []byte) (NodeInterest, error) {
+	intr := NodeInterest{}
+	err := encoder.MsgPackUnpackStruct(b, &intr)
+	return intr, err
+}

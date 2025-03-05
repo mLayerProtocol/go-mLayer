@@ -13,6 +13,7 @@ import (
 
 // DeliveryProof
 type DeliveryProof struct {
+	Version float32 `json:"_v"`
 	MessageHash   string `json:"mH"`
 	MessageSender string `json:"mS"`
 	OperatorAddress   string `json:"nA"`

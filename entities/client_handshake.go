@@ -12,9 +12,10 @@ import (
 )
 
 type ClientHandshake struct {
+	Version float32 `json:"_v"`
 	Signature    string             `json:"sig"`
 	Signer       DeviceString       `json:"sigr"`
-	Account      DIDString          `json:"acct"`
+	Account      AccountString      `json:"acct"`
 	Validator    PublicKeyString    `json:"val"`
 	Protocol     constants.Protocol `json:"proto"`
 	ClientSocket interface{}        `json:"ws"`
@@ -80,8 +81,12 @@ func (nma *ClientHandshake) IsValid(chainId configs.ChainId) bool {
 		logger.Error("Unable to encode message", err)
 		return false
 	}
+	add, err := AddressFromString(string(nma.Signer))
+	if err != nil {
+		return false
+	}
 
-	isValid := crypto.VerifySignatureECC(DIDFromString(string(nma.Signer)).Addr, &data, nma.Signature)
+	isValid := crypto.VerifySignatureECC(add.Addr, &data, nma.Signature)
 	if err != nil {
 		logger.Error("VerifySignatureECC:", err)
 		return false
@@ -140,6 +145,13 @@ func UnpackServerIdentity(b []byte) (ServerIdentity, error) {
 type ClientWsSubscription struct {
 	Conn   *websocket.Conn
 	Filter map[string][]string
+	Account string
+	Id string
+}
+
+type ClientWsSubscriptionV2 struct {
+	Conn   *websocket.Conn
+	Filter map[string]map[string]string
 	Account string
 	Id string
 }

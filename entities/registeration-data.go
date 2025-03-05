@@ -47,4 +47,3 @@ func (regData *RegisterationData) GetHash() []byte {
 	d, _ := regData.EncodeBytes()
 	return crypto.Keccak256Hash(d)
 }
-

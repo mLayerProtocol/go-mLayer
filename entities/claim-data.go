@@ -9,6 +9,7 @@ import (
 // "math"
 
 type ClaimData struct {
+	Version float32 `json:"_v"`
 	// Cycle uint64
 	// Signature [32]byte
 	// Commitment []byte

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 
 	// "github.com/mlayerprotocol/go-mlayer/entities"
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
+	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/sql"
 	"github.com/mlayerprotocol/go-mlayer/pkg/log"
 	"github.com/mlayerprotocol/go-mlayer/pkg/node"
@@ -46,7 +48,9 @@ const (
 	RPC_PORT            Flag = "rpc-port"
 	WS_ADDRESS          Flag = "ws-address"
 	REST_ADDRESS        Flag = "rest-address"
-	QUIC_HOST        Flag = "quic-host"
+	HOSTNAME        Flag = "hostname"
+	QUIC_PORT        Flag = "quic-port"
+	EXT_IP        Flag = "ext-ip"
 	DATA_DIR            Flag = "data-dir"
 	LISTENERS            Flag = "listen"
 	KEYSTORE_DIR         Flag = "keystore-dir"
@@ -104,13 +108,16 @@ func init() {
 	daemonCmd.Flags().BoolP(string(MAINNET_MODE), "", false, "Run in mainnet mode")
 	daemonCmd.Flags().BoolP(string(VALIDATOR_MODE), "v", false, "Run as validator")
 	daemonCmd.Flags().BoolP(string(TEST_MODE), "", false, "Run test functions")
-	daemonCmd.Flags().StringP(string(QUIC_HOST), "", "", "Quic server listening address")
+	daemonCmd.Flags().StringP(string(QUIC_PORT), "", "", "Quic server listening port")
+	daemonCmd.Flags().StringP(string(HOSTNAME), "", "" , "Server hostname")
+	daemonCmd.Flags().StringP(string(EXT_IP), "", "" , "Server public ip")
 	daemonCmd.Flags().BoolP(string(VERBOSE), "", false, "Sets log level to debug")
 	daemonCmd.Flags().BoolP(string(BOOTSTRAP_NODE), "", false, "Run as bootstrap node")
 	daemonCmd.Flags().StringP(string(SYNC_HOST), "", "", "IP address of sync node")
 }
 
 func daemonFunc(cmd *cobra.Command, _ []string) {
+	// var systeError error
 	testnet, _ := cmd.Flags().GetBool(string(TESTNET_MODE))
 	mainnet, _ := cmd.Flags().GetBool(string(MAINNET_MODE))
 	if mainnet {
@@ -127,7 +134,11 @@ func daemonFunc(cmd *cobra.Command, _ []string) {
 	ctx := context.Background()
 
 	chain.NetworkInfo = &chain.NetworkParams{Config: &cfg}
-	defer node.Start(&ctx)
+
+	
+	defer func() {
+		node.Start(&ctx)
+	}()
 	defer func () {
 		// chain.Network = chain.Init(&cfg)
 		logger.Println("Initializing chain...")
@@ -162,7 +173,13 @@ func daemonFunc(cmd *cobra.Command, _ []string) {
 		// cfg.OwnerAddress = common.BytesToAddress(ownerAddress)
 		// fmt.Println("Chain initialized!")
 	}()
-	defer sql.Init(&cfg)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Fatal(r)
+		}
+	
+		sql.Init(&cfg)
+	}()
 	
 
 	
@@ -212,13 +229,55 @@ func daemonFunc(cmd *cobra.Command, _ []string) {
 		cfg.RestAddress = restAddress
 	}
 
-	quicHost, _ := cmd.Flags().GetString(string(QUIC_HOST))
-	if len(quicHost) > 0 {
-		cfg.QuicHost = quicHost
+	
+	hostname, _ := cmd.Flags().GetString(string(HOSTNAME))
+	if hostname != "" {
+		cfg.Hostname = hostname
 	}
-	if len(cfg.QuicHost) == 0 {
-		cfg.QuicHost = constants.DefaultQuickHost
+
+	ip, _ := cmd.Flags().GetString(string(EXT_IP))
+	
+	// validate IP
+	remoteIp, err := utils.GetPublicIPFromDial()
+	if err != nil {
+		remoteIp, _ = utils.GetPublicIPFromAPI()
+		
 	}
+	
+	if  remoteIp != "" {
+		if ip != "" && ip != remoteIp {
+			logger.Fatal(fmt.Sprintf("invalid external ip. %s provide but %s was detected", ip, remoteIp))
+		}
+		ip = remoteIp
+	} else {
+		if ip == "" {
+			logger.Fatal("error detecting public IP and external ip not provided")
+		}
+	}
+	cfg.IP = ip
+
+	quicPort, _ := cmd.Flags().GetString(string(QUIC_PORT))
+	
+	if quicPort != "" {
+		qp, err := strconv.Atoi(quicPort)
+		if err != nil {
+		logger.Fatal(err)
+
+		}
+		cfg.QuicPort = uint16(qp)
+	}
+	if cfg.QuicPort == 0 {
+		cfg.QuicPort = constants.DefaultQuicPort
+	}
+	if len(cfg.Hostname) > 0 {
+		cfg.QuicHost = fmt.Sprintf("%s:%d", cfg.Hostname, cfg.QuicPort)
+	} else {
+		cfg.QuicHost = fmt.Sprintf("%s:%d", cfg.IP, cfg.QuicPort)
+	}
+	
+
+
+
 
 	dataDir, _ := cmd.Flags().GetString(string(DATA_DIR))
 	if len(dataDir) != 0  {
@@ -286,8 +345,8 @@ func daemonFunc(cmd *cobra.Command, _ []string) {
 	if strings.HasPrefix(cfg.DataDir, "../") && !strings.HasPrefix(archiveDir, "../") {
 		archiveDir = "../"+archiveDir
 	}
-	if err := os.MkdirAll(archiveDir, os.ModePerm); err!=nil {
-		panic(err)
+	if err = os.MkdirAll(archiveDir, os.ModePerm); err!=nil {
+		logger.Fatal(err)
 	}
 	cfg.ArchiveDir = archiveDir
 

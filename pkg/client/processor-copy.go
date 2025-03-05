@@ -23,15 +23,15 @@ package client
 
 // type Flag string
 
-// type ClientRequestProcessor struct {
+// type ClientRequestHandler struct {
 // 	Ctx                    *context.Context
 // 	Cfg                    *configs.MainConfiguration
 // }
 
-// func NewClientRequestProcess(mainCtx *context.Context) *ClientRequestProcessor {
+// func NewClientRequestProcess(mainCtx *context.Context) *ClientRequestHandler {
 // 	cfg, _ := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 // 	clientVerificationc, _ := (*mainCtx).Value(constants.ClientHandShackChId).(*chan *entities.ClientHandshake)
-// 	return &ClientRequestProcessor{
+// 	return &ClientRequestHandler{
 // 		Ctx:                    mainCtx,
 // 		Cfg:                    cfg,
 // 	}
@@ -59,7 +59,7 @@ package client
 // 		return  auths, nil
 // }
 
-// func (p *ClientRequestProcessor) Process(request string, params map[string]string, payload interface{}) (interface{}, error) {
+// func (p *ClientRequestHandler) Process(request string, params map[string]string, payload interface{}) (interface{}, error) {
 // 	switch (reques) {
 // 		case "GET:/ping":
 // 			return entities.ClientResponse{}, nil

@@ -67,7 +67,7 @@ func New(mainCtx *context.Context, keyStore string) (*Datastore) {
     opts.WithValueThreshold(1024)          // Store values > 1KB in value log
     opts.WithNumVersionsToKeep(1)          // Keep only latest version
     opts.WithBloomFalsePositive(0.01)    
-	opts.WithLoggingLevel(badger.INFO)
+	opts.WithLoggingLevel(badger.DEBUG)
 
 	opt := DefaultOptions
 	opt.Options = opts

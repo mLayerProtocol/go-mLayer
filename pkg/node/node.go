@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/big"
 	"time"
 
@@ -22,8 +23,11 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/mlayerprotocol/go-mlayer/configs"
 	"github.com/mlayerprotocol/go-mlayer/entities"
+	"github.com/mlayerprotocol/go-mlayer/global"
+	"github.com/mlayerprotocol/go-mlayer/internal/chain/ring"
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	dsstores "github.com/mlayerprotocol/go-mlayer/internal/ds/stores"
+	"github.com/mlayerprotocol/go-mlayer/internal/system"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/quic-go/quic-go"
 
@@ -34,6 +38,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/chain"
 	"github.com/mlayerprotocol/go-mlayer/internal/channelpool"
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
+	"github.com/mlayerprotocol/go-mlayer/pkg/client"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	p2p "github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/rest"
@@ -53,12 +58,13 @@ import (
 var logger = &log.Logger
 var syncedBlockMutex sync.Mutex
 
+
 // var wsClients =  make(map[string]map[*websocket.Conn]*entities.ClientWsSubscription)
 // var subscribedWsClientIndex =  make(map[string]map[*websocket.Conn][]int)
 // var wsClients =  make(map[string][]*websocket.Conn)
 
 var wsClients = entities.NewWsClientLog()
-
+var eventProcessor *EventProcessor
 func Start(mainCtx *context.Context) {
 	time.Sleep(1 * time.Second)
 	logger.Println("Starting network...")
@@ -82,6 +88,8 @@ func Start(mainCtx *context.Context) {
 		defer store.Close()
 	}
 
+	dsstores.InitCaches(&ctx)
+
 	eventCountStore := ds.New(&ctx, string(constants.EventCountStore))
 	defer eventCountStore.Close()
 	ctx = context.WithValue(ctx, constants.EventCountStore, eventCountStore)
@@ -94,8 +102,10 @@ func Start(mainCtx *context.Context) {
 	ctx = context.WithValue(ctx, constants.ConnectedSubscribersMap, connectedSubscribers)
 
 	ctx = context.WithValue(ctx, constants.WSClientLogId, &wsClients)
-	eventProcessor := NewEventProcessor(&ctx)
+	eventProcessor = NewEventProcessor(&ctx)
 
+
+	cfg.Context = &ctx
 	// defer func () {
 	// 	if chain.NetworkInfo.Synced && SystemStore != nil && !SystemStore.DB.IsClosed() {
 	// 		lastBlockKey :=  ds.Key(ds.SyncedBlockKey)
@@ -103,12 +113,60 @@ func Start(mainCtx *context.Context) {
 	// 	}
 	// }()
 
-	if err := loadChainInfo(cfg); err != nil {
+	for _, globaEvent := range global.GlobalEvent {
+		// data = append(data, &globalSubs)
+		// dsstores.StateStore.Delete(context.Background(), datastore.NewKey(globaTopic.RefKey()))
+		// event := globaEvent 
+		func(event entities.Event) {
+			if  err := dsquery.UpdateEvent(&event, nil, nil, true); err != nil {
+				panic(err)
+			}
+		}(globaEvent)
+		
+	}
+	for _, globalSubnet := range global.GlobalSubnets {
+		subnet := globalSubnet // avoid pointer dereferencing issues
+		if _, err := dsquery.UpdateSubnetState(globalSubnet.ID, &subnet, nil, true); err != nil {
+			panic(err)
+		}
+	}
+	for _, globaTopic := range global.GlobalTopics {
+		// data = append(data, &globalSubs)
+		// dsstores.StateStore.Delete(context.Background(), datastore.NewKey(globaTopic.RefKey()))
+		topic := globaTopic // avoid pointer dereferencing issues
+		if _, err := dsquery.UpdateTopicState(globaTopic.ID, &topic, nil, true); err != nil {
+			panic(err)
+		}
+	}
+
+	mempool, err := system.NewMempoolWorker(dsstores.MempoolStore, 10 * time.Millisecond, 5 * time.Minute, &channelpool.MempoolC)
+	if err != nil {
 		logger.Fatal(err)
+		return
+	}
+	system.Mempool = mempool
+	system.Mempool.Start()
+	ringNodes, err := loadChainInfo(cfg);
+	if  err != nil {
+		logger.Fatal(err)
+	}
+	if len(ringNodes) > 0 {
+		ring.GlobalHashRing, err = ring.NewHashRing(ringNodes, 2)
+		if  err != nil {
+			logger.Fatal(err)
+		}
 	}
 
 	defer wg.Wait()
 
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		p2p.StateDhtSyncer = p2p.NewDhtSyncer(dsstores.StateStore, context.Background())
+		p2p.StateDhtSyncer.Sync()
+	}()
+	
 	//  wg.Add(1)
 	// go func() {
 	// 	defer wg.Done()
@@ -201,7 +259,7 @@ func Start(mainCtx *context.Context) {
 							if len(count) > 0 || len(cyleEvent) > 0  {
 								txn, err := dsquery.InitTx(dsstores.NetworkStatsStore, nil)
 								if err != nil {
-									logger.Error("NetworkStateStoreError: %v", err)
+									logger.Errorf("NetworkStateStoreError: %v", err)
 								}
 								for k, v := range count {
 									if v > 0 {
@@ -237,11 +295,19 @@ func Start(mainCtx *context.Context) {
 		// defer ticker.Stop()
 			// for range ticker.C {
 				// go func() {
+					// wg.Add(1)
+					// go func ()  {
+					// 	defer wg.Done()
+					// 	for eventPtr := range channelpool.RemoteEventProcessorChannel {
+					// 		eventProcessor.HandleEvent(eventPtr.Event, eventPtr.ResponseChannel)
+					// 	}
+					// }()
+					
 					for eventPtr := range channelpool.EventProcessorChannel {
 						event := eventPtr
 						//modelType := event.GetDataModelType()
 						
-						eventProcessor.HandleEvent(event)
+						eventProcessor.HandleEvent(event, nil)
 
 						
 					// 		logger.Debugf("StartedProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
@@ -297,20 +363,67 @@ func Start(mainCtx *context.Context) {
 	}()
 
 	// load network params
+	var blockTime  = 0
+	var startBlock  = big.NewInt(0)
+	var loadInterval  = 5 * time.Minute
+	var blocksPerCycle  = big.NewInt(0)
+	var blocksPerEpoch  =big.NewInt(0)
+
+	
 	wg.Add(1)
 	go func() {
 		_, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		defer wg.Done()
 		// time.Sleep(1 * time.Minute)
+		var startLoading = time.Now()
 		for {
-			if err := loadChainInfo(cfg); err != nil {
-				logger.Error("loadChainInfoError:", err)
-				// time.Sleep(1 * time.Second)
-				panic(err)
-				// continue
+			if blockTime > 0 {
+				chain.NetworkInfo.CurrentBlock = new(big.Int).Add(chain.NetworkInfo.CurrentBlock, big.NewInt(1))
+				chain.NetworkInfo.CurrentCycle =new(big.Int).Div(chain.NetworkInfo.CurrentBlock, blocksPerCycle)
+				chain.NetworkInfo.CurrentEpoch =new(big.Int).Div(chain.NetworkInfo.CurrentBlock, blocksPerEpoch)
 			}
-			time.Sleep(1 * time.Second)
+			if blockTime == 0 ||  time.Now().Second() % int(loadInterval.Seconds()) == 0 {
+			
+				nodes, err := loadChainInfo(cfg);
+				if  err != nil {
+					// logger.Error("loadChainInfoError:", err)
+					// time.Sleep(1 * time.Second)
+					logger.Fatalf("loadChainInfoError: %v", err)
+					// continue
+				}
+			
+				if len(nodes) > 0 {
+					ring.GlobalHashRing, err = ring.NewHashRing(nodes, 2)
+				}
+				if  err != nil {
+					logger.Error("hashringcreationerror:", err)
+					// time.Sleep(1 * time.Second)
+					panic(err)
+					// continue
+				}
+			}
+			if startBlock.Cmp(big.NewInt(0)) == 0 {
+				startBlock = chain.NetworkInfo.CurrentBlock
+			}
+			if blocksPerCycle.Uint64() == 0 {
+				blocksPerCycle = new(big.Int).Div(new(big.Int).Sub(chain.NetworkInfo.CurrentBlock, chain.NetworkInfo.StartBlock), chain.NetworkInfo.CurrentCycle)
+			}
+			if blocksPerEpoch.Uint64() == 0 {
+				blocksPerCycle = new(big.Int).Div(new(big.Int).Sub(chain.NetworkInfo.CurrentBlock, chain.NetworkInfo.StartBlock), chain.NetworkInfo.CurrentEpoch)
+			}
+			timeDiff := time.Now().Second() - startLoading.Second()
+			if blockTime == 0 && timeDiff > 300 {
+				// find average of block time
+				diff := new(big.Int).Sub(chain.NetworkInfo.CurrentBlock, startBlock)
+				blockTime = int(math.Round(float64(600) / float64(diff.Uint64())))
+			}
+			if blockTime == 0 {
+			time.Sleep(2 * time.Second)
+			} else {
+				time.Sleep(time.Duration(blockTime) * time.Second)
+			}
+
 		}
 	}()
 
@@ -352,11 +465,34 @@ func Start(mainCtx *context.Context) {
 				continue
 			}
 
-			wsClients.RegisterClient(subscription)
+			topics := wsClients.RegisterClient(subscription)
+			if len(topics) > 0 {
+				go client.PublishInterest(topics, entities.TopicModel, cfg)
+			}
+			
 		}
 
 	}()
 
+
+	wg.Add(1)
+	// start the REST server
+	go func() {
+		for {
+			wsSubscription, ok := <-channelpool.ClientWsSubscriptionChannelV2
+			if !ok {
+				logger.Errorf("Client WS subscription channel closed")
+				continue
+			}
+			
+			topics := wsClients.RegisterClientV2(wsSubscription)
+			if len(topics) > 0 {
+				
+				go client.PublishInterest(topics, entities.TopicModel, cfg)
+			}
+		}
+
+	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -373,6 +509,7 @@ func Start(mainCtx *context.Context) {
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.WalletModel, &entities.WalletPubSub, &ctx)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubscriptionModel, &entities.SubscriptionPubSub, &ctx)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.MessageModel, &entities.MessagePubSub, &ctx)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SystemModel, &entities.SystemMessagePubSub, &ctx)
 
 		p2p.Run(&ctx)
 		// if err != nil {
@@ -515,10 +652,12 @@ func Start(mainCtx *context.Context) {
 
 			for {
 				connection, err := listener.Accept(ctx)
+				// connection.ConnectionState().TLS.PeerCertificates[0].PublicKey
 				if err != nil {
 					logger.Fatal(err)
 				}
-				go p2p.HandleQuicConnection(&ctx, cfg, connection)
+				
+				go HandleQuicConnection(&ctx, cfg, connection)
 			}
 		}()
 
@@ -553,19 +692,24 @@ func Start(mainCtx *context.Context) {
 	}
 }
 
-func loadChainInfo(cfg *configs.MainConfiguration) error {
+func loadChainInfo(cfg *configs.MainConfiguration) (ringNodes []*ring.Node, err error) {
 
 	info, err := chain.Provider(cfg.ChainId).GetChainInfo()
 	if err != nil {
-		return fmt.Errorf("pkg/node/NodeInfo/GetChainInfo: %v", err)
+		return nil, fmt.Errorf("pkg/node/NodeInfo/GetChainInfo: %v", err)
 	}
+
+	
 	if chain.NetworkInfo.ActiveValidatorLicenseCount != info.ValidatorActiveLicenseCount.Uint64() {
 		// if chain.NetworkInfo.Validators == nil {
 		chain.NetworkInfo.Validators = map[string]string{}
 		// }
 		page := big.NewInt(1)
 		perPage := big.NewInt(100)
+		validatorOperatorCount := 0
+		// validatorOperators := []string{}
 		for {
+			logger.Infof("GettingValidatorNodeInfo....")
 
 			validators, err := chain.Provider(cfg.ChainId).GetValidatorNodeOperators(page, perPage)
 			if err != nil {
@@ -575,13 +719,49 @@ func loadChainInfo(cfg *configs.MainConfiguration) error {
 			}
 
 			for _, val := range validators {
+				validatorOperatorCount++
+				
 				pubKey := hex.EncodeToString(val.PublicKey)
+				logger.Infof("NewNODE %v", val.PublicKey)
+				// ring.EventDistribtor.JoinNetwork(&ring.Node{
+				// 	ID: pubKey,
+				// }, 2)
+				ringNodes = append(ringNodes, &ring.Node{ID: pubKey, PubKey: pubKey})
+				// madBytes, _ := stores.SystemStore.Get(context.Background(), datastore.NewKey(fmt.Sprintf("/mad/%s", val.PublicKey)))
+				logger.Infof("Getting nma handshake for %s", pubKey)
+				d := p2p.ValidMads.Get(pubKey, true)
+				if d != nil {
+					logger.Infof("Found nma handshake for %s", pubKey)
+				}
+				// if mad != nil  {
+					
+				// 		(&p2p.ValidMads).Update(&mad)
+				// 		// p2p.ValidMads[pubKey] = &mad
+				// 		// p2p.ValidMads[hex.EncodeToString(mad.CertHash)] = &mad
+				// 		// p2p.ValidCerts[hex.EncodeToString(certHash)] = addr
+				// 		// p2p.ValidCerts[addr] = hex.EncodeToString(crd.CertHash)
+				// 		// p2p.ValidCerts[ip] = hex.EncodeToString(crd.CertHash)
+				// 		// p2p.ValidCerts[fmt.Sprintf("%s/addr", ip)] = addr
+				// 	}
+					
+				// }
+				
+				// validatorOperators = append(validatorOperators, pubKey)
 				// chain.NetworkInfo.Validators[pubKey] = val.LicenseOwner
 				chain.NetworkInfo.Validators[val.LicenseOwner] = "true"
 				chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/edd", pubKey)] = hex.EncodeToString(val.EddKey[:])
 				chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/addr", pubKey)] = val.LicenseOwner
+				// chain.NetworkInfo.Validators
+				// keySecP := "/ml/val/" + pubKey
+				// value, dhtError := p2p.GetDhtValue(keySecP)
+				// if dhtError == nil {
+				// 	chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/mad", pubKey)] = hex.EncodeToString(value)
+				// } else {
+				// 	logger.Errorf("loadchainInfo.GetMAD error: %v", err)
+				// }
 				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/secp", hex.EncodeToString(val.EddKey[:]))] = pubKey
 				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/addr", hex.EncodeToString(val.EddKey[:]))] = val.LicenseOwner
+				
 			}
 			if len(validators) == 0 || big.NewInt(int64(len(validators))).Cmp(perPage) == -1 {
 				break
@@ -611,7 +791,7 @@ func loadChainInfo(cfg *configs.MainConfiguration) error {
 	chain.NetworkInfo.ActiveValidatorLicenseCount = info.ValidatorActiveLicenseCount.Uint64()
 	chain.NetworkInfo.ActiveSentryLicenseCount = info.SentryActiveLicenseCount.Uint64()
 
-	return err
+	return ringNodes, err
 }
 
 func waitToSync() {

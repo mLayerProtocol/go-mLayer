@@ -14,7 +14,6 @@ import (
 	dsquery "github.com/mlayerprotocol/go-mlayer/internal/ds/query"
 	"github.com/mlayerprotocol/go-mlayer/internal/service"
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
-	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/p2p"
 )
 
@@ -70,7 +69,6 @@ func Info(cfg *configs.MainConfiguration) (*NodeInfo, error) {
 
 }
 func ValidateClientPayload(
-	ds *ds.Datastore,
 	payload *entities.ClientPayload,
 	strictAuth bool,
 	cfg *configs.MainConfiguration,
@@ -103,8 +101,11 @@ func ValidateClientPayload(
 	// subnet := models.SubnetState{}
 	// err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: payload.Subnet}}, &subnet)
 	// subnet , err := dsquery.GetSubnetStateById(payload.Subnet)
-	subnet := &entities.Subnet{}
-	_, err = service.SyncTypedStateById(payload.Subnet, subnet, cfg, "")
+	 subnet := entities.Subnet{}
+	_, err = service.SyncTypedStateById(payload.Subnet, &subnet, cfg, "")
+	if err != nil {
+		return nil, nil, err
+	}
 	// if err != nil {
 	// 	// if err == gorm.ErrRecordNotFound {
 	// 	if dsquery.IsErrorNotFound(err){
@@ -117,23 +118,26 @@ func ValidateClientPayload(
 	// 		return nil, nil, apperror.Internal(err.Error())
 	// 	}
 	// }
-	if err != nil {
-		return nil, nil, err
-	}
-	if subnet == nil {
+	//subnet := sub.(entities.Subnet)
+	
+	if subnet.ID == "" {
 		return nil, nil, apperror.Forbidden("Invalid subnet")
 	}
 	if *subnet.Status ==  0 {
 		return nil, nil, apperror.Forbidden("Subnet is disabled")
 	}
 
+	
 
 	// check if device is authorized
-	if agent != "" {
+	if agent != ""  {
 		
 		agent = entities.DeviceString(agent)
 		
 		if strictAuth || string(payload.Account) != ""  {
+			if !agent.IsValid() {
+				return nil, nil, apperror.BadRequest("agent address is invalid")
+			}
 			
 			var authData models.AuthorizationState
 			// err := query.GetOne(models.AuthorizationState{
@@ -144,7 +148,7 @@ func ValidateClientPayload(
 			filter := entities.Authorization{
 				Account: payload.Account,
 				Subnet: payload.Subnet,
-				Agent: agent,
+				Authorized: entities.AddressString(agent),
 			}
 			
 			authDatas, err := dsquery.GetAccountAuthorizations(filter, dsquery.DefaultQueryLimit, nil)
@@ -188,7 +192,7 @@ func validateAgent(payload *entities.ClientPayload) error {
 		// auth := models.AuthorizationState{}
 		// err = query.GetOneState(entities.Authorization{Agent: payload.Agent, Account: payload.Account}, &auth)
 		auth, err := dsquery.GetAccountAuthorizations(entities.Authorization{
-			Agent: payload.Agent, Account: payload.Account, Subnet: payload.Subnet,
+			Authorized: entities.AddressString(payload.Agent), Account: payload.Account, Subnet: payload.Subnet,
 		}, nil, nil)
 		if err != nil {
 			return  apperror.Unauthorized("Invalid subnet")

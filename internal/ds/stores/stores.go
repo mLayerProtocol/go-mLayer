@@ -5,7 +5,11 @@ import (
 
 	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
+	"github.com/mlayerprotocol/go-mlayer/pkg/log"
 )
+
+var logger = &log.Logger
+
 var (
 	P2pDhtStore *ds.Datastore
 	StateStore *ds.Datastore
@@ -15,6 +19,10 @@ var (
 	EventStore  *ds.Datastore
 	ClaimedRewardStore *ds.Datastore
 	NetworkStatsStore *ds.Datastore // to be removed later
+	NodeTopicsStore *ds.Datastore
+	GlobalHandlerStore *ds.Datastore
+	MempoolStore *ds.Datastore
+	//CacheStore *ds.Datastore 
 )
 
 
@@ -53,6 +61,22 @@ func InitStores(mainContext *context.Context) (_ctx context.Context,  _stores []
 	NetworkStatsStore = ds.New(&ctx,   string(constants.NetworkStatsStore))
 	ctx = context.WithValue(ctx, constants.NetworkStatsStore, NetworkStatsStore)
 	_stores = append(_stores, NetworkStatsStore)
+
+	// CacheStore = ds.New(&ctx,   string(constants.CacheStore))
+	// ctx = context.WithValue(ctx, constants.CacheStore, CacheStore)
+	// _stores = append(_stores, CacheStore)
+
+	NodeTopicsStore = ds.New(&ctx,   string(constants.NodeTopicsStore))
+	ctx = context.WithValue(ctx, constants.NodeTopicsStore, NodeTopicsStore)
+	_stores = append(_stores, NodeTopicsStore)
+
+	GlobalHandlerStore = ds.New(&ctx,   string(constants.GlobalHandlerStore))
+	ctx = context.WithValue(ctx, constants.GlobalHandlerStore, GlobalHandlerStore)
+	_stores = append(_stores, GlobalHandlerStore)
+
+	MempoolStore = ds.New(&ctx,   string(constants.MempoolStore))
+	ctx = context.WithValue(ctx, constants.MempoolStore, MempoolStore)
+	_stores = append(_stores, MempoolStore)
 
 	return ctx, _stores
 }

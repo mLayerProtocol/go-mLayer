@@ -99,7 +99,7 @@ func (n EthereumAPI) GetCurrentBlockNumber() (*big.Int, error) {
 	return n.chainInfoContract.GetCurrentBlockNumber( nil)
 }
 func (n EthereumAPI) GetSentryActiveLicenseCount(cycle *big.Int)  (*big.Int, error)  {
-	return n.sentryContract.ActiveLicenseCount( nil)
+	return n.sentryContract.GetActiveLicenseCount( nil)
 }
 func (n EthereumAPI) GetSentryLicenses(operator []byte, cycle *big.Int)  ([]*big.Int, error)  {
 	return n.sentryContract.GetOperatorLicenses( nil, operator)
@@ -108,13 +108,13 @@ func (n EthereumAPI) GetValidatorLicenses(operator []byte, cycle *big.Int)  ([]*
 	return n.validatorContract.GetOperatorLicenses( nil, operator)
 }
 func (n EthereumAPI) GetValidatorActiveLicenseCount(cycle *big.Int) (*big.Int, error) {
-	return n.validatorContract.ActiveLicenseCount( nil)
+	return n.validatorContract.GetActiveLicenseCount( nil)
 }
 func (n EthereumAPI) GetSentryOperatorCycleLicenseCount(operator []byte, cycle  *big.Int) (*big.Int, error) {
-	return n.sentryContract.OperatorCycleLicenseCount( nil, operator, cycle)
+	return n.sentryContract.GetOperatorCycleLicenseCount( nil, operator, cycle)
 }
 func (n EthereumAPI) GetValidatorOperatorCycleLicenseCount(operator []byte, cycle  *big.Int) (*big.Int, error) {
-	return n.validatorContract.OperatorCycleLicenseCount( nil, operator, cycle)
+	return n.validatorContract.GetOperatorCycleLicenseCount( nil, operator, cycle)
 }
 func (n EthereumAPI) GetSentryLicenseOperator(license *big.Int) ([]byte, error) {
 	return n.sentryContract.LicenseOperator(nil, license)
@@ -124,7 +124,7 @@ func (n EthereumAPI) GetValidatorLicenseOperator(license *big.Int) ([]byte, erro
 }
 
 func (n EthereumAPI) IsValidatorNodeOperator(publicKey []byte,  cycle *big.Int) (bool, error) {
-	licenseCount, err := n.validatorContract.OperatorCycleLicenseCount(nil, publicKey, cycle)
+	licenseCount, err := n.validatorContract.GetOperatorCycleLicenseCount(nil, publicKey, cycle)
 	if err != nil {
 		return false, err
 	}
@@ -135,7 +135,7 @@ func (n EthereumAPI) IsValidatorNodeOperator(publicKey []byte,  cycle *big.Int) 
 }
 
 func (n EthereumAPI) IsSentryNodeOperator(publicKey []byte, cycle *big.Int) (bool, error) {
-	licenseCount, err := n.sentryContract.OperatorCycleLicenseCount(nil, publicKey, cycle)
+	licenseCount, err := n.sentryContract.GetOperatorCycleLicenseCount(nil, publicKey, cycle)
 	if err != nil {
 		return false, err
 	}
@@ -191,10 +191,18 @@ func (n EthereumAPI)  GetSentryLicenseOwnerAddress(publicKey []byte) ([]byte, er
 func (n EthereumAPI) GetCurrentMessagePrice() (*big.Int, error) {
 	return n.chainInfoContract.GetCurrentMessagePrice(nil)
 }
+
 func (n EthereumAPI) GetMessagePrice(cycle *big.Int) (*big.Int, error) {
 	return n.chainInfoContract.GetMessagePrice(nil, cycle)
 }
 
+func (n EthereumAPI) GetValidatorOperatorCount(cycle *big.Int) (*big.Int, error) {
+	return big.NewInt(10), nil
+}
+
+func (n EthereumAPI) GetSentryOperatorCount(cycle *big.Int) (*big.Int, error) {
+	return big.NewInt(10), nil
+}
 
 func (n EthereumAPI) GetTotalValueLockedInSubnets() (*big.Int, error) {
 	return n.subnetContract.TotalValueLocked(nil)
@@ -209,6 +217,11 @@ func (n EthereumAPI) GetChainInfo() (info *ChainInfo, err error) {
 	if err != nil {
 		return nil, err
 	}
+	validatorOperatorCount := big.NewInt(10)
+	// validatorOperatorCount, err := n.validatorContract.CycleOperatorCount(nil, chain.CurrentCycle);
+	// if err != nil {
+	// 	return nil, err
+	// }
 	validatorActiveLicenseCount, err := n.validatorContract.GetCycleActiveLicenseCount(nil, chain.CurrentCycle);
 	if err != nil {
 		return nil, err
@@ -221,6 +234,11 @@ func (n EthereumAPI) GetChainInfo() (info *ChainInfo, err error) {
 	if err != nil {
 		return nil, err
 	}
+	sentryOperatorCount := big.NewInt(10)
+	// sentryOperatorCount, err := n.sentryContract.CycleOperatorCount(nil, chain.CurrentCycle);
+	// if err != nil {
+	// 	return nil, err
+	// }
  return &ChainInfo{
 	StartTime: chain.StartTime,
 	CurrentBlock: chain.CurrentBlock,
@@ -230,8 +248,10 @@ func (n EthereumAPI) GetChainInfo() (info *ChainInfo, err error) {
 	CurrentEpoch: chain.CurrentEpoch,
 	ValidatorLicenseCount: validatorLicenseCount,
 	ValidatorActiveLicenseCount: validatorActiveLicenseCount,
+	ValidatorOperatorCount: validatorOperatorCount,
 	SentryLicenseCount: sentryLicenseCount,
 	SentryActiveLicenseCount: sentryActiveLicenseCount,
+	SentryOperatorCount: sentryOperatorCount,
 	}, err
 }
 func (n EthereumAPI)  GetStartTime() (*big.Int, error) {

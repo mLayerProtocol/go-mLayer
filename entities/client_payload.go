@@ -12,6 +12,7 @@ import (
 	// "math"
 
 	"github.com/google/uuid"
+	"github.com/mlayerprotocol/go-mlayer/common/constants"
 	"github.com/mlayerprotocol/go-mlayer/common/encoder"
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/configs"
@@ -56,20 +57,22 @@ func GetId(d Payload, id string) (string, error) {
 
 type ClientPayload struct {
 	// Primary
-	Id string `json:"id"`
+	Version float32 `json:"_v"`
+	Id string `json:"id,omitempty"`
 	Data      interface{}   `json:"d"`
-	Timestamp uint64           `json:"ts"`
-	EventType uint16        `json:"ty"`
-	Nonce     uint64        `json:"nonce"`
-	Account   DIDString `json:"acct,omitempty"` // optional public key of sender
-	ChainId   configs.ChainId `json:"chId"` // optional public key of sender
+	Timestamp uint64           `json:"ts,omitempty"`
+	EventType constants.EventType        `json:"ty,omitempty"`
+	Nonce     uint64        `json:"nonce,omitempty"`
+	Account   AccountString `json:"acct,omitempty"` // optional public key of sender
+	ChainId   configs.ChainId `json:"chId,omitempty"` // optional public key of sender
+	DataEncoder   string `json:"encoder,omitempty"`
 
 	Validator string `json:"val,omitempty"`
 	// Secondary																								 	AA	`							qaZAA	`q1aZaswq21``		`	`
-	Signature string       `json:"sig"`
+	Signature string       `json:"sig,omitempty"`
 	Hash      string       `json:"h,omitempty"`
-	Agent     DeviceString `gorm:"-" json:"agt"`
-	Subnet    string       `json:"snet" gorm:"index;"`
+	Agent     DeviceString `gorm:"-" json:"agt,omitempty"`
+	Subnet    string       `json:"snet,omitempty" gorm:"index;"`
 	Page      uint16       `json:"page,omitempty" gorm:"_"`
 	PerPage   uint16       `json:"perPage,omitempty" gorm:"_"`
 }
@@ -123,8 +126,8 @@ func (msg ClientPayload) GetHash() ([]byte, error) {
 		logger.Debugf("ENCODBYTEERROR: %v",err)
 		return nil, err
 	}
-	
-	bs := crypto.Keccak256Hash(b)
+	logger.Debugf("HELLOSJSLIJSDMSG %s", hex.EncodeToString(b))
+	bs := crypto.Sha256(b)
 	
 	return bs, nil
 }
@@ -137,7 +140,11 @@ func (msg *ClientPayload) GetSigner() (DeviceString, error) {
 		}
 		
 		agent, _ := crypto.GetSignerECC(&b,  &msg.Signature)
-		msg.Agent = AddressFromString(agent).ToDeviceString()
+		s, err := AddressFromString(agent)
+		if err != nil {
+			return "", err
+		}
+		msg.Agent = s.ToDeviceString()
 		return msg.Agent, nil
 }
 
@@ -154,6 +161,7 @@ func (msg ClientPayload) EncodeBytes() ([]byte, error) {
 		}
 		hashed = crypto.Keccak256Hash(b)
 	}
+	
 	var params []encoder.EncoderParam
 	params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: msg.ChainId.Bytes()})
 	params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: hashed})

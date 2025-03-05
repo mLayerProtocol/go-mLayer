@@ -26,4 +26,7 @@ const (
 	P2PDhtStore                 DataStore		= "p2p-data-store"
 	SystemStore                 DataStore		= "system-store"
 	NetworkStatsStore                 DataStore		= "network-stats-store"
+	NodeTopicsStore                 DataStore		= "node-topics-store"
+	GlobalHandlerStore	DataStore		= "global-handler-store"
+	MempoolStore	DataStore		= "mempool-store"
 )

@@ -598,7 +598,7 @@ package service
 // 		go HandleNewPubSubTopicEvent(event, ctx)
 // 		valid = false
 // 		// // lets get my local authstate and see if its the same
-// 		// localAuthState, _ := query.GetOneAuthorizationState(entities.Authorization{Subnet: subnet, Agent: entities.DeviceString(agent), Account: entities.DIDString(account)})
+// 		// localAuthState, _ := query.GetOneAuthorizationState(entities.Authorization{Subnet: subnet, Agent: entities.DeviceString(agent), Account: entities.AccountString(account)})
 // 		// if localAuthState == nil  { // I have no auth state record as well.
 // 		// 	// all i can do is store this event and try to get the authstate from this node
 // 		// 	// i will still have to validate it

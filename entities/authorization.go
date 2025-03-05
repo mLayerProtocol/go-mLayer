@@ -15,16 +15,19 @@ import (
 type PubKeyType string
 
 const (
+	// EDD PubKeyType = "Edd"
+	// GenericSecP PubKeyType = "PubKeySecp256k1"
 	TendermintsSecp256k1PubKey PubKeyType = "tendermint/PubKeySecp256k1"
 	EthereumPubKey             PubKeyType = "eth"
 )
 
 type Authorization struct {
+	Version float32 `json:"_v"`
 	ID            string                           	`json:"id" gorm:"type:uuid;not null;primaryKey"`
-	Agent         DeviceString                    	`json:"agt" gorm:"uniqueIndex:idx_agent_account_subnet;index:idx_authorization_states_agent"`
+	Authorized    AddressString                 	`json:"auth" gorm:"uniqueIndex:idx_agent_account_subnet;index:idx_authorization_states_agent"`
 	Meta          string                           	`json:"meta,omitempty"`
-	Account       DIDString                        	`json:"acct" gorm:"varchar(40);"`
-	Grantor       DIDString                        	`json:"gr" gorm:"index"`
+	Account       AccountString                     `json:"acct" gorm:"varchar(40);"`
+	Grantor       AccountString                       	`json:"gr" gorm:"index"`
 	Priviledge    *constants.AuthorizationPrivilege	`json:"privi"  gorm:""`
 	TopicIds      string                           	`json:"topIds"`
 	Timestamp     *uint64                           `json:"ts"`
@@ -60,9 +63,9 @@ func (g Authorization) GetHash() ([]byte, error) {
 func (entity Authorization) GetEvent() EventPath {
 	return entity.Event
 }
-func (entity Authorization) GetAgent() DeviceString {
-	return entity.Agent
-}
+// func (entity Authorization) GetAgent() DeviceString {
+// 	return entity.Agent
+// }
 func (g Authorization) ToJSON() []byte {
 	b, _ := json.Marshal(g)
 	return b
@@ -94,20 +97,20 @@ func (g *Authorization) GetKeys() (keys []string)  {
 
 
 func (g *Authorization) AuthorizedAgentStateKey() (string) {
-	if (g.Account == "") {
-		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Agent, g.Subnet)
+	if (g.Authorized.IsDevice()) {
+		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Authorized, g.Subnet)
 	}
-	return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Agent, g.Subnet, g.Account)
+	return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Authorized, g.Subnet, g.Account)
 }
 
 func (g *Authorization) AccountAuthorizationsKey() (string) {
 	if (g.TopicIds != "" && g.TopicIds != "*") {
-			return fmt.Sprintf("%s/agt/%s/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Agent, g.TopicIds)
+			return fmt.Sprintf("%s/agt/%s/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Authorized, g.TopicIds)
 	} 
 
 	if (g.Subnet != "") {
-		if g.Agent != ""  {
-			return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Agent)
+		if g.Authorized != ""  {
+			return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Authorized)
 		}
 		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Account, g.Subnet)
 	} else {
@@ -120,9 +123,17 @@ func AccountAuthorizationsKeyToAuthorization(key string) (*Authorization, error)
 	if len(parts) > 3 {
 		return nil, fmt.Errorf("auth key too long")
 	}
-	auth := &Authorization{Account: DIDFromString(parts[0]).ToDIDString(), Subnet: parts[1]}
+	account, err := AccountFromString(parts[0])
+	if err != nil {
+		return nil, err
+	}
+	if !account.IsValid() {
+		return nil, fmt.Errorf("invalid account")
+	}
+	auth := &Authorization{Account: account.ToString(), Subnet: parts[1]}
 	if len(parts) > 2 {
-		auth.Agent = DIDFromString(parts[2]).ToDeviceString()
+		addr, _ := AddressFromString(parts[2])
+		auth.Authorized = addr.ToString()
 	}
 	return auth, nil
 }
@@ -160,8 +171,8 @@ func AgentCountKey() string {
 func (g Authorization) EncodeBytes() ([]byte, error) {
 
 	b, e := encoder.EncodeBytes(
-		encoder.EncoderParam{Type: encoder.AddressEncoderDataType, Value: string(g.Account)},
-		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: AddressFromString(string(g.Agent)).Addr},
+		encoder.EncoderParam{Type: encoder.AddressEncoderDataType, Value: g.Account},
+		encoder.EncoderParam{Type: encoder.AddressEncoderDataType, Value: g.Authorized},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *g.Duration},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: g.Meta},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *g.Priviledge},

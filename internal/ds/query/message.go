@@ -24,7 +24,7 @@ import (
 // 	return &data, errp
 // }
 
-func GetMessages( filter entities.Message, limits *QueryLimit, txn *datastore.Txn) (data []*entities.Message, err error) {
+func GetMessages( filter entities.Message, limits *entities.QueryLimit, txn *datastore.Txn) (data []*entities.Message, err error) {
 	ds :=  stores.MessageStore
 	var rsl query.Results
 	if limits == nil {
@@ -50,12 +50,14 @@ func GetMessages( filter entities.Message, limits *QueryLimit, txn *datastore.Tx
 			Prefix: prefix,
 			Limit:  limits.Limit,
 			Offset: limits.Offset,
+			Orders: []query.Order{query.OrderByKeyDescending{}},
 		})
 	} else {
 		rsl,  err = ds.Query(context.Background(), query.Query{
 			Prefix: prefix,
 			Limit:  limits.Limit,
 			Offset: limits.Offset,
+			Orders: []query.Order{query.OrderByKeyDescending{}},
 		})
 	}
 

@@ -77,7 +77,7 @@ const (
 	OnlineState ConnectionState = 1
 )
 type Presence struct {
-	Account DIDString `json:"acct"`
+	Account AccountString `json:"acct"`
 	MetaData json.RawMessage `json:"metaD"`
 	ConnectionState ConnectionState `json:"connS"`
 	ActiveAgo uint64 `json:"actA"`
@@ -94,4 +94,5 @@ type Presence struct {
  type SocketSubscriptoinResponseData struct {
 	SubscriptionId string `json:"subscriptionId"`
 	Event map[string]interface{} `json:"event"`
+	Result interface{}
 }

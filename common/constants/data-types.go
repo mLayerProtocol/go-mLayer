@@ -1,5 +1,13 @@
 package constants
 
+type DataEncoding = string;
+
+const (
+    RAW_ENCODING DataEncoding = "raw"
+    HEX_ENCODING DataEncoding = "hex"
+    BASE64_ENCODING DataEncoding = "base64"
+)
+
 type DataType = string;
 const (
     BINARY   DataType = ""
@@ -33,6 +41,7 @@ const (
     WAR      DataType = "war"
     EAR      DataType = "ear"
     JSON     DataType = "json"
+    MsgPack     DataType = "msgpack"
     HQX      DataType = "hqx"
     DOC      DataType = "doc"
     PDF      DataType = "pdf"

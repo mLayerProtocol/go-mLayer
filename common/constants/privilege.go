@@ -12,7 +12,7 @@ const (
 type SubscriberRole uint8
 
 var (
-	TopicReaderRole SubscriberRole = 0
+	TopicUnsubscribed SubscriberRole = 0
 	TopicWriterRole  SubscriberRole = 10
 	TopicManagerRole SubscriberRole = 20
 	TopicAdminRole  SubscriberRole = 30

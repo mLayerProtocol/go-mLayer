@@ -17,7 +17,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/sql/models"
 )
 
-func GetBlockStats(startBlock uint64, limit *dsquery.QueryLimit) (*[]models.BlockStat, error) {
+func GetBlockStats(startBlock uint64, limit *entities.QueryLimit) (*[]models.BlockStat, error) {
 	var blockStat []models.BlockStat
 	
 
@@ -78,7 +78,7 @@ func GetBlockStats(startBlock uint64, limit *dsquery.QueryLimit) (*[]models.Bloc
 	return &blockStat, nil
 }
 
-func GetCycleStats(startCycle uint64, limit *dsquery.QueryLimit) (*[]models.BlockStat, error) {
+func GetCycleStats(startCycle uint64, limit *entities.QueryLimit) (*[]models.BlockStat, error) {
 	var blockStat []models.BlockStat
 	
 

@@ -15,6 +15,7 @@ var TopicPubSub Channel
 var SubnetPubSub Channel
 var MessagePubSub Channel
 var SubscriptionPubSub Channel
+var SystemMessagePubSub Channel
 var WalletPubSub Channel
 
 type Channel struct {

@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -48,7 +49,9 @@ func (v *DhtValidator) Validate(key string, value []byte) error {
     case "val":
         return v.validateValidatorListKey(parts, value)
     case "cost":
-        return v.validatePriceKey(parts, value)
+        return v.validatePriceKey(&parts, &value)
+    case "snet", "snetRef":
+        return v.validateSubnetKey(&parts, &value)
     }
 
     return nil
@@ -59,8 +62,12 @@ func (v *DhtValidator) Select(key string, values [][]byte) (int, error) {
         return 0, nil
     }
     parts := strings.Split(string(key), "/")
-    if parts[2] == "val" {
-		return v.selectFromValidatorList(parts, values)
+    switch(parts[2]) {
+    case "val":
+		return v.selectFromValidatorList(&parts, &values)
+	
+    case "snet", "snetRef":
+		return v.selectFromSubnetValidatorList(&parts, &values)
 	}
     // Handle selecting the valid value among multiple
     logger.Debugf("FOUND records %d", len(values))
@@ -99,11 +106,9 @@ func (v *DhtValidator) validateValidatorListKey(parts []string, value []byte ) e
 	return nil
 }
 
-func (v *DhtValidator) selectFromValidatorList(parts []string, value [][]byte ) (int, error) {
+func (v *DhtValidator) selectFromValidatorList(parts *[]string, value *[][]byte ) (int, error) {
     result := []NodeMultiAddressDataIndexed{}
-   
-    for idx, b := range value {
-      
+    for idx, b := range *value {
         d, err := UnpackNodeMultiAddressData(b)
         if err != nil {
             continue
@@ -114,7 +119,7 @@ func (v *DhtValidator) selectFromValidatorList(parts []string, value [][]byte ) 
         if !d.IsValid(cfg.ChainId) {
            continue
         }
-        if parts[3] != hex.EncodeToString(d.Signer) && parts[3] != hex.EncodeToString(d.PubKeyEDD) {
+        if (*parts)[3] != hex.EncodeToString(d.Signer) && (*parts)[3] != hex.EncodeToString(d.PubKeyEDD) {
             continue
         }
         result = append(result, NodeMultiAddressDataIndexed{Data: d, Index: idx})
@@ -129,19 +134,19 @@ func (v *DhtValidator) selectFromValidatorList(parts []string, value [][]byte ) 
 	return result[0].Index, nil
 }
 
-func (v *DhtValidator) validatePriceKey(parts []string, value []byte ) error {
-    if len(parts) != 4 {
+func (v *DhtValidator) validatePriceKey(parts *[]string, value *[]byte ) error {
+    if len(*parts) != 4 {
 		return errors.New("DhtValidator: price key parts too short or long")
 	}
-	if !utils.IsNumericInt(parts[3]) {
+	if !utils.IsNumericInt((*parts)[3]) {
 		return errors.New("DhtValidator: price key value must be a numeric")
 	}
-    priceData, err := UnpackMessagePrice(value)
+    priceData, err := UnpackMessagePrice(*value)
     if err != nil {
         return fmt.Errorf("DhtValidator: Invalid price data - %v", err)
     }
-    logger.Debugf("PRICE_KEY %s, %d", parts[3], new(big.Int).SetBytes(priceData.Cycle))
-    if parts[3] != fmt.Sprintf("%d", new(big.Int).SetBytes(priceData.Cycle)) {
+    logger.Debugf("PRICE_KEY %s, %d", (*parts)[3], new(big.Int).SetBytes(priceData.Cycle))
+    if (*parts)[3] != fmt.Sprintf("%d", new(big.Int).SetBytes(priceData.Cycle)) {
         return errors.New("DhtValidator: price data cycle does not match key cycle")
     }
     if !priceData.IsValid(cfg.ChainId) {
@@ -155,4 +160,59 @@ func (v *DhtValidator) validatePriceKey(parts []string, value []byte ) error {
     // }
 
 	return nil
+}
+
+func (v *DhtValidator) validateSubnetKey(parts *[]string, value *[]byte ) error {
+    if len((*parts)) != 4 {
+		return errors.New("DhtValidator: subnet key parts too short or long")
+	}
+	if len((*parts)[3]) != 32 || len((*parts)[3]) != 64 {
+		return errors.New("DhtValidator: subnet key value must be subnet uuid or Keccak hash of subnet ref")
+	}
+
+    
+        validatorData, err := UnpackSubnetValidator(*value)
+        if err != nil {
+            return fmt.Errorf("DhtValidator: Invalid subnet validator data - %v", err)
+        }
+        isValidator,  _ := chain.NetworkInfo.IsValidator(hex.EncodeToString(validatorData.Signer))
+        if !isValidator {
+            return errors.New("DhtValidator: Signer is not a validator")
+        }
+        if (*parts)[2] == "snet" {
+            validators := bytes.Split(validatorData.Validators, []byte{':'})
+            if len(validators) == 0 {
+                return fmt.Errorf("DhtValidator: must contain list of validators")
+            }
+            for _, validator := range validators {
+                if len(validator) != 0 && len(validator) != 32 {
+                    return fmt.Errorf("DhtValidator: invalid validator public key")
+                }
+            }
+     }
+    
+    
+    
+	return nil
+}
+
+func (v *DhtValidator) selectFromSubnetValidatorList(_ *[]string, values *[][]byte ) (int, error) {
+    result := []SubnetValidator{}
+    selectedIndex := 0
+    previouseTimestamp := uint64(0)
+    for idx, b := range *values {
+        validatorData, err := UnpackSubnetValidator(b)
+        if err != nil {
+            return 0, fmt.Errorf("DhtValidator: Invalid subnet validator data - %v", err)
+        }
+        if previouseTimestamp < validatorData.Timestamp {
+            selectedIndex = idx
+            previouseTimestamp = validatorData.Timestamp
+        } 
+    }
+    if len(result) == 0 {
+        return 0, nil
+    }
+   
+	return selectedIndex, nil
 }

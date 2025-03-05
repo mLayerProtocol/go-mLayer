@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
+	"net/http"
 	"os"
 	"reflect"
 	"regexp"
@@ -85,6 +87,129 @@ func Abs(a uint64, b uint64) uint64 {
 	return IfThenElse(a >b, a-b,b-a)
 }
 
+func CreateKey(separator string, values ...any) string {
+	var sb strings.Builder
+
+	for i, v := range values {
+		// Convert value to string
+		switch v := v.(type) {
+		case string:
+			sb.WriteString(v)
+		case int:
+			sb.WriteString(strconv.Itoa(v))
+		case int64:
+			sb.WriteString(strconv.FormatInt(v, 10))
+		case float64:
+			sb.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+		case float32:
+			sb.WriteString(strconv.FormatFloat(float64(v), 'f', -1, 32))
+		default:
+			sb.WriteString(fmt.Sprintf("%v", v)) // Fallback for other types
+		}
+
+		// Add "/" separator if not the last item
+		if i < len(values)-1 {
+			sb.WriteString(separator)
+		}
+	}
+
+	return sb.String()
+}
+
+func CopyStructToStruct(src, dest interface{}) error {
+	srcVal := reflect.ValueOf(src)
+	destVal := reflect.ValueOf(dest)
+
+	// Ensure src is a struct
+	if srcVal.Kind() == reflect.Ptr {
+		srcVal = srcVal.Elem()
+	}
+	if destVal.Kind() == reflect.Ptr {
+		destVal = destVal.Elem()
+	}
+
+	// Ensure both are structs
+	if srcVal.Kind() != reflect.Struct || destVal.Kind() != reflect.Struct {
+		return fmt.Errorf("both source and destination must be structs")
+	}
+
+	for i := 0; i < srcVal.NumField(); i++ {
+		field := srcVal.Type().Field(i)
+		srcFieldVal := srcVal.Field(i)
+		destFieldVal := destVal.FieldByName(field.Name)
+
+		// Skip if destination struct doesn't have the field
+		if !destFieldVal.IsValid() || !destFieldVal.CanSet() {
+			continue
+		}
+
+		// Copy only if the source field is non-zero
+		if !isZeroValue(srcFieldVal) {
+			destFieldVal.Set(srcFieldVal)
+		}
+	}
+	return nil
+}
+
+func MapToStruct(m map[string]interface{}, s interface{}) error {
+    // Get the value that the interface{} contains
+    val := reflect.ValueOf(s)
+    
+    // If it's a pointer, resolve its value
+    if val.Kind() == reflect.Ptr {
+        val = val.Elem()
+    }
+    
+    // Make sure we have a struct
+    if val.Kind() != reflect.Struct {
+        return fmt.Errorf("expected struct, got %s", val.Kind())
+    }
+    
+    // Iterate over the struct fields
+    for i := 0; i < val.NumField(); i++ {
+        field := val.Field(i)
+        fieldType := val.Type().Field(i)
+        fieldName := fieldType.Name
+        
+        // Check if the map contains this field
+        if mapVal, ok := m[fieldName]; ok {
+            // Get the value from the map
+            mapValue := reflect.ValueOf(mapVal)
+            
+            // Check if the field is settable
+            if !field.CanSet() {
+                continue
+            }
+            
+            // Handle pointer fields
+            if field.Kind() == reflect.Ptr {
+                // Get the type of the pointer's target
+                targetType := field.Type().Elem()
+                
+                // Create a new pointer of the correct type
+                newPtr := reflect.New(targetType)
+                
+                // If map value type matches pointer's target type, set the value
+                if mapValue.Type() == targetType {
+                    newPtr.Elem().Set(mapValue)
+                    field.Set(newPtr)
+                } else if mapValue.Kind() == reflect.Ptr {
+                    // If the map value is also a pointer, handle that case
+                    if mapValue.Elem().Type() == targetType {
+                        field.Set(mapValue)
+                    }
+                }
+            } else {
+                // Non-pointer field handling
+                if field.Type() == mapValue.Type() {
+                    field.Set(mapValue)
+                }
+            }
+        }
+    }
+    
+    return nil
+}
 func CopyStructValues(src, dst interface{}) error {
 	srcVal := reflect.ValueOf(src)
 	dstVal := reflect.ValueOf(dst).Elem()
@@ -459,6 +584,15 @@ func Find[T any](slice []T, predicate func(T) bool) (T, bool) {
 	var zero T
 	return zero, false
 }
+func FindMany[T any](slice []T, predicate func(T) bool) (result []T, found bool) {
+	for _, v := range slice {
+		if predicate(v) {
+			result = append(result, v)
+		}
+	}
+	
+	return result, len(result) > 0
+}
 
 func CompressToGzip(input []byte) ([]byte, error) {
 	// Create a buffer to hold the compressed data
@@ -532,6 +666,13 @@ func IntMilliToTimestampString( milliseconds int64) string {
     return  timestamp.Format("20060102150405000") // No dot bef
 }
 
+func CurrentTimestampAsString() string {
+    // Convert microseconds to nanoseconds
+    nanoseconds := time.Now().UnixMilli() * 1_000_000
+    timestamp := time.Unix(0, nanoseconds)
+    return  timestamp.Format("20060102150405000") // No dot bef
+}
+
 func ListFilesInDir(directory string) ([]string, error) {
 	entries, err := os.ReadDir(directory)
 	if err != nil {
@@ -560,4 +701,55 @@ func WriteBytesToFile(filePath string, data []byte) error {
 	defer file.Close()
 	_, err = file.Write(data)
 	return err
+}
+
+func GetPublicIPFromAPI() (string, error) {
+	resp, err := http.Get("https://api.ipify.org")
+	if err != nil {
+		return "", err // Return error if API call fails
+	}
+	defer resp.Body.Close()
+
+	ip, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(ip), nil
+}
+
+// GetPublicIPFromDial falls back to discovering the public IP via a UDP connection
+func GetPublicIPFromDial() (string, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80") // Google's Public DNS
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String(), nil
+}
+
+
+func GetDifference(oldState, newState map[string]interface{}) map[string]interface{} {
+	diffs := make(map[string]interface{})
+
+	for key, value1 := range oldState {
+		if value2, exists := newState[key]; exists {
+			if !reflect.DeepEqual(value1, value2) {
+				diffs[key] = value2
+			}
+		} else {
+			diffs[key] = nil // Key exists in map1 but not in map2
+		}
+	}
+
+	// Check for keys in map2 that are not in map1
+	for key := range newState {
+		if _, exists := oldState[key]; !exists {
+			diffs[key] = newState[key] // Key exists in map2 but not in map1
+		}
+	}
+
+	return diffs
 }

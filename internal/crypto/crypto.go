@@ -389,7 +389,7 @@ func GenerateCertData() (cd *CertData, err error) {
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			Organization: []string{"Example Org"},
+			Organization: []string{"mlayer.network"},
 		},
 		NotBefore: time.Now(),
 		NotAfter:  time.Now().Add(365 * 24 * time.Hour), // 1 year validity
@@ -442,6 +442,7 @@ func ValidateCert(cert []byte) error {
 	if time.Now().AddDate(0, 6, 0).After(parsedCert.NotAfter) {
 		return fmt.Errorf("expired or almost expired")
 	}
+	
 	return nil
 }
 
@@ -503,3 +504,7 @@ func GetOrGenerateCert(ctx *context.Context) *CertData {
 		}
 		return cd
 }
+
+
+// 93d7bde2d930794d1f7c9f01724bb72e580ddedd7fc676ad5ea8b32358937b690000000000000000ddb466a5dd4a5c0835614c7a46e18943ef750a9d00000000000000000000000000000000000000000152b5fa00000000000000b90000000000000173000000000000000a0000019529d85bf400000000000000000000000000000000
+// b64e1436c16c43f22f758a19d253496f048880e063541656362ee1eb432e55510000000000000000ddb466a5dd4a5c0835614c7a46e18943ef750a9d00000000000000000000000000000000000000000152b5fa00000000000000b90000000000000173000000000000000a0000019529d85bf400000000000000000000000000000000

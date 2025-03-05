@@ -15,6 +15,7 @@ import (
 
 // Block
 type Block struct {
+	Version float32 `json:"_v"`
 	BlockId    string `json:"blId"`
 	Size       int    `json:"s"`
 	Closed     bool   `json:"c"`
