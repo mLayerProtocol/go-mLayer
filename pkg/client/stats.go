@@ -160,7 +160,7 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 
 
 
-	agentCounBytes, err  := stores.StateStore.Get(context.Background(), datastore.NewKey(entities.AgentCountKey()))
+	agentCounBytes, err  := stores.StateStore.Get(context.Background(), datastore.NewKey(entities.DeviceKeyCountKey()))
 	
 	if err != nil && !dsquery.IsErrorNotFound(err) {
 		return  &entities.MainStat{}, err

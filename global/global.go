@@ -26,7 +26,7 @@ var GlobalSubnets = []entities.Subnet {
     BlockNumber: 0,
     Cycle  : 0,
     Epoch:		0,
-    Agent:  "did:0x0000000000000000000000000000000000000000",
+    DeviceKey:  "did:0x0000000000000000000000000000000000000000",
     Event: entities.EventPath{EntityPath: entities.EntityPath{ Model: "snet", ID: "00000000-0000-0000-0000-000000000000", Validator: ""}},
     Timestamp: TIMESTAMP,
   },
@@ -90,7 +90,7 @@ var GlobalTopics = []entities.Topic {
     Cycle  : 0,
     Epoch:		0,
     
-    Agent:  "did:0x0000000000000000000000000000000000000000",
+    DeviceKey:  "did:0x0000000000000000000000000000000000000000",
     Event: entities.EventPath{EntityPath: entities.EntityPath{ Model: "top", ID: "00000000-0000-0000-0000-000000000001", Validator: ""}},
   },
   {
@@ -107,7 +107,7 @@ var GlobalTopics = []entities.Topic {
     Cycle  : 0,
     Epoch:		0,
     
-    Agent:  "did:0x0000000000000000000000000000000000000000",
+    DeviceKey:  "did:0x0000000000000000000000000000000000000000",
     Event: entities.EventPath{EntityPath: entities.EntityPath{ Model: "top", ID: "00000000-0000-0000-0000-000000000001", Validator: ""}},
   },
 }

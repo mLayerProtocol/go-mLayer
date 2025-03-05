@@ -64,7 +64,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 			(uint64(*authState.Timestamp)+uint64(*authState.Duration)) {
 			return model, apperror.Unauthorized("Agent authorization expired")
 		}
-		payload.Agent = *agent
+		payload.DeviceKey = *agent
 	}
 
 	var assocPrevEvent *entities.EventPath

@@ -94,7 +94,7 @@ func ValidateClientPayload(
 		return nil, nil, err
 	}
 	
-	// if agent != payload.Agent {
+	// if agent != payload.DeviceKey {
 	// 	return nil, nil, apperror.BadRequest("Agent is required")
 	// }
 	// logger.Debugf("AGENTTTT %s", agent)
@@ -187,12 +187,12 @@ func SyncRequest(payload *entities.ClientPayload) entities.SyncResponse {
 
 
 func validateAgent(payload *entities.ClientPayload) error {
-	if len(payload.Account) > 0 &&  len(payload.Agent) > 0  {
+	if len(payload.Account) > 0 &&  len(payload.DeviceKey) > 0  {
 		// check if its an admin
 		// auth := models.AuthorizationState{}
-		// err = query.GetOneState(entities.Authorization{Agent: payload.Agent, Account: payload.Account}, &auth)
+		// err = query.GetOneState(entities.Authorization{Agent: payload.DeviceKey, Account: payload.Account}, &auth)
 		auth, err := dsquery.GetAccountAuthorizations(entities.Authorization{
-			Authorized: entities.AddressString(payload.Agent), Account: payload.Account, Subnet: payload.Subnet,
+			Authorized: entities.AddressString(payload.DeviceKey), Account: payload.Account, Subnet: payload.Subnet,
 		}, nil, nil)
 		if err != nil {
 			return  apperror.Unauthorized("Invalid subnet")

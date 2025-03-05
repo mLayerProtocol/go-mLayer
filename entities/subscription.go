@@ -33,7 +33,7 @@ type Subscription struct {
 	Timestamp *uint64       `json:"ts,omitempty"`
 	Hash      string       `json:"h,omitempty" gorm:"unique" `
 	Event     EventPath    `json:"e,omitempty" gorm:"index;char(64);"`
-	Agent     DeviceString `json:"agt,omitempty"  gorm:"not null;type:varchar(100);index"`
+	DeviceKey     DeviceString `json:"dKey,omitempty"  gorm:"not null;type:varchar(100);index"`
 	BlockNumber uint64          `json:"blk,omitempty"`
 	Cycle   	uint64			`json:"cy,omitempty"`
 	Epoch		uint64			`json:"ep,omitempty"`
@@ -140,8 +140,8 @@ func (sub Subscription) GetHash() ([]byte, error) {
 func (sub Subscription) GetEvent() EventPath {
 	return sub.Event
 }
-func (sub Subscription) GetAgent() DeviceString {
-	return sub.Agent
+func (sub Subscription) GetDeviceKey() DeviceString {
+	return sub.DeviceKey
 }
 
 func (sub Subscription) EncodeBytes() ([]byte, error) {

@@ -135,7 +135,7 @@ type Message struct {
 
 	/// DERIVED
 	
-	Agent DeviceString `json:"agt,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	DeviceKey DeviceString `json:"dKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 	Event       EventPath           `json:"e,omitempty" gorm:"index;char(64);"`
 	Hash        string              `json:"h"`
 	// Attachments []MessageAttachment `json:"atts" gorm:"json;"`
@@ -387,8 +387,8 @@ func (msg *Message) MsgPack() []byte {
 func (entity Message) GetEvent() EventPath {
 	return entity.Event
 }
-func (entity Message) GetAgent() DeviceString {
-	return entity.Agent
+func (entity Message) GetDeviceKey() DeviceString {
+	return entity.DeviceKey
 }
 
 func MessageFromBytes(b []byte) *Message {

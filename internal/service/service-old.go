@@ -130,8 +130,8 @@ package service
 // 	// reject event if not
 
 // 	// save event
-// 	// if len(event.Payload.Agent) > 0 {
-// 	// 	currentAgentAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Agent: event.Payload.Agent, Subnet: event.Payload.Subnet})
+// 	// if len(event.Payload.DeviceKey) > 0 {
+// 	// 	currentAgentAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Agent: event.Payload.DeviceKey, Subnet: event.Payload.Subnet})
 // 	// 	if err != nil {
 // 	// 		logger.Errorf("query: %v", err)
 // 	// 	}
@@ -176,7 +176,7 @@ package service
 // 				Event: entities.Event{Hash: event.Hash},
 // 			}
 // 			topic.Event = *entities.NewEventPath(event.Validator, modelName, event.Hash)
-// 			topic.Agent = entities.AddressFromString(agent).ToDeviceString()
+// 			topic.DeviceKey = entities.AddressFromString(agent).ToDeviceString()
 // 			topic.Account = event.Payload.Account
 // 			data = topic
 // 		case entities.Authorization:
@@ -189,8 +189,8 @@ package service
 // 			authRequest.Hash = entityHash
 // 			subnet = authRequest.Subnet
 // 			account = string(event.Payload.Account)
-// 			agent = string(authRequest.Agent)
-// 			authRequest.Agent = entities.AddressFromString(string(authRequest.Agent)).ToDeviceString()
+// 			agent = string(authRequest.DeviceKey)
+// 			authRequest.DeviceKey = entities.AddressFromString(string(authRequest.DeviceKey)).ToDeviceString()
 // 			// check if the current local state is based on thise event
 // 			// authState, authError = query.GetOneAuthorizationState(entities.Authorization{Subnet: subnet, Agent: entities.DeviceString(agent)})
 // 			// validate from here
@@ -247,7 +247,7 @@ package service
 // 				Event: entities.Event{Hash: event.Hash},
 // 			}
 // 			authRequest.Event = *entities.NewEventPath(event.Validator, modelName, event.Hash)
-// 			authRequest.Agent = entities.AddressFromString(agent).ToDeviceString()
+// 			authRequest.DeviceKey = entities.AddressFromString(agent).ToDeviceString()
 // 			// authRequest.Account = event.Payload.Account
 // 			data = authRequest
 
@@ -425,12 +425,12 @@ package service
 // 				// 	Authorization: auth,
 // 				// }
 // 				// query.GetOne(models.AuthorizationState{
-// 				// 	Authorization: entities.Authorization{Agent: auth.Agent, Subnet: auth.Subnet},
+// 				// 	Authorization: entities.Authorization{Agent: auth.DeviceKey, Subnet: auth.Subnet},
 // 				// }, &auth)
-// 				logger.Debug("AuthState", auth.Agent, " ",  auth.Subnet, " ", auth.Account)
+// 				logger.Debug("AuthState", auth.DeviceKey, " ",  auth.Subnet, " ", auth.Account)
 // 				// if len(auth.ID) > 0 {
 // 				// 	newState, txResult = SaveState(models.AuthorizationState{
-// 				// 		Authorization: entities.Authorization{Agent: auth.Agent, Subnet: auth.Subnet},
+// 				// 		Authorization: entities.Authorization{Agent: auth.DeviceKey, Subnet: auth.Subnet},
 // 				// 	}, models.AuthorizationState{Authorization: entities.Authorization{ID: auth.ID}}, true, tx)
 // 				// } else {
 // 				// 	txResult = tx.Model(&models.AuthorizationState{}).Create(&newState)

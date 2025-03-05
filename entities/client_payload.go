@@ -71,7 +71,7 @@ type ClientPayload struct {
 	// Secondary																								 	AA	`							qaZAA	`q1aZaswq21``		`	`
 	Signature string       `json:"sig,omitempty"`
 	Hash      string       `json:"h,omitempty"`
-	Agent     DeviceString `gorm:"-" json:"agt,omitempty"`
+	DeviceKey     DeviceString `gorm:"-" json:"dKey,omitempty"`
 	Subnet    string       `json:"snet,omitempty" gorm:"index;"`
 	Page      uint16       `json:"page,omitempty" gorm:"_"`
 	PerPage   uint16       `json:"perPage,omitempty" gorm:"_"`
@@ -144,8 +144,8 @@ func (msg *ClientPayload) GetSigner() (DeviceString, error) {
 		if err != nil {
 			return "", err
 		}
-		msg.Agent = s.ToDeviceString()
-		return msg.Agent, nil
+		msg.DeviceKey = s.ToDeviceString()
+		return msg.DeviceKey, nil
 }
 
 

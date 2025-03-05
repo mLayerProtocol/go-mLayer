@@ -22,7 +22,7 @@ type WalletBalance struct {
 	Account           AccountString `json:"acct"  gorm:"type:varchar(64);uniqueIndex:idx_wallet_acct;not null"`
 	Wallet string `json:"wal"  gorm:"type:char(36);uniqueIndex:idx_wallet_acct;not null"`
 	Balance             big.Int        `json:"bal" gorm:"index;not null;default:0"`
-	Agent DeviceString `json:"agt,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	DeviceKey DeviceString `json:"dKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 
 	// Derived
 	Event EventPath `json:"e,omitempty" gorm:"index;not null;varchar;"`
@@ -54,7 +54,7 @@ func (entity WalletBalance) GetEvent() (EventPath) {
 	return entity.Event
 }
 func (entity WalletBalance) GetAgent() (DeviceString) {
-	return entity.Agent
+	return entity.DeviceKey
 }
 
 // func (e *WalletBalance) Key() string {

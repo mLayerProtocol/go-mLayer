@@ -63,8 +63,8 @@ func (g Authorization) GetHash() ([]byte, error) {
 func (entity Authorization) GetEvent() EventPath {
 	return entity.Event
 }
-// func (entity Authorization) GetAgent() DeviceString {
-// 	return entity.Agent
+// func (entity Authorization) GetDeviceKey() DeviceString {
+// 	return entity.DeviceKey
 // }
 func (g Authorization) ToJSON() []byte {
 	b, _ := json.Marshal(g)
@@ -81,8 +81,8 @@ func (g *Authorization) GetKeys() (keys []string)  {
 	if g.ID == "" {
 		g.ID, _ = GetId(g, "")
 	}
-	 // keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Agent, g.ID))
-	 keys = append(keys, fmt.Sprintf("%s/%s",  g.AuthorizedAgentStateKey(), utils.IntMilliToTimestampString(int64(*g.Timestamp))))
+	 // keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.DeviceKey, g.ID))
+	 keys = append(keys, fmt.Sprintf("%s/%s",  g.AuthorizedDeviceKeyStateKey(), utils.IntMilliToTimestampString(int64(*g.Timestamp))))
 	 keys = append(keys, fmt.Sprintf("%s/%s", g.AccountAuthorizationsKey(), utils.IntMilliToTimestampString(int64(*g.Timestamp))))
 	 keys = append(keys, g.Key())
 	 keys = append(keys, g.DataKey())
@@ -96,7 +96,7 @@ func (g *Authorization) GetKeys() (keys []string)  {
 // }
 
 
-func (g *Authorization) AuthorizedAgentStateKey() (string) {
+func (g *Authorization) AuthorizedDeviceKeyStateKey() (string) {
 	if (g.Authorized.IsDevice()) {
 		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Authorized, g.Subnet)
 	}
@@ -165,7 +165,7 @@ func UnpackAuthorization(b []byte) (Authorization, error) {
 	return auth, err
 }
 
-func AgentCountKey() string {
+func DeviceKeyCountKey() string {
 	return fmt.Sprintf("%s/agents", SubscriptionModel)
 }
 func (g Authorization) EncodeBytes() ([]byte, error) {

@@ -193,7 +193,7 @@ func HandleNewPubSubWalletEvent(event *entities.Event, ctx *context.Context) err
 	// 	logger.Errorf("Invalid event payload")
 	// }
 	data.Event = *entities.NewEventPath(event.Validator, entities.WalletModel, event.ID)
-	// data.Agent = entities.AccountString(agent)
+	// data.DeviceKey = entities.AccountString(agent)
 	data.Account = event.Payload.Account
 	// logger.Error("data.Public ", data.Public)
 

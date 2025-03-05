@@ -105,7 +105,7 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 	
 	if len(entries) == 0 {
 		agentCount := 0
-		if agentCountBytes, err := txn.Get(context.Background(), datastore.NewKey(entities.AgentCountKey())); err != nil {
+		if agentCountBytes, err := txn.Get(context.Background(), datastore.NewKey(entities.DeviceKeyCountKey())); err != nil {
 			if !IsErrorNotFound(err) {
 				return nil, err
 			}
@@ -120,7 +120,7 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 			}			
 		}
 		agentCount++
-		txn.Put(context.Background(), datastore.NewKey(entities.AgentCountKey()), []byte(fmt.Sprint(agentCount)) )
+		txn.Put(context.Background(), datastore.NewKey(entities.DeviceKeyCountKey()), []byte(fmt.Sprint(agentCount)) )
 		
 	}
 	
@@ -129,7 +129,7 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 		txn.Delete(context.Background(), datastore.NewKey(entry.Key))
 	}
 	agentRsl,  err := txn.Query(context.Background(), query.Query{
-		Prefix: newState.AuthorizedAgentStateKey(),
+		Prefix: newState.AuthorizedDeviceKeyStateKey(),
 	})
 	if err != nil && !IsErrorNotFound(err) {
 		return nil, err
@@ -200,7 +200,7 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 // 	if tx == nil {
 // 		defer txn.Discard(context.Background())
 // 	}
-// 	if newState.Account == "" || newState.Agent == "" || newState.Subnet == "" {
+// 	if newState.Account == "" || newState.DeviceKey == "" || newState.Subnet == "" {
 // 		return nil, fmt.Errorf("new state must include acc, snet and agent field")
 // 	}
 
@@ -255,7 +255,7 @@ func CreateAuthorizationState(newState *entities.Authorization, tx *datastore.Tx
 func GetAgentAuthorizationStates(subnet string, agent entities.DeviceString, limits entities.QueryLimit) (rsl []*entities.Authorization, err error) {
 	ds :=  stores.StateStore
 	result,  err := ds.Query(context.Background(), query.Query{
-		Prefix: (&entities.Authorization{Subnet: subnet, Authorized: entities.AddressString(agent)}).AuthorizedAgentStateKey(),
+		Prefix: (&entities.Authorization{Subnet: subnet, Authorized: entities.AddressString(agent)}).AuthorizedDeviceKeyStateKey(),
 		Limit:  limits.Limit,
 		Offset: limits.Offset,
 	})

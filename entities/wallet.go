@@ -19,9 +19,9 @@ type Wallet struct {
 	Account   AccountString `json:"acct"`
 	Subnet    string        `json:"snet" gorm:"type:varchar(32);index;not null" msgpack:",noinline"`
 	Name      string        `json:"n" gorm:"type:varchar(12);not null"`
-	Symbol      string        `json:"sym" gorm:"type:varchar(8);not null"`
-	Timestamp uint64        `json:"ts"`
-	Agent DeviceString `json:"agt,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	Symbol      string      `json:"sym" gorm:"type:varchar(8);not null"`
+	Timestamp 	uint64       `json:"ts"`
+	DeviceKey 	DeviceString `json:"dKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 
 	// Derived
 	Event EventPath `json:"e,omitempty" gorm:"index;varchar;"`
@@ -90,7 +90,7 @@ func (entity Wallet) GetEvent() (EventPath) {
 	return entity.Event
 }
 func (entity Wallet) GetAgent() (DeviceString) {
-	return entity.Agent
+	return entity.DeviceKey
 }
 
 func (e Wallet) ToString() (string, error) {

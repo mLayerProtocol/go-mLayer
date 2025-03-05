@@ -53,7 +53,7 @@ func ValidateSubscriptionData(payload *entities.ClientPayload, topic *entities.T
 	// if payload.EventType == uint16(constants.SubscribeTopicEvent) {
 	// 	// someone inviting someone else
 	// 	logger.Infof("ValidateSubscription...3")
-	// 	// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.Agent != payload.Agent 
+	// 	// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.DeviceKey != payload.DeviceKey 
 	// 	subscribingSomeoneElse := subscription.Subscriber != payload.Account
 	// 	if subscribingSomeoneElse {
 	// 		if !slices.Contains([]constants.SubscriptionStatus{constants.InvitedSubscriptionStatus, constants.BannedSubscriptionStatus}, *subscription.Status) {
@@ -88,7 +88,7 @@ func ValidateSubscriptionData(payload *entities.ClientPayload, topic *entities.T
 func ValidateSubscription (account entities.AccountString, subscription *entities.Subscription,  topic *entities.Topic, currentState *entities.Subscription) error {
 		// someone inviting someone else
 		logger.Infof("ValidateSubscription...3")
-		// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.Agent != payload.Agent 
+		// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.DeviceKey != payload.DeviceKey 
 		subscribingSomeoneElse := subscription.Subscriber != entities.AddressString(account)
 		if len(subscription.Subnet) == 0 {
 			return apperror.BadRequest("subnet must be specified")
@@ -142,7 +142,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	data.BlockNumber = event.BlockNumber
 	data.Cycle = event.Cycle
 	data.Epoch = event.Epoch
-	data.Agent = event.Payload.Agent
+	data.DeviceKey = event.Payload.DeviceKey
 	data.EventSignature = event.Signature
 	data.Timestamp = &event.Timestamp
 	hash, err := data.GetHash()

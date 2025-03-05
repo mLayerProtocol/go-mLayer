@@ -293,7 +293,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 
 	var localState *models.AuthorizationState
 	// err := query.GetOne(&models.TopicState{Topic: entities.Topic{ID: id}}, &localTopicState)
-	// err = sql.SqlDb.Where(&models.AuthorizationState{Authorization: entities.Authorization{Subnet: subnet, Agent: entities.AddressFromString(string(data.Agent)).ToDeviceString()}}).Take(&localState).Error
+	// err = sql.SqlDb.Where(&models.AuthorizationState{Authorization: entities.Authorization{Subnet: subnet, Agent: entities.AddressFromString(string(data.DeviceKey)).ToDeviceString()}}).Take(&localState).Error
 	stateTxn, err := stores.StateStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
 	if err != nil {
 		// either subnet does not exist or you are not uptodate
@@ -415,7 +415,7 @@ func HandleNewPubSubAuthEvent(event *entities.Event, ctx *context.Context) error
 			// if err == nil {
 			// 	go func() {
 			// 		dsquery.IncrementStats(event, nil)
-			// 		dsquery.UpdateAccountCounter(utils.IfThenElse(len(data.Account) > 0, data.Account.ToString(), string(data.Agent)))
+			// 		dsquery.UpdateAccountCounter(utils.IfThenElse(len(data.Account) > 0, data.Account.ToString(), string(data.DeviceKey)))
 			// 		event.Subnet = event.Payload.Subnet
 			// 		OnFinishProcessingEvent(ctx, event, &models.AuthorizationState{
 			// 			Authorization: data,

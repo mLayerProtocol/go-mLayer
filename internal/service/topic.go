@@ -83,7 +83,7 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 	}
 	data.Hash = hex.EncodeToString(hash)
 	data.Account = event.Payload.Account
-	data.Agent = event.Payload.Agent
+	data.DeviceKey = event.Payload.DeviceKey
 	data.Timestamp = event.Payload.Timestamp
 	logger.Debug("Processing 1...")
 	var localState models.TopicState

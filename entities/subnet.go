@@ -45,7 +45,7 @@ type Subnet struct {
 	BlockNumber uint64          `json:"blk"`
 	Cycle   	uint64			`json:"cy"`
 	Epoch		uint64			`json:"ep"`
-	Agent   	DeviceString `json:"agent"  gorm:"agent" msgpack:"agent"`
+	DeviceKey   	DeviceString `json:"dKey"  gorm:"dKey" msgpack:"dKey"`
 
 	//Deprecated
 	Owner         string     `json:"-" gorm:"-" msgpack:"-"`
@@ -193,8 +193,8 @@ func (item Subnet) ToString() (string, error) {
 func (entity Subnet) GetEvent() EventPath {
 	return entity.Event
 }
-func (entity Subnet) GetAgent() DeviceString {
-	return entity.Agent
+func (entity Subnet) GetDeviceKey() DeviceString {
+	return entity.DeviceKey
 }
 
 func (item Subnet) EncodeBytes() ([]byte, error) {

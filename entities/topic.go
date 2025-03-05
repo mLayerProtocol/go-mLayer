@@ -26,7 +26,7 @@ type Topic struct {
 	SubscriberCount uint64        `json:"sC,omitempty"`
 	Account         AccountString `json:"acct,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 
-	Agent DeviceString `json:"agt,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	DeviceKey DeviceString `json:"dKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 	//
 	Public   *bool `json:"pub,omitempty" gorm:"default:false"`
 
@@ -93,8 +93,8 @@ func (item *Topic) RefKey() string {
 
 func (g *Topic) GetAccountTopicsKey() (string) {
 	if (g.Subnet != "") {
-		if g.Agent != ""  {
-			return fmt.Sprintf("%s/sub/%s/%s/%s", TopicModel, g.Subnet, g.Account, g.Agent)
+		if g.DeviceKey != ""  {
+			return fmt.Sprintf("%s/sub/%s/%s/%s", TopicModel, g.Subnet, g.Account, g.DeviceKey)
 		}
 		return fmt.Sprintf("%s/sub/%s/%s", TopicModel, g.Subnet, g.Account)
 	} else {
@@ -171,7 +171,7 @@ func (topic Topic) GetEvent() EventPath {
 	return topic.Event
 }
 func (topic Topic) GetAgent() DeviceString {
-	return topic.Agent
+	return topic.DeviceKey
 }
 
 func (topic Topic) EncodeBytes() ([]byte, error) {

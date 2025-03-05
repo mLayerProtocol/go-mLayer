@@ -49,7 +49,7 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 		return nil, apperror.BadRequest("Invalid message signer")
 	}
 
-	subsribers := []entities.AddressString{entities.AddressString(payload.Account), entities.AddressString(payload.Agent)}
+	subsribers := []entities.AddressString{entities.AddressString(payload.Account), entities.AddressString(payload.DeviceKey)}
 	// subscriptions, err := query.GetSubscriptionStateBySubscriber(payload.Subnet, message.Topic, subsribers, sql.SqlDb)
 	subscriptions := []*entities.Subscription{}
 	accountSubcribed, err := dsquery.GetSubscriptions(entities.Subscription{
@@ -120,7 +120,7 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 
 			// check if its an admin
 			// auth := models.AuthorizationState{}
-			// err = query.GetOneState(entities.Authorization{Agent: payload.Agent, Account: payload.Account}, &auth)
+			// err = query.GetOneState(entities.Authorization{Agent: payload.DeviceKey, Account: payload.Account}, &auth)
 			auth, err := dsquery.GetAccountAuthorizations(entities.Authorization{
 				Authorized: entities.AddressString(payload.Account), Account: subnet.Account, Subnet: payload.Subnet,
 			}, nil, nil)
@@ -178,7 +178,7 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) ( 
 		return err
 	}
 	data.Hash = hex.EncodeToString(hash)
-	data.Agent = event.Payload.Agent
+	data.DeviceKey = event.Payload.DeviceKey
 	data.Sender = event.Payload.Account
 	var subnet = event.Payload.Subnet
 	var topic = &entities.Topic{}

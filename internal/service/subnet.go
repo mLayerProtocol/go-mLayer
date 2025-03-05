@@ -31,7 +31,7 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 	
 	var currentSubnetState *entities.Subnet
 	subnet := clientPayload.Data.(entities.Subnet)
-	agent, err := entities.DeviceFromString(string(subnet.Agent))
+	agent, err := entities.DeviceFromString(string(subnet.DeviceKey))
 	if err != nil {
 		return nil, fmt.Errorf("invalid agent")
 	}
@@ -42,7 +42,7 @@ func ValidateSubnetData(clientPayload *entities.ClientPayload, chainID configs.C
 
 	
 	logger.Infof("SUBNETID %s", subnet.ID)
-	if len(subnet.Agent) > 0 && subnet.ID != "" {
+	if len(subnet.DeviceKey) > 0 && subnet.ID != "" {
 		
 		// TODO Check that this agent is an admin of subnet. Return error if not
 		priv := constants.AdminPriviledge

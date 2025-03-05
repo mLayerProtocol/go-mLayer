@@ -197,7 +197,7 @@ func ProcessEvent(
 		}
 	}
 
-	 agent, _ := entities.AddressFromString(string(event.Payload.Agent))
+	 agent, _ := entities.AddressFromString(string(event.Payload.DeviceKey))
 	if validAgentRequired || agent.Addr != "" {
 		agentString, err := crypto.GetSignerECC(&d, &event.Payload.Signature)
 		if err != nil {

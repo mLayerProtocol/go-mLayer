@@ -1280,7 +1280,7 @@ func HandleNewPubSubEvent(event *entities.Event, ctx *context.Context, validator
 		logger.Errorf("Invalid event payload")
 	}
 	data.Event = *entities.NewEventPath(event.Validator, entities.TopicModel, event.Hash)
-	data.Agent = entities.AccountString(agent)
+	data.DeviceKey = entities.AccountString(agent)
 	data.Account = event.Payload.Account
 	// logger.Error("data.Public ", data.Public)
 

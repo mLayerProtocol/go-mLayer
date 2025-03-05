@@ -221,7 +221,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		var topicPayload entities.Topic
 		json.Unmarshal(*b, &topicPayload)
 
-		logger.Debugf("Payload %v", topicPayload.Agent)
+		logger.Debugf("Payload %v", topicPayload.DeviceKey)
 
 		topics, err := dsquery.GetAccountTopics(topicPayload, nil, nil)
 
