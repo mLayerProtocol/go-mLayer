@@ -60,12 +60,12 @@ func newResponse(status string, data interface{}) *RpcResponse {
 }
 
 // NewClient creates an http.Client that automatically perform basic auth on each request.
-func NewClient(projectId, projectSecret string) *http.Client {
+func NewClient(appectId, appectSecret string) *http.Client {
 	return &http.Client{
 		Transport: authTransport{
 			RoundTripper:  http.DefaultTransport,
-			ProjectId:     projectId,
-			ProjectSecret: projectSecret,
+			ApplicationId:     appectId,
+			ApplicationSecret: appectSecret,
 		},
 	}
 }
@@ -73,12 +73,12 @@ func NewClient(projectId, projectSecret string) *http.Client {
 // authTransport decorates each request with a basic auth header.
 type authTransport struct {
 	http.RoundTripper
-	ProjectId     string
-	ProjectSecret string
+	ApplicationId     string
+	ApplicationSecret string
 }
 
 func (t authTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	r.SetBasicAuth(t.ProjectId, t.ProjectSecret)
+	r.SetBasicAuth(t.ApplicationId, t.ApplicationSecret)
 	return t.RoundTripper.RoundTrip(r)
 }
 
@@ -89,7 +89,7 @@ func (p *RpcService) SendMessage(param []byte, reply *RpcResponse) error {
 	// }
 
 	logger.Debugf("ipfs address %s", p.Cfg.Ipfs.Host)
-	//client := NewClient(p.Cfg.Ipfs.ProjectId, p.Cfg.Ipfs.ProjectSecret)
+	//client := NewClient(p.Cfg.Ipfs.ApplicationId, p.Cfg.Ipfs.ApplicationSecret)
 	//sh := shell.NewShellWithClient(p.Cfg.Ipfs.Host, client)
 	//chatMsg, err := entities.CreateMessageFromJson(request)
 	// if err != nil {

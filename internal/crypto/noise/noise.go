@@ -140,7 +140,7 @@ func (ns *NoiseSession) encryptKeyForRecipient(messageKey, recipientKey []byte) 
     return msg, nil
 }
 
-func (ns *NoiseSession) decryptKeyForRecipient(encryptedKey []byte) ([]byte, error) {
+func (ns *NoiseSession) decryptKeyForRecipient(encrypteaKey []byte) ([]byte, error) {
     // Create handshake state for key decryption
     config := noise.Config{
         CipherSuite: noise.NewCipherSuite(noise.DH25519, noise.CipherChaChaPoly, noise.HashSHA256),
@@ -155,7 +155,7 @@ func (ns *NoiseSession) decryptKeyForRecipient(encryptedKey []byte) ([]byte, err
     }
 
     // Perform handshake and decrypt key
-    messageKey, _, _, err := hs.ReadMessage(nil, encryptedKey)
+    messageKey, _, _, err := hs.ReadMessage(nil, encrypteaKey)
     if err != nil {
         return nil, err
     }

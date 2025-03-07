@@ -221,7 +221,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		var topicPayload entities.Topic
 		json.Unmarshal(*b, &topicPayload)
 
-		logger.Debugf("Payload %v", topicPayload.DeviceKey)
+		logger.Debugf("Payload %v", topicPayload.AppKey)
 
 		topics, err := dsquery.GetAccountTopics(topicPayload, nil, nil)
 
@@ -314,7 +314,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		var payload  = make(map[string]interface{})
 		json.Unmarshal(*b, &payload)
 		// payload["sub"] = c.Param("acct")
-		// snet := c.Param("snet")
+		// app := c.Param("app")
 		topicId :=strings.Trim( c.Param("id"), " ")
 		id := strings.Trim(c.Param("dataId"), " ")
 		
@@ -639,14 +639,14 @@ func (p *RestService) Initialize() *gin.Engine {
 		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: event}))
 	})
 
-	router.POST("/api/subnets", func(c *gin.Context) {
+	router.POST("/api/apps", func(c *gin.Context) {
 		var payload entities.ClientPayload
 		if err := c.BindJSON(&payload); err != nil {
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
 		
-		event, err := requestProcessor.Process(client.WriteSubnetRequest, nil, payload)
+		event, err := requestProcessor.Process(client.WriteApplicationRequest, nil, payload)
 		if err != nil {
 			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
@@ -658,7 +658,7 @@ func (p *RestService) Initialize() *gin.Engine {
 		}}))
 	})
 
-	router.GET("/api/subnets", func(c *gin.Context) {
+	router.GET("/api/apps", func(c *gin.Context) {
 		b, parseError := utils.ParseQueryString(c)
 		if parseError != nil {
 			logger.Error(parseError)
@@ -666,21 +666,21 @@ func (p *RestService) Initialize() *gin.Engine {
 			return
 		}
 
-		var subnetState models.SubnetState
+		var appState models.ApplicationState
 
-		json.Unmarshal(*b, &subnetState)
+		json.Unmarshal(*b, &appState)
 
-		subnets, err := client.GetSubscribedSubnets(subnetState)
+		apps, err := client.GetSubscribedApplications(appState)
 
 		if err != nil {
 			logger.Error(err)
 			c.JSON(http.StatusBadRequest, entities.NewClientResponse(entities.ClientResponse{Error: err.Error()}))
 			return
 		}
-		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: subnets}))
+		c.JSON(http.StatusOK, entities.NewClientResponse(entities.ClientResponse{Data: apps}))
 	})
 
-	router.GET("/api/subnets/:id/by-account", func(c *gin.Context) {
+	router.GET("/api/apps/:id/by-account", func(c *gin.Context) {
 		id := c.Param("id")
 		messages, err := client.GetMessages(id)
 

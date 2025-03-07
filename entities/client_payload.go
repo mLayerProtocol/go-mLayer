@@ -71,8 +71,8 @@ type ClientPayload struct {
 	// Secondary																								 	AA	`							qaZAA	`q1aZaswq21``		`	`
 	Signature string       `json:"sig,omitempty"`
 	Hash      string       `json:"h,omitempty"`
-	DeviceKey     DeviceString `gorm:"-" json:"dKey,omitempty"`
-	Subnet    string       `json:"snet,omitempty" gorm:"index;"`
+	AppKey     DeviceString `gorm:"-" json:"aKey,omitempty"`
+	Application    string       `json:"app,omitempty" gorm:"index;"`
 	Page      uint16       `json:"page,omitempty" gorm:"_"`
 	PerPage   uint16       `json:"perPage,omitempty" gorm:"_"`
 }
@@ -144,8 +144,8 @@ func (msg *ClientPayload) GetSigner() (DeviceString, error) {
 		if err != nil {
 			return "", err
 		}
-		msg.DeviceKey = s.ToDeviceString()
-		return msg.DeviceKey, nil
+		msg.AppKey = s.ToDeviceString()
+		return msg.AppKey, nil
 }
 
 
@@ -169,8 +169,8 @@ func (msg ClientPayload) EncodeBytes() ([]byte, error) {
 	
 	params = append(params, encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: msg.Id})
 	
-	if msg.Subnet != "" {
-		params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(msg.Subnet)})
+	if msg.Application != "" {
+		params = append(params, encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(msg.Application)})
 	}
 	if msg.Account != "" {
 		params = append(params, encoder.EncoderParam{Type: encoder.AddressEncoderDataType, Value: msg.Account})

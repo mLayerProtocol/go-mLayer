@@ -20,13 +20,16 @@ type Topic struct {
 	Version float32 `json:"_v"`
 	ID string `json:"id" gorm:"type:uuid;primaryKey;not null"`
 	// Name            string        `json:"n,omitempty" binding:"required"`
-	Ref             string        `json:"ref,omitempty" binding:"required" gorm:"uniqueIndex:idx_unique_subnet_ref;type:varchar(64);default:null"`
+	Ref             string        `json:"ref,omitempty" binding:"required" gorm:"uniqueIndex:idx_unique_app_ref;type:varchar(64);default:null"`
 	Meta            string        `json:"meta,omitempty"`
 	ParentTopic string        `json:"pT,omitempty" gorm:"type:char(64)"`
 	SubscriberCount uint64        `json:"sC,omitempty"`
 	Account         AccountString `json:"acct,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	MinimumValidators  uint8			`json:"minVal,omitempty"` // minimum amount of secondary validators need to validate, max is 5
+	
+	
 
-	DeviceKey DeviceString `json:"dKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	AppKey DeviceString `json:"aKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 	//
 	Public   *bool `json:"pub,omitempty" gorm:"default:false"`
 
@@ -45,8 +48,8 @@ type Topic struct {
 	// Signature   string    `json:"sig,omitempty" binding:"required"  gorm:"non null;"`
 	// Broadcasted   bool      `json:"br,omitempty"  gorm:"default:false;"`
 	Timestamp uint64 `json:"ts,omitempty" binding:"required"`
-	Subnet    string `json:"snet" gorm:"uniqueIndex:idx_unique_subnet_ref;type:char(36);"`
-	// Subnet string `json:"snet" gorm:"index;varchar(36)"`
+	Application    string `json:"app" gorm:"uniqueIndex:idx_unique_app_ref;type:char(36);"`
+	// Application string `json:"app" gorm:"index;varchar(36)"`
 	BlockNumber uint64          `json:"blk"`
 	Cycle   	uint64			`json:"cy"`
 	Epoch		uint64			`json:"ep"`
@@ -76,7 +79,7 @@ func (item *Topic) Key() string {
 
 func (g *Topic) GetKeys() (keys []string)  {
 	keys = append(keys, fmt.Sprintf("%s/%s/%s",  g.GetAccountTopicsKey(), utils.IntMilliToTimestampString(int64(g.Timestamp)), g.ID))
-	// keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s", TopicModel, g.Account, g.Subnet, g.ID))
+	// keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s", TopicModel, g.Account, g.Application, g.ID))
 	keys = append(keys, g.Key())
 	keys = append(keys, g.DataKey())
 	keys = append(keys, g.RefKey())
@@ -88,17 +91,17 @@ func (item *Topic) RefKey() string {
 	if item.Ref == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s|ref|%s|%s", TopicModel, item.Subnet, item.Ref)
+	return fmt.Sprintf("%s|ref|%s|%s", TopicModel, item.Application, item.Ref)
 }
 
 func (g *Topic) GetAccountTopicsKey() (string) {
-	if (g.Subnet != "") {
-		if g.DeviceKey != ""  {
-			return fmt.Sprintf("%s/sub/%s/%s/%s", TopicModel, g.Subnet, g.Account, g.DeviceKey)
+	if (g.Application != "") {
+		if g.AppKey != ""  {
+			return fmt.Sprintf("%s/sub/%s/%s/%s", TopicModel, g.Application, g.Account, g.AppKey)
 		}
-		return fmt.Sprintf("%s/sub/%s/%s", TopicModel, g.Subnet, g.Account)
+		return fmt.Sprintf("%s/sub/%s/%s", TopicModel, g.Application, g.Account)
 	} else {
-		return fmt.Sprintf("%s/sub/%s", TopicModel, g.Subnet)
+		return fmt.Sprintf("%s/sub/%s", TopicModel, g.Application)
 	}
 }
 
@@ -171,7 +174,7 @@ func (topic Topic) GetEvent() EventPath {
 	return topic.Event
 }
 func (topic Topic) GetAgent() DeviceString {
-	return topic.DeviceKey
+	return topic.AppKey
 }
 
 func (topic Topic) EncodeBytes() ([]byte, error) {
@@ -180,12 +183,14 @@ func (topic Topic) EncodeBytes() ([]byte, error) {
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.ID)},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: topic.Handler},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.Meta},
+
+		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: topic.MinimumValidators},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.ParentTopic)},
 		encoder.EncoderParam{Type: encoder.BoolEncoderDataType, Value: utils.SafePointerValue(topic.Public, false)},
 		encoder.EncoderParam{Type: encoder.BoolEncoderDataType, Value:  utils.SafePointerValue(topic.ReadOnly, false)},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: topic.Ref},
 		// encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *topic.DefaultSubscriptionStatus},
-		 encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.Subnet)},
+		 encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(topic.Application)},
 	)
 }
 

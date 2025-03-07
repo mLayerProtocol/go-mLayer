@@ -8,7 +8,7 @@ import (
 
 func RenameEventAndAuthHashColumns(db *gorm.DB) (err error) {
 	models := []interface{}{
-		&models.SubnetEvent{},
+		&models.ApplicationEvent{},
 		&models.AuthorizationEvent{},
 		&models.TopicEvent{},
 		&models.MessageEvent{},
@@ -32,15 +32,15 @@ func RenameEventAndAuthHashColumns(db *gorm.DB) (err error) {
 	}
 	return nil
 }
-//  func RenameSubnetEventAndAuthHashColumns(db *gorm.DB) (err error) {
-// 	model := &models.SubnetEvent{}
-// 	if db.Migrator().HasTable(&models.SubnetEvent{}) && db.Migrator().HasColumn(&models.SubnetEvent{}, "previous_event_hash") {
+//  func RenameApplicationEventAndAuthHashColumns(db *gorm.DB) (err error) {
+// 	model := &models.ApplicationEvent{}
+// 	if db.Migrator().HasTable(&models.ApplicationEvent{}) && db.Migrator().HasColumn(&models.ApplicationEvent{}, "previous_event_hash") {
 // 		err = db.Migrator().RenameColumn(model, "previous_event_hash", "previous_event")
 // 		if err != nil {
 // 			return err
 // 		}
 // 	}
-// 	if db.Migrator().HasTable(&models.SubnetEvent{}) && db.Migrator().HasColumn(&models.SubnetEvent{}, "auth_event_hash") {
+// 	if db.Migrator().HasTable(&models.ApplicationEvent{}) && db.Migrator().HasColumn(&models.ApplicationEvent{}, "auth_event_hash") {
 // 		err = db.Migrator().RenameColumn(model, "auth_event_hash","auth_event")
 // 		if err != nil {
 // 			return err
@@ -57,7 +57,7 @@ func RenameEventAndAuthHashColumns(db *gorm.DB) (err error) {
 // 			return err
 // 		}
 // 	}
-// 	if db.Migrator().HasTable(&models.SubnetEvent{}) && db.Migrator().HasColumn(&models.SubnetEvent{}, "auth_event_hash") {
+// 	if db.Migrator().HasTable(&models.ApplicationEvent{}) && db.Migrator().HasColumn(&models.ApplicationEvent{}, "auth_event_hash") {
 // 		err = db.Migrator().RenameColumn(model, "auth_event_hash","auth_event")
 // 		if err != nil {
 // 			return err
@@ -66,7 +66,7 @@ func RenameEventAndAuthHashColumns(db *gorm.DB) (err error) {
 // 	return err
 //  }
 
-//  func DropAgentColumnFromSubnetState(db *gorm.DB) (err error) {
+//  func DropAgentColumnFromApplicationState(db *gorm.DB) (err error) {
 // 	// if db.Migrator().HasColumn(model, "Agent") {
 // 	// 	err = db.Migrator().DropColumn(model, "Agent")
 // 	// }

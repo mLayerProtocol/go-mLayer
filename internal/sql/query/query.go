@@ -162,9 +162,9 @@ func GetManyGroupBy[T any, U any](item T, data *U, gb string) error {
 func GetOneState[T any](filter any, data *T) error {
 		var model any
 			switch val := filter.(type) {
-				case entities.Subnet:
+				case entities.Application:
 					// logger.Debug(val)
-					model = models.SubnetState{Subnet: val}
+					model = models.ApplicationState{Application: val}
 				case entities.Authorization:
 					model = models.AuthorizationState{Authorization: val}
 				case entities.Topic:

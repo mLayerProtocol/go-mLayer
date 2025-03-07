@@ -29,8 +29,8 @@ var Models = []interface{}{
 	SubscriptionEvent{},
 	BlockStat{},
 
-	SubnetState{},
-	SubnetEvent{},
+	ApplicationState{},
+	ApplicationEvent{},
 
 	WalletState{},
 	WalletEvent{},
@@ -39,8 +39,8 @@ var Models = []interface{}{
 }
 
 var SyncModels = []any{
-	SubnetEvent{},
-	SubnetState{},
+	ApplicationEvent{},
+	ApplicationState{},
 	 AuthorizationEvent{},
 	AuthorizationState{},
 	TopicEvent{},
@@ -53,7 +53,7 @@ var SyncModels = []any{
 }
 
 var SyncEvents = []any{
-	SubnetEvent{},
+	ApplicationEvent{},
 	AuthorizationEvent{},
 	TopicEvent{},
 	SubscriptionEvent{},

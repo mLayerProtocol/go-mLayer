@@ -81,8 +81,8 @@ func ValidateClientPayload(
 	// }
 	// logger.Debug("ENCODEDBYTESSS"," ", hex.EncodeToString(d), " ", hex.EncodeToString(crypto.Keccak256Hash(d)))
 
-	if payload.Subnet == ""  {
-		return nil, nil, apperror.Forbidden("Subnet Id is required")
+	if payload.Application == ""  {
+		return nil, nil, apperror.Forbidden("Application Id is required")
 	}
 	if string(payload.ChainId) != string(cfg.ChainId) {
 		return nil, nil, apperror.Forbidden("Invalid chain Id")
@@ -94,37 +94,37 @@ func ValidateClientPayload(
 		return nil, nil, err
 	}
 	
-	// if agent != payload.DeviceKey {
+	// if agent != payload.AppKey {
 	// 	return nil, nil, apperror.BadRequest("Agent is required")
 	// }
 	// logger.Debugf("AGENTTTT %s", agent)
-	// subnet := models.SubnetState{}
-	// err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: payload.Subnet}}, &subnet)
-	// subnet , err := dsquery.GetSubnetStateById(payload.Subnet)
-	 subnet := entities.Subnet{}
-	_, err = service.SyncTypedStateById(payload.Subnet, &subnet, cfg, "")
+	// app := models.ApplicationState{}
+	// err = query.GetOne(models.ApplicationState{Application: entities.Application{ID: payload.Application}}, &app)
+	// app , err := dsquery.GetApplicationStateById(payload.Application)
+	 app := entities.Application{}
+	_, err = service.SyncTypedStateById(payload.Application, &app, cfg, "")
 	if err != nil {
 		return nil, nil, err
 	}
 	// if err != nil {
 	// 	// if err == gorm.ErrRecordNotFound {
 	// 	if dsquery.IsErrorNotFound(err){
-	// 		logger.Infof("GettingSubnetFrom %s", payload.Subnet )
-	// 		subnet, err = service.UpdateSubnetFromPeer(payload.Subnet, cfg, "" )
-	// 		if err != nil || subnet == nil || subnet.ID == "" {
-	// 			return nil,  nil, apperror.Forbidden("Invalid subnet id")
+	// 		logger.Infof("GettingApplicationFrom %s", payload.Application )
+	// 		app, err = service.UpdateApplicationFromPeer(payload.Application, cfg, "" )
+	// 		if err != nil || app == nil || app.ID == "" {
+	// 			return nil,  nil, apperror.Forbidden("Invalid app id")
 	// 		}
 	// 	} else {
 	// 		return nil, nil, apperror.Internal(err.Error())
 	// 	}
 	// }
-	//subnet := sub.(entities.Subnet)
+	//app := sub.(entities.Application)
 	
-	if subnet.ID == "" {
-		return nil, nil, apperror.Forbidden("Invalid subnet")
+	if app.ID == "" {
+		return nil, nil, apperror.Forbidden("Invalid app")
 	}
-	if *subnet.Status ==  0 {
-		return nil, nil, apperror.Forbidden("Subnet is disabled")
+	if *app.Status ==  0 {
+		return nil, nil, apperror.Forbidden("Application is disabled")
 	}
 
 	
@@ -142,12 +142,12 @@ func ValidateClientPayload(
 			var authData models.AuthorizationState
 			// err := query.GetOne(models.AuthorizationState{
 			// 	Authorization: entities.Authorization{Account: payload.Account,
-			// 		Subnet: payload.Subnet,
+			// 		Application: payload.Application,
 			// 		Agent:  agent},
 			// }, &authData)
 			filter := entities.Authorization{
 				Account: payload.Account,
-				Subnet: payload.Subnet,
+				Application: payload.Application,
 				Authorized: entities.AddressString(agent),
 			}
 			
@@ -187,15 +187,15 @@ func SyncRequest(payload *entities.ClientPayload) entities.SyncResponse {
 
 
 func validateAgent(payload *entities.ClientPayload) error {
-	if len(payload.Account) > 0 &&  len(payload.DeviceKey) > 0  {
+	if len(payload.Account) > 0 &&  len(payload.AppKey) > 0  {
 		// check if its an admin
 		// auth := models.AuthorizationState{}
-		// err = query.GetOneState(entities.Authorization{Agent: payload.DeviceKey, Account: payload.Account}, &auth)
+		// err = query.GetOneState(entities.Authorization{Agent: payload.AppKey, Account: payload.Account}, &auth)
 		auth, err := dsquery.GetAccountAuthorizations(entities.Authorization{
-			Authorized: entities.AddressString(payload.DeviceKey), Account: payload.Account, Subnet: payload.Subnet,
+			Authorized: entities.AddressString(payload.AppKey), Account: payload.Account, Application: payload.Application,
 		}, nil, nil)
 		if err != nil {
-			return  apperror.Unauthorized("Invalid subnet")
+			return  apperror.Unauthorized("Invalid app")
 		}
 		
 		if len(auth) == 0 || *auth[0].Priviledge  < constants.MemberPriviledge {

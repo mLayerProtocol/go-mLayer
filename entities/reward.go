@@ -13,15 +13,15 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 )
 
-type SubnetCount struct {
-	Subnet     string `json:"sNet"`
+type ApplicationCount struct {
+	Application     string `json:"sNet"`
 	EventCount uint64 `json:"eC"`
 	Cost json.RawMessage `json:"cost"`
 }
 const MaxBatchSize = 100
 
-func (msg *SubnetCount) EncodeBytes() ([]byte, error) {
-	d := utils.UuidToBytes(msg.Subnet)
+func (msg *ApplicationCount) EncodeBytes() ([]byte, error) {
+	d := utils.UuidToBytes(msg.Application)
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: d[:6]},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: msg.Cost},
@@ -33,8 +33,8 @@ func (msg *SubnetCount) EncodeBytes() ([]byte, error) {
 type RewardBatch struct {
 	Id           string          `json:"id"`
 	Index        int           `json:"idx"`
-	Data         []SubnetCount   `json:"d"`
-	DataBoundary [2]SubnetCount  `json:"dBound"`
+	Data         []ApplicationCount   `json:"d"`
+	DataBoundary [2]ApplicationCount  `json:"dBound"`
 	DataHash     json.RawMessage `json:"dH"`
 	ChainId      configs.ChainId `json:"pre"`
 	Closed       bool            `json:"cl"`
@@ -59,20 +59,20 @@ type RewardBatch struct {
 // 	return buf.Bytes()
 // }
 
-func (msg *RewardBatch) Append(subnetCount SubnetCount) {
+func (msg *RewardBatch) Append(appCount ApplicationCount) {
 	if len(msg.Data) == 0 {
 		msg.DataHash = nil
 	}
-	subnetTotal := big.NewInt(0).SetBytes(msg.MessageCost).Mul(big.NewInt(int64(subnetCount.EventCount)), new(big.Int).SetBytes(msg.MessageCost))
-	subnetCount.Cost = utils.ToUint256(subnetTotal)
-	msg.Data = append(msg.Data, subnetCount)
-	encoded, err := subnetCount.EncodeBytes()
+	appTotal := big.NewInt(0).SetBytes(msg.MessageCost).Mul(big.NewInt(int64(appCount.EventCount)), new(big.Int).SetBytes(msg.MessageCost))
+	appCount.Cost = utils.ToUint256(appTotal)
+	msg.Data = append(msg.Data, appCount)
+	encoded, err := appCount.EncodeBytes()
 	if err != nil {
-		panic("Unable to encode SubnetCount data")
+		panic("Unable to encode ApplicationCount data")
 	}
 	msg.DataHash = crypto.Keccak256Hash(append(msg.DataHash, encoded...))
-	logger.Debugf("TOTALVLAUE:::%s", big.NewInt(0).Add(new(big.Int).SetBytes(msg.TotalValue), subnetTotal))
-	msg.TotalValue = utils.ToUint256(big.NewInt(0).Add(new(big.Int).SetBytes(msg.TotalValue), subnetTotal))
+	logger.Debugf("TOTALVLAUE:::%s", big.NewInt(0).Add(new(big.Int).SetBytes(msg.TotalValue), appTotal))
+	msg.TotalValue = utils.ToUint256(big.NewInt(0).Add(new(big.Int).SetBytes(msg.TotalValue), appTotal))
 	length := len(msg.Data)
 	if length == 1 {
 		msg.DataBoundary[0] = msg.Data[0]
@@ -84,7 +84,7 @@ func (msg *RewardBatch) Append(subnetCount SubnetCount) {
 }
 
 func (msg *RewardBatch) Clear() {
-	msg.Data =[]SubnetCount{}
+	msg.Data =[]ApplicationCount{}
 	msg.TotalValue = nil
 	msg.DataHash = []byte{}
 }

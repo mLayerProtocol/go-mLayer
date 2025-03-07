@@ -148,14 +148,14 @@ func ProcessEventsReceivedFromOtherNodes(modelType entities.EntityModel, fromPub
 
 		event, errT := entities.UnpackEvent(message.Data, modelType)
 
-		logger.Debugf("ReceivedEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
+		logger.Debugf("ReceivedEvent \"%s\" in Application: %s", event.ID, event.Application)
 		if errT != nil {
 			logger.Errorf("Error receiving event  %v\n", errT)
 			panic(errT)
 			// continue
 		}
 
-		logger.Debugf("ProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
+		logger.Debugf("ProcessingEvent \"%s\" in Application: %s", event.ID, event.Application)
 		// event.ID, _ = event.GetId()
 
 		channelpool.EventProcessorChannel <- event
@@ -489,39 +489,39 @@ func ProcessP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 			response.Error = err.Error()
 		}
 		//  cycleKey :=  fmt.Sprintf("%s/%d", response.Signer, batch.Cycle)
-		// subnetList := []models.EventCounter{}
+		// appList := []models.EventCounter{}
 		claimed := false
-		subnetList, err := dsquery.GetCycleCounts(batch.Cycle, entities.PublicKeyString(hex.EncodeToString(payload.Signer)), &claimed, nil, &entities.QueryLimit{Limit: entities.MaxBatchSize, Offset: batch.Index * entities.MaxBatchSize})
-		// err = query.GetManyWithLimit(models.EventCounter{Cycle: &batch.Cycle, Validator: entities.PublicKeyString(hex.EncodeToString(payload.Signer)), Claimed: &claimed}, &subnetList, &map[string]query.Order{"count": query.OrderDec}, entities.MaxBatchSize, batch.Index*entities.MaxBatchSize)
+		appList, err := dsquery.GetCycleCounts(batch.Cycle, entities.PublicKeyString(hex.EncodeToString(payload.Signer)), &claimed, nil, &entities.QueryLimit{Limit: entities.MaxBatchSize, Offset: batch.Index * entities.MaxBatchSize})
+		// err = query.GetManyWithLimit(models.EventCounter{Cycle: &batch.Cycle, Validator: entities.PublicKeyString(hex.EncodeToString(payload.Signer)), Claimed: &claimed}, &appList, &map[string]query.Order{"count": query.OrderDec}, entities.MaxBatchSize, batch.Index*entities.MaxBatchSize)
 
 		if err != nil {
 			return nil, err
 		}
-		if len(subnetList) == 0 {
+		if len(appList) == 0 {
 			response.ResponseCode = 500
 			response.Error = "empty list"
 			break
 		}
-		if subnetList[0].Subnet != realBatch.DataBoundary[0].Subnet {
+		if appList[0].Application != realBatch.DataBoundary[0].Application {
 			response.ResponseCode = 500
 			response.Error = "upper data boundary dont match"
 			break
 		}
-		if subnetList[len(subnetList)-1].Subnet != realBatch.DataBoundary[1].Subnet {
+		if appList[len(appList)-1].Application != realBatch.DataBoundary[1].Application {
 			response.ResponseCode = 500
 			response.Error = "lower data boundary dont match"
 			break
 		}
 
-		for _, rsl := range subnetList {
+		for _, rsl := range appList {
 			// if start  == i {
-			// if rsl.Subnet != batch.DataBoundary[0].Subnet {
+			// if rsl.Application != batch.DataBoundary[0].Application {
 			// 	response.ResponseCode = 500
 			// 	response.Error = "data boundary dont match"
 			// 	break
 			// }
-			batch.Append(entities.SubnetCount{
-				Subnet:     rsl.Subnet,
+			batch.Append(entities.ApplicationCount{
+				Application:     rsl.Application,
 				EventCount: *rsl.Count,
 			})
 
@@ -605,7 +605,7 @@ func ProcessP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 		// }
 
 		// 1. Get the reward batch data
-		// 2. Loop through the Data field and check your /validator/cycle/subnetId/{batchId} to get the last time a proof was requested
+		// 2. Loop through the Data field and check your /validator/cycle/appId/{batchId} to get the last time a proof was requested
 		// 3. If this is less than 10 minutes ago, respond with error - proof requested too early
 		// 4. If non exists or most recent is more than 10 minutes
 	case P2pActionGetCert, P2pActionGetHandshake:
@@ -740,7 +740,7 @@ func ProcessP2pPayload(config *configs.MainConfiguration, payload *P2pPayload, m
 
 // func generateImportScript(model any, fromBlock uint64, toBlock uint64) ([]byte, error) {
 
-// 	sql, err := query.GenerateImportScript(sql.SqlDb, models.SubnetEvent{}, sql.SqlDb.Where("block_number >= ? AND block_number <= ?",  fromBlock, toBlock), "", config )
+// 	sql, err := query.GenerateImportScript(sql.SqlDb, models.ApplicationEvent{}, sql.SqlDb.Where("block_number >= ? AND block_number <= ?",  fromBlock, toBlock), "", config )
 // 				if err != nil {
 // 					logger.Debugf("SQLFILEERROR: %v", err)
 // 				}

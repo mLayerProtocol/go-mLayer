@@ -46,7 +46,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 	var authState *models.AuthorizationState
 	var agent *entities.DeviceString
 	logger.Infof("SUBSCRIPTION_PAYLOAD2 %+v", payload)
-	excludedEvents := []constants.EventType{constants.CreateSubnetEvent, constants.UpdateSubnetEvent, constants.DeleteSubnetEvent, constants.AuthorizationEvent}
+	excludedEvents := []constants.EventType{constants.CreateApplicationEvent, constants.UpdateApplicationEvent, constants.DeleteApplicationEvent, constants.AuthorizationEvent}
 	if !slices.Contains(excludedEvents, constants.EventType(payload.EventType)) {
 		logger.Infof("ISNOTEXLUCDED: %d",  payload.EventType)
 		authState, agent, err = ValidateClientPayload( &payload, true, cfg)
@@ -57,30 +57,30 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		}
 		if authState == nil || *authState.Authorization.Priviledge < constants.MemberPriviledge {
 			// agent not authorized
-			return model, apperror.Unauthorized("agent unauthorized to write in this subnet")
+			return model, apperror.Unauthorized("agent unauthorized to write in this app")
 		}
 
 		if *authState.Duration != 0 && uint64(time.Now().UnixMilli()) >
 			(uint64(*authState.Timestamp)+uint64(*authState.Duration)) {
 			return model, apperror.Unauthorized("Agent authorization expired")
 		}
-		payload.DeviceKey = *agent
+		payload.AppKey = *agent
 	}
 
 	var assocPrevEvent *entities.EventPath
 	var assocAuthEvent *entities.EventPath
 	eventPayloadType := entities.GetModelTypeFromEventType(constants.EventType(payload.EventType))
-	var subnetState = models.SubnetState{}
+	var appState = models.ApplicationState{}
 	logger.Infof("NewRequest: %v",  payload.EventType)
-	if payload.Subnet != "" {
-		// query.GetOneState(entities.Subnet{ID: payload.Subnet}, &subnetState)
-		snet, _ := dsquery.GetSubnetStateById(payload.Subnet)
+	if payload.Application != "" {
+		// query.GetOneState(entities.Application{ID: payload.Application}, &appState)
+		app, _ := dsquery.GetApplicationStateById(payload.Application)
 		if err != nil {
-				logger.Errorf("CreateEvent/GetSubnetError: %v", err)
+				logger.Errorf("CreateEvent/GetApplicationError: %v", err)
 				return model, err
 		}
-		subnetState.Subnet = *snet
-		stateEvent = append(stateEvent, entities.StateEvents{ID: snet.ID, Event: snet.Event})
+		appState.Application = *app
+		stateEvent = append(stateEvent, entities.StateEvents{ID: app.ID, Event: app.Event})
 	}
 	
 	//Perfom checks base on event types
@@ -96,9 +96,13 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		// }
 		// payload.Data = authData
 		// logger.Infof("NewRequest: %v",  "Authorization")
-		subnetState := &entities.Subnet{}
-		assocPrevEvent, assocAuthEvent, subnetState, err = ValidateAuthPayload(cfg, payload)
-		stateEvent = append(stateEvent, entities.StateEvents{ID: subnetState.ID, Event: subnetState.Event})
+		appState := &entities.Application{}
+		assocPrevEvent, assocAuthEvent, appState, err = ValidateAuthPayload(cfg, payload)
+		if err != nil {
+			return nil, err
+		}
+
+		stateEvent = append(stateEvent, entities.StateEvents{ID: appState.ID, Event: appState.Event})
 		
 		if err != nil {
 			logger.Errorf("AuthDataVerificationError: %v", err)
@@ -121,7 +125,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 			return model, apperror.Forbidden("Agent not authorized to perform this action")
 		}
 		if assocPrevEvent == nil {
-			assocPrevEvent = &subnetState.Event
+			assocPrevEvent = &appState.Event
 		}
 		// case constants.SubscribeTopicEvent):
 		// 	if authState.Authorization.Priviledge < constants.AdminPriviledge {
@@ -132,18 +136,18 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		// 	if err != nil {
 		// 		return nil, err
 		// 	}
-	case constants.CreateSubnetEvent, constants.UpdateSubnetEvent:
+	case constants.CreateApplicationEvent, constants.UpdateApplicationEvent:
 		
 		// if authState.Authorization.Priviledge < constants.AdminPriviledge {
 		// 	return nil, apperror.Forbidden("Agent not authorized to perform this action")
 		// }
-		logger.Infof("ValidatingSubnetPayload: %v", payload)
-		assocPrevEvent, assocAuthEvent, err = ValidateSubnetPayload(payload, authState, ctx)
+		logger.Infof("ValidatingApplicationPayload: %v", payload)
+		assocPrevEvent, assocAuthEvent, err = ValidateApplicationPayload(payload, authState, ctx)
 		if err != nil {
-			logger.Errorf("InvalidSubnetPayload: %v", err)
+			logger.Errorf("InvalidApplicationPayload: %v", err)
 			return model, err
 		}
-		logger.Infof("ValidSubnetPayload: %v", payload)
+		logger.Infof("ValidApplicationPayload: %v", payload)
 		
 	case constants.CreateWalletEvent,constants.UpdateWalletEvent:
 	
@@ -196,7 +200,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 	payloadHash, err := payload.GetHash()
 	
 	if err != nil {
-		logger.Errorf("UPDATINGSUBNET2 %v", err)
+		logger.Errorf("UPDATINGAPP2 %v", err)
 	}
 	logger.Debugf("UPDATINGSUBNE_HASH: %v",payloadHash)
 	// chainInfo, err := chain.DefaultProvider(cfg).GetChainInfo()
@@ -208,20 +212,20 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		return nil, err
 	}
 	
-	subnet := payload.Subnet
-	if payload.EventType == constants.CreateSubnetEvent {
-		subnet, err = entities.GetId(payload.Data.(entities.Subnet), "")
+	app := payload.Application
+	if payload.EventType == constants.CreateApplicationEvent {
+		app, err = entities.GetId(payload.Data.(entities.Application), "")
 		if err != nil {
-			logger.Debugf("Subnet error: %v", err)
+			logger.Debugf("Application error: %v", err)
 			return model, err
 		}
 		
 	}
 	if payload.EventType == constants.UpdateAvatarEvent {
-		subnet = payload.Data.(entities.Subnet).ID
+		app = payload.Data.(entities.Application).ID
 	}
 	if payload.EventType == constants.AuthorizationEvent {
-		subnet = payload.Data.(entities.Authorization).Subnet
+		app = payload.Data.(entities.Authorization).Application
 	}
 	
 	event := entities.Event{
@@ -238,7 +242,7 @@ func CreateEvent(payload entities.ClientPayload, ctx *context.Context) (model an
 		Cycle: 				chain.NetworkInfo.CurrentCycle.Uint64(),
 		Epoch: 				chain.NetworkInfo.CurrentEpoch.Uint64(),		
 		Validator:         entities.PublicKeyString(cfg.PublicKeyEDDHex),
-		Subnet: subnet,
+		Application: app,
 		StateEvents:  stateEvent,
 	}
 	
@@ -341,8 +345,8 @@ func GetEventTypeFromModel(eventType entities.EntityModel) constants.EventType {
 	case entities.MessageModel:
 		return constants.SendMessageEvent
 
-	case entities.SubnetModel:
-		return constants.CreateSubnetEvent
+	case entities.ApplicationModel:
+		return constants.CreateApplicationEvent
 
 	case entities.WalletModel:
 		return constants.CreateWalletEvent
@@ -418,8 +422,8 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 	// 	}
 	// 	return event, nil
 
-	// case constants.CreateSubnetEvent):
-	// 	event, err1 := dsquery.GetEventById(eventHash, entities.SubnetModel)
+	// case constants.CreateApplicationEvent):
+	// 	event, err1 := dsquery.GetEventById(eventHash, entities.ApplicationModel)
 
 	// 	if err1 != nil {
 	// 		logger.Error(err)
@@ -493,10 +497,10 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 
 // }
 
-// func GetSubnetEventById(id string) (*models.SubnetEvent, error) {
-// 	nEvent := models.SubnetEvent{}
+// func GetApplicationEventById(id string) (*models.ApplicationEvent, error) {
+// 	nEvent := models.ApplicationEvent{}
 
-// 	err := query.GetOne(models.SubnetEvent{
+// 	err := query.GetOne(models.ApplicationEvent{
 // 		Event: entities.Event{ID: id},
 // 	}, &nEvent)
 // 	if err != nil {
@@ -509,10 +513,10 @@ func GetEventByPath(eventHash string, eventType int) (model interface{}, err err
 
 // }
 
-// func GetSubnetEventByHash(hash string) (*models.SubnetEvent, error) {
-// 	nEvent := models.SubnetEvent{}
+// func GetApplicationEventByHash(hash string) (*models.ApplicationEvent, error) {
+// 	nEvent := models.ApplicationEvent{}
 
-// 	err := query.GetOne(models.SubnetEvent{
+// 	err := query.GetOne(models.ApplicationEvent{
 // 		Event: entities.Event{Hash: hash},
 // 	}, &nEvent)
 // 	if err != nil {
@@ -626,7 +630,7 @@ func GetEventModelFromEventType(eventType constants.EventType)  any {
 		return &models.MessageEvent{}
 	}
 	if eventType < 1400 {
-		return &models.SubnetEvent{}
+		return &models.ApplicationEvent{}
 	}
 	if eventType < 1400 {
 		return &models.WalletEvent{}

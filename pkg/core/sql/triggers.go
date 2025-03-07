@@ -22,11 +22,11 @@ func EventSyncedTrigger(dbDriver string, table string, counterTable string) (Tri
 			BEGIN
 				UPDATE %s
 				SET count = count + 1
-				WHERE cycle = NEW.cycle AND subnet = NEW.subnet AND validator = NEW.validator;
+				WHERE cycle = NEW.cycle AND app = NEW.app AND validator = NEW.validator;
 
 				-- If no row is updated, insert a new row
-				INSERT INTO %s (subnet, cycle, count, validator)
-				SELECT NEW.subnet, NEW.cycle, 1, NEW.validator
+				INSERT INTO %s (app, cycle, count, validator)
+				SELECT NEW.app, NEW.cycle, 1, NEW.validator
 				WHERE (SELECT changes() = 0);
 			END;
 			`,  table, table, counterTable, counterTable),
@@ -48,12 +48,12 @@ func EventSyncedTrigger(dbDriver string, table string, counterTable string) (Tri
 				IF NEW.synced = 1 THEN
 					UPDATE %s
 					SET count = count + 1
-					WHERE cycle = NEW.cycle AND subnet = NEW.subnet AND validator = NEW.validator;
+					WHERE cycle = NEW.cycle AND app = NEW.app AND validator = NEW.validator;
 
 					IF NOT FOUND THEN
-						INSERT INTO %s (subnet, cycle, count, validator)
-						VALUES (NEW.subnet, NEW.cycle, 1, NEW.validator)
-						ON CONFLICT (subnet, cycle, validator) DO UPDATE
+						INSERT INTO %s (app, cycle, count, validator)
+						VALUES (NEW.app, NEW.cycle, 1, NEW.validator)
+						ON CONFLICT (app, cycle, validator) DO UPDATE
 						SET count = %s.count + 1;
 					END IF;
 				END IF;

@@ -23,9 +23,9 @@ type RequestType string
 
 const (
 	GetNodeInfoRequest   RequestType = "READ:info"
-	FindSubnetsRequest   RequestType = "READ:subnets"
-	GetSubnetByIdRequest             = "READ:subnets/:id"
-	WriteSubnetRequest               = "WRITE:subnets"
+	FindApplicationsRequest   RequestType = "READ:apps"
+	GetApplicationByIdRequest             = "READ:apps/:id"
+	WriteApplicationRequest               = "WRITE:apps"
 	FindAuthorizationsRequest RequestType = "READ:authorizations"
 	WriteAuthorizationRequest RequestType = "WRITE:authorizations"
 	FindTopicsRequest          = "READ:topics"
@@ -45,9 +45,9 @@ const (
 
 var requestPatterns = []RequestType{
 	GetNodeInfoRequest,
-	FindSubnetsRequest,
-	GetSubnetByIdRequest,
-	WriteSubnetRequest,
+	FindApplicationsRequest,
+	GetApplicationByIdRequest,
+	WriteApplicationRequest,
 
 	FindAuthorizationsRequest,
 	WriteAuthorizationRequest,
@@ -112,7 +112,7 @@ func parseEntity[M any](_type M, payload *entities.ClientPayload) {
 func parseClientPayload(payload *entities.ClientPayload, requestType RequestType) {
 	switch requestType {
 	case GetNodeInfoRequest:
-		parseEntity(entities.Subnet{}, payload)
+		parseEntity(entities.Application{}, payload)
 	case WriteAuthorizationRequest:
 		parseEntity(entities.Authorization{}, payload)
 		// data := entities.Authorization{}
@@ -186,9 +186,9 @@ func (p *ClientRequestHandler) Process(requestPath RequestType, params map[strin
 		// return getAuthorizations(&authEntity)
 	case FindTopicsRequest:
 		return dsquery.GetAccountTopics(payload.(entities.Topic), dsquery.DefaultQueryLimit, nil)
-	case WriteSubnetRequest: // "WRITE:topics/subscribers/approve", "PATCH:topics/unsubscribe", "PATCH:topics/ban":
+	case WriteApplicationRequest: // "WRITE:topics/subscribers/approve", "PATCH:topics/unsubscribe", "PATCH:topics/ban":
 		cpl := payload.(entities.ClientPayload)
-		data := entities.Subnet{}
+		data := entities.Application{}
 		d, _ := json.Marshal(cpl.Data)
 		e := json.Unmarshal(d, &data)
 		if e != nil {
@@ -327,24 +327,24 @@ func (p *ClientRequestHandler) Process(requestPath RequestType, params map[strin
 			return nil, err
 		}
 		return event, nil
-	case FindSubnetsRequest:
+	case FindApplicationsRequest:
 
 		b, parseError := json.Marshal(params)
 		if parseError != nil {
 			return nil, parseError
 		}
 
-		var subnetState models.SubnetState
+		var appState models.ApplicationState
 
-		json.Unmarshal(b, &subnetState)
+		json.Unmarshal(b, &appState)
 
-		return GetSubscribedSubnets(subnetState)
-	case GetSubnetByIdRequest:
-		subnet, err := dsquery.GetSubnetStateById(params["id"].(string))
+		return GetSubscribedApplications(appState)
+	case GetApplicationByIdRequest:
+		app, err := dsquery.GetApplicationStateById(params["id"].(string))
 		if err != nil {
 			return nil, err
 		}
-		return models.SubnetState{Subnet: *subnet}, nil
+		return models.ApplicationState{Application: *app}, nil
 	default:
 		return nil, ErrorInvalidRequest
 	}

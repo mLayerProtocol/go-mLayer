@@ -28,7 +28,7 @@ type ChainInfo struct {
 type OperatorInfo struct {
 	PublicKey  []byte
 	LicenseOwner string
-	EddKey [32]byte
+	EdaKey [32]byte
 }
 type IChainAPI interface {
 	// general
@@ -66,10 +66,10 @@ type IChainAPI interface {
 	
 	// GetStakeBalance(address entities.AccountString) big.Int
 
-	// subnet
-	GetSubnetBalance(id [16]byte) (*big.Int, error)
+	// app
+	GetApplicationBalance(id [16]byte) (*big.Int, error)
 
-	GetTotalValueLockedInSubnets() (*big.Int, error)
+	GetTotalValueLockedInApplications() (*big.Int, error)
 
 	// sentry
 	// GetMinStakeAmountForValidators() (*big.Int, error)

@@ -33,7 +33,7 @@ const (
 	TopicModel        EntityModel = "top"
 	SubscriptionModel EntityModel = "sub"
 	MessageModel      EntityModel = "msg"
-	SubnetModel       EntityModel = "snet"
+	ApplicationModel       EntityModel = "app"
 	TopicInterestModel       EntityModel = "topInt"
 	WalletModel       EntityModel = "wal"
 	SystemModel		EntityModel = "sys"
@@ -41,7 +41,7 @@ const (
 )
 
 var EntityModels = []EntityModel{
-	AuthModel, TopicModel, SubscriptionModel, MessageModel, SubnetModel, WalletModel, SystemModel,
+	AuthModel, TopicModel, SubscriptionModel, MessageModel, ApplicationModel, WalletModel, SystemModel,
 }
 
 
@@ -210,7 +210,7 @@ type EventInterface interface {
 }
 
 // type StateEvents struct {
-// 	Subnet EventPath `json:"snet"`
+// 	Application EventPath `json:"app"`
 // 	Authorization EventPath `json:"auth"`
 // 	Topic EventPath`json:"top"`
 // 	Subscription EventPath`json:"sub"`
@@ -299,7 +299,7 @@ type Event struct {
 	IsValid     *bool            `json:"isVal,omitempty" gorm:"default:false"`
 	Synced      *bool            `json:"sync,omitempty" gorm:"default:false"`
 	Validator   PublicKeyString `json:"val,omitempty"`
-	Subnet   	string			`json:"snet,omitempty"`
+	Application   	string			`json:"app,omitempty"`
 	Index int64 `json:"vec,omitempty"`
 	NodeCount int32 `json:"n,omitempty"`
 
@@ -308,13 +308,13 @@ type Event struct {
 }
 
 func (g *Event) GetKeys() (keys []string)  {
-	keys = append(keys, g.SubnetKey())
+	keys = append(keys, g.ApplicationKey())
 	keys = append(keys, g.BlockKey())
-	// keys = append(keys, fmt.Sprintf("cy/%d/%d/%s/%s", g.Cycle, utils.IfThenElse(g.Synced, 1,0), g.Subnet, g.ID))
+	// keys = append(keys, fmt.Sprintf("cy/%d/%d/%s/%s", g.Cycle, utils.IfThenElse(g.Synced, 1,0), g.Application, g.ID))
 	
 	keys = append(keys, g.DataKey())
 	
-	// keys = append(keys, fmt.Sprintf("%s/%s/%s", EntityModel, g.Subnet, g.ID))
+	// keys = append(keys, fmt.Sprintf("%s/%s/%s", EntityModel, g.Application, g.ID))
 	// keys = append(keys,fmt.Sprintf("hash/%s",  g.GetIdHash()))
 	// keys = append(keys,fmt.Sprintf("%s/%s", TopicModel, g.Hash))
 	// keys = append(keys,fmt.Sprintf("prev/%s", g.PreviousEvent.ID ))
@@ -330,15 +330,15 @@ func (e *Event) VectorKey(topic string) string {
 	return fmt.Sprintf("vec/%s/%s", e.Validator, topic)
 }
 
-func (e *Event) SubnetKey()  string {
-	return  fmt.Sprintf("snet/%s/%015d", e.Subnet, e.Cycle)
+func (e *Event) ApplicationKey()  string {
+	return  fmt.Sprintf("app/%s/%015d", e.Application, e.Cycle)
 }
 func (e *Event) BlockKey() string {
 	// if e.ID != "" {
-	// 	return  fmt.Sprintf("bl/%d/%d/%s/%s/%s", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1), GetModelTypeFromEventType(constants.EventType(e.EventType)), e.Subnet, e.ID)
+	// 	return  fmt.Sprintf("bl/%d/%d/%s/%s/%s", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1), GetModelTypeFromEventType(constants.EventType(e.EventType)), e.Application, e.ID)
 	// }
-	// if e.Subnet != "" {
-	// 	return  fmt.Sprintf("bl/%d/%d/%s/%s", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1), GetModelTypeFromEventType(constants.EventType(e.EventType)), e.Subnet)
+	// if e.Application != "" {
+	// 	return  fmt.Sprintf("bl/%d/%d/%s/%s", e.BlockNumber, utils.IfThenElse(e.Synced == nil || !*e.Synced, 0,1), GetModelTypeFromEventType(constants.EventType(e.EventType)), e.Application)
 	// }
 	if e.ID != "" {
 		return utils.CreateKey("/", "bl",fmt.Sprintf("%020d/%015d",  e.BlockNumber, time.Now().UnixMilli()),  e.ID)
@@ -432,9 +432,9 @@ func GetModel(ent any) EntityModel {
 		val = val.Elem()
 	}
 	switch val.Interface().(type) {
-		case Subnet:
+		case Application:
 			// logger.Debug(val)
-			model = SubnetModel
+			model = ApplicationModel
 		case Authorization:
 			model = AuthModel
 		case Topic:
@@ -491,8 +491,8 @@ func UnpackEvent(b []byte, model EntityModel) (*Event, error) {
 		r := Authorization{}
 		encoder.MsgPackUnpackStruct(dBytes, &r)
 		e.Payload.Data = r
-	case SubnetModel:
-		r := Subnet{}
+	case ApplicationModel:
+		r := Application{}
 		encoder.MsgPackUnpackStruct(dBytes, &r)
 		e.Payload.Data = r
 	case TopicModel:
@@ -605,7 +605,7 @@ func (e Event) EncodeBytes() ([]byte, error) {
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Epoch},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.EventType},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.PreviousEvent.ID)},
-		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.Subnet)},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(e.Application)},
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: stateEventsBytes},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Timestamp},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: e.Index},
@@ -645,8 +645,8 @@ func GetEventEntityFromModel(eventType EntityModel) *Event {
 	case MessageModel:
 		event.Payload.Data = Message{}
 
-	case SubnetModel:
-		event.Payload.Data = Subnet{}
+	case ApplicationModel:
+		event.Payload.Data = Application{}
 
 	case SystemModel:
 		event.Payload.Data = SystemMessage{}
@@ -676,8 +676,8 @@ func GetStateModelFromEntityType(entityType EntityModel) any {
 	case MessageModel:
 		return Message{}
 
-	case SubnetModel:
-		return Subnet{}
+	case ApplicationModel:
+		return Application{}
 	case SystemModel:
 		return SystemMessage{}
 
@@ -695,7 +695,7 @@ func GetModelTypeFromEventType(eventType constants.EventType ) EntityModel {
 		return  SystemModel	
 	}
 	if eventType < 600 {
-		return  SubnetModel	
+		return  ApplicationModel	
 	}
 	if eventType < 700 {	
 		return  AuthModel	
@@ -718,28 +718,28 @@ func GetModelTypeFromEventType(eventType constants.EventType ) EntityModel {
 
 }
 
-func CycleCounterKey(cycle uint64, validator *PublicKeyString, claimed *bool, subnet *string) string {
-	if validator == nil && claimed == nil && subnet == nil {
+func CycleCounterKey(cycle uint64, validator *PublicKeyString, claimed *bool, app *string) string {
+	if validator == nil && claimed == nil && app == nil {
 		return fmt.Sprintf("cy/%015d/n", cycle)
 	}
 	if claimed == nil {
 		return fmt.Sprintf("cy/%015d/%s", cycle, *validator )
 	}
-	if subnet == nil {
+	if app == nil {
 		return fmt.Sprintf("cy/%015d/%s/%d", cycle, *validator, utils.IfThenElse(*claimed, 1, 0) )
 	}
-	return fmt.Sprintf("cy/%015d/%s/%d/%s", cycle, *validator, utils.IfThenElse(*claimed, 1, 0), *subnet)
+	return fmt.Sprintf("cy/%015d/%s/%d/%s", cycle, *validator, utils.IfThenElse(*claimed, 1, 0), *app)
 }
 
 
-func NetworkCounterKey(subnet *string) string {
-	if subnet == nil {
+func NetworkCounterKey(app *string) string {
+	if app == nil {
 		return "net/"
 	}
-	return fmt.Sprintf("net/%s", *subnet)
+	return fmt.Sprintf("net/%s", *app)
 }
-func CycleSubnetKey(cycle uint64, subnet string) string {
-	return fmt.Sprintf("cyc/%015d/%s", cycle, subnet)
+func CycleApplicationKey(cycle uint64, app string) string {
+	return fmt.Sprintf("cyc/%015d/%s", cycle, app)
 }
 
 

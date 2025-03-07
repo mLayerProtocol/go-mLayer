@@ -5,7 +5,7 @@ type ChannelsId string
 const (
 	// BroadcastAuthorizationEventChId 		ChannelsId = "BroadcastAuthorizationEventChannel"
 	// BroadcastTopicEventChId             	ChannelsId  = "BroadcastTopicEventChannel"
-	// BroadcastSubnetEventChId               			= "BroadcastSubnetEventChannel"
+	// BroadcastApplicationEventChId               			= "BroadcastApplicationEventChannel"
 	// IncomingAuthorizationEventChId         = "IncomingAuthorizationEventChannel"
 	// IncomingTopicEventChId 							= "IncomingTopicEventChannel"
 

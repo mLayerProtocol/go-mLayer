@@ -6,16 +6,16 @@ import (
 )
 
 
- func DropOwnerColumnFromSubnetState(db *gorm.DB) (err error) {
-	if !db.Migrator().HasTable(&models.SubnetState{}) {
+ func DropOwnerColumnFromApplicationState(db *gorm.DB) (err error) {
+	if !db.Migrator().HasTable(&models.ApplicationState{}) {
 		return nil
 	}
-	return db.Migrator().DropColumn(&models.SubnetState{}, "owner")
+	return db.Migrator().DropColumn(&models.ApplicationState{}, "owner")
  }
 
-//  func DropAgentColumnFromSubnetState(db *gorm.DB) (err error) {
-// 	// if db.Migrator().HasColumn(&models.SubnetState{}, "Agent") {
-// 	// 	err = db.Migrator().DropColumn(&models.SubnetState{}, "Agent")
+//  func DropAgentColumnFromApplicationState(db *gorm.DB) (err error) {
+// 	// if db.Migrator().HasColumn(&models.ApplicationState{}, "Agent") {
+// 	// 	err = db.Migrator().DropColumn(&models.ApplicationState{}, "Agent")
 // 	// }
-// 	return  db.Migrator().DropColumn(&models.SubnetState{}, "Agent")
+// 	return  db.Migrator().DropColumn(&models.ApplicationState{}, "Agent")
 //  }

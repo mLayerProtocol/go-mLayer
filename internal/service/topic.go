@@ -27,7 +27,7 @@ func ValidateTopicData(topic *entities.Topic, authState *models.AuthorizationSta
 		_topicState, err := dsquery.GetTopicById(topic.ID)
 		if err != nil && !dsquery.IsErrorNotFound(err) {
 			if err == gorm.ErrRecordNotFound {
-				return nil, apperror.Forbidden("Invalid subnet id")
+				return nil, apperror.Forbidden("Invalid app id")
 			}
 		}
 		if _topicState != nil {
@@ -83,7 +83,7 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 	}
 	data.Hash = hex.EncodeToString(hash)
 	data.Account = event.Payload.Account
-	data.DeviceKey = event.Payload.DeviceKey
+	data.AppKey = event.Payload.AppKey
 	data.Timestamp = event.Payload.Timestamp
 	logger.Debug("Processing 1...")
 	var localState models.TopicState
@@ -116,11 +116,11 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 	logger.Debug("Processing 2... ", "topic")
 	// stateTxn, err := stores.StateStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
 	// if err != nil {
-	// 	// either subnet does not exist or you are not uptodate
+	// 	// either app does not exist or you are not uptodate
 	// }
 	// txn, err := stores.EventStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
 	// if err != nil {
-	// 	// either subnet does not exist or you are not uptodate
+	// 	// either app does not exist or you are not uptodate
 	// }
 	// defer stateTxn.Discard(context.Background())
 	// defer txn.Discard(context.Background())
@@ -159,7 +159,7 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 		}
 	}
 
-	eventData := PayloadData{Subnet: data.Subnet, localDataState: localDataState, localDataStateEvent: localDataStateEvent}
+	eventData := PayloadData{Application: data.Application, localDataState: localDataState, localDataStateEvent: localDataStateEvent}
 	// tx := sql.SqlDb
 	// // defer func () {
 	// 	if tx.Error != nil {
@@ -180,7 +180,7 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 			data.Invite[i].ID, err = entities.GetId(subscription, subscription.ID)
 			data.Invite[i].Topic = id
 			data.Invite[i].Cycle = data.Cycle
-			data.Invite[i].Subnet = data.Subnet
+			data.Invite[i].Application = data.Application
 			data.Invite[i].Epoch = data.Epoch
 			subHash, err := subscription.GetHash()
 			if err != nil {
@@ -198,7 +198,7 @@ func HandleNewPubSubTopicEvent(event *entities.Event, ctx *context.Context) erro
 		logger.Error("ProcessEventError ", err)
 		return err
 	}
-	// err = dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, &txn)
+	// err = dsquery.IncrementCounters(event.Cycle, event.Validator, event.Application, &txn)
 	// if err != nil { 
 	// 	logger.Errorf("ErorrIncrementingCounters: %v", err)
 	// 	return err

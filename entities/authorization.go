@@ -24,7 +24,7 @@ const (
 type Authorization struct {
 	Version float32 `json:"_v"`
 	ID            string                           	`json:"id" gorm:"type:uuid;not null;primaryKey"`
-	Authorized    AddressString                 	`json:"auth" gorm:"uniqueIndex:idx_agent_account_subnet;index:idx_authorization_states_agent"`
+	Authorized    AddressString                 	`json:"auth" gorm:"uniqueIndex:idx_agent_account_app;index:idx_authorization_states_agent"`
 	Meta          string                           	`json:"meta,omitempty"`
 	Account       AccountString                     `json:"acct" gorm:"varchar(40);"`
 	Grantor       AccountString                       	`json:"gr" gorm:"index"`
@@ -35,7 +35,7 @@ type Authorization struct {
 	SignatureData SignatureData                    	`json:"sigD" gorm:"json;"`
 	Hash          string                           	`json:"h" gorm:"unique" `
 	Event         EventPath                        	`json:"e,omitempty" gorm:"index;varchar;"`
-	Subnet        string                           	`json:"snet" gorm:"uniqueIndex:idx_agent_account_subnet;char(36)"`
+	Application        string                           	`json:"app" gorm:"uniqueIndex:idx_agent_account_app;char(36)"`
 	BlockNumber uint64          `json:"blk"`
 	Cycle   	uint64			`json:"cy"`
 	Epoch		uint64			`json:"ep"`
@@ -63,8 +63,8 @@ func (g Authorization) GetHash() ([]byte, error) {
 func (entity Authorization) GetEvent() EventPath {
 	return entity.Event
 }
-// func (entity Authorization) GetDeviceKey() DeviceString {
-// 	return entity.DeviceKey
+// func (entity Authorization) GetAppKey() DeviceString {
+// 	return entity.AppKey
 // }
 func (g Authorization) ToJSON() []byte {
 	b, _ := json.Marshal(g)
@@ -81,13 +81,13 @@ func (g *Authorization) GetKeys() (keys []string)  {
 	if g.ID == "" {
 		g.ID, _ = GetId(g, "")
 	}
-	 // keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.DeviceKey, g.ID))
-	 keys = append(keys, fmt.Sprintf("%s/%s",  g.AuthorizedDeviceKeyStateKey(), utils.IntMilliToTimestampString(int64(*g.Timestamp))))
+	 // keys = append(keys, fmt.Sprintf("%s/acct/%s/%s/%s/%s", AuthModel, g.Account, g.Application, g.AppKey, g.ID))
+	 keys = append(keys, fmt.Sprintf("%s/%s",  g.AuthorizedAppKeyStateKey(), utils.IntMilliToTimestampString(int64(*g.Timestamp))))
 	 keys = append(keys, fmt.Sprintf("%s/%s", g.AccountAuthorizationsKey(), utils.IntMilliToTimestampString(int64(*g.Timestamp))))
 	 keys = append(keys, g.Key())
 	 keys = append(keys, g.DataKey())
 	 if (g.Account != g.Grantor) {
-		keys = append(keys, fmt.Sprintf("%s/%s/%s/%s", AuthModel, g.Grantor, g.Subnet, g.ID))
+		keys = append(keys, fmt.Sprintf("%s/%s/%s/%s", AuthModel, g.Grantor, g.Application, g.ID))
 	 }
 	 return keys;
 }
@@ -96,23 +96,23 @@ func (g *Authorization) GetKeys() (keys []string)  {
 // }
 
 
-func (g *Authorization) AuthorizedDeviceKeyStateKey() (string) {
+func (g *Authorization) AuthorizedAppKeyStateKey() (string) {
 	if (g.Authorized.IsDevice()) {
-		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Authorized, g.Subnet)
+		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Authorized, g.Application)
 	}
-	return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Authorized, g.Subnet, g.Account)
+	return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Authorized, g.Application, g.Account)
 }
 
 func (g *Authorization) AccountAuthorizationsKey() (string) {
 	if (g.TopicIds != "" && g.TopicIds != "*") {
-			return fmt.Sprintf("%s/agt/%s/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Authorized, g.TopicIds)
+			return fmt.Sprintf("%s/agt/%s/%s/%s/%s", AuthModel, g.Account, g.Application, g.Authorized, g.TopicIds)
 	} 
 
-	if (g.Subnet != "") {
+	if (g.Application != "") {
 		if g.Authorized != ""  {
-			return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Account, g.Subnet, g.Authorized)
+			return fmt.Sprintf("%s/agt/%s/%s/%s", AuthModel, g.Account, g.Application, g.Authorized)
 		}
-		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Account, g.Subnet)
+		return fmt.Sprintf("%s/agt/%s/%s", AuthModel, g.Account, g.Application)
 	} else {
 		return fmt.Sprintf("%s/agt/%s", AuthModel, g.Account)
 	}
@@ -130,7 +130,7 @@ func AccountAuthorizationsKeyToAuthorization(key string) (*Authorization, error)
 	if !account.IsValid() {
 		return nil, fmt.Errorf("invalid account")
 	}
-	auth := &Authorization{Account: account.ToString(), Subnet: parts[1]}
+	auth := &Authorization{Account: account.ToString(), Application: parts[1]}
 	if len(parts) > 2 {
 		addr, _ := AddressFromString(parts[2])
 		auth.Authorized = addr.ToString()
@@ -138,7 +138,7 @@ func AccountAuthorizationsKeyToAuthorization(key string) (*Authorization, error)
 	return auth, nil
 }
 func (item *Authorization) ToAccountAuthKey() string {
-	return fmt.Sprintf("%s/%s/%s", item.Subnet, item)
+	return fmt.Sprintf("%s/%s/%s", item.Application, item)
 }
 
 func (item *Authorization) Key() string {
@@ -165,8 +165,8 @@ func UnpackAuthorization(b []byte) (Authorization, error) {
 	return auth, err
 }
 
-func DeviceKeyCountKey() string {
-	return fmt.Sprintf("%s/agents", SubscriptionModel)
+func AppKeyCountKey() string {
+	return fmt.Sprintf("%s/appKeys", SubscriptionModel)
 }
 func (g Authorization) EncodeBytes() ([]byte, error) {
 
@@ -176,7 +176,7 @@ func (g Authorization) EncodeBytes() ([]byte, error) {
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *g.Duration},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: g.Meta},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *g.Priviledge},
-		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(g.Subnet)},
+		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: utils.UuidToBytes(g.Application)},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: *g.Timestamp},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: g.TopicIds},
 	)

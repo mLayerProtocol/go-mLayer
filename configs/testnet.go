@@ -30,7 +30,7 @@ var TestNetConfig = MainConfiguration{
 			ChainInfoContract:     "0x7b45C5Bf6b4f27E9ac0F9a6907656c2BE342c16F",
 			SentryNodeContract:    "0x9856c3B8d03937862C57b2330aF088684CA196c1",
 			ValidatorNodeContract: "0x58E549288E64e4A1bcF80aeCfa3bb002E6C4742b",
-			SubnetContract:        "0x331bd4973dAC41F20aAB98856bB2cF3b691419a6",
+			ApplicationContract:        "0x331bd4973dAC41F20aAB98856bB2cF3b691419a6",
 		},
 	},
 	SQLDB: SqlConfig{

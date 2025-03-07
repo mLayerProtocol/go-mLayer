@@ -90,11 +90,11 @@ func GetEventFromPath(ePath *entities.EventPath) (*entities.Event, error) {
 		return &data.Event, nil
 	}
 
-	if ePath.Model == entities.SubnetModel {
-		var data *models.SubnetEvent
-		err := GetOneWithOr(models.SubnetEvent{
+	if ePath.Model == entities.ApplicationModel {
+		var data *models.ApplicationEvent
+		err := GetOneWithOr(models.ApplicationEvent{
 			Event: entities.Event{Hash: ePath.ID},
-		}, models.SubnetEvent{
+		}, models.ApplicationEvent{
 			Event: entities.Event{ID: ePath.ID},
 		}, &data)
 		if err != nil {
@@ -158,15 +158,15 @@ func GetStateFromPath(ePath *entities.EntityPath) (any, error) {
 		return &data.Topic, nil
 	}
 
-	if ePath.Model == entities.SubnetModel {
-		var data *models.SubnetState
-		err := GetOne(models.SubnetState{
-			Subnet: entities.Subnet{ID: ePath.ID},
+	if ePath.Model == entities.ApplicationModel {
+		var data *models.ApplicationState
+		err := GetOne(models.ApplicationState{
+			Application: entities.Application{ID: ePath.ID},
 		}, &data)
 		if err != nil {
 			return nil, err
 		}
-		return &data.Subnet, nil
+		return &data.Application, nil
 	}
 
 	if ePath.Model == entities.AuthModel {

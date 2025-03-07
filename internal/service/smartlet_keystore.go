@@ -85,7 +85,7 @@ func (ks smartletKeyStore) Get(keys [][16]byte) (result map[(smartlet.Key)][]byt
 	err = ks.db.View(func(txn *badger.Txn) error {
 		for _, key := range keys {
 			ksKey := toKeystoreKey(key[:])
-			item, err := txn.Get(append([]byte(fmt.Sprintf("%s/%s", ks.app.Topic.Subnet, ks.app.Topic.ID)), ksKey...))
+			item, err := txn.Get(append([]byte(fmt.Sprintf("%s/%s", ks.app.Topic.Application, ks.app.Topic.ID)), ksKey...))
 			if err != nil && badger.ErrKeyNotFound != err {
 				ks.logger.Debugf("ApplicationGetError: %s", err)
 				return err
@@ -199,7 +199,7 @@ func (ks smartletKeyStore) update(commit bool) (err error) {
 				// key1 := []byte(hex.EncodeToString(keyByte[:]))
 				// key := [16]byte(key1[:16])
 				ksKey := toKeystoreKey(key[:])
-				keyByte := append([]byte(fmt.Sprintf("/%s/%s/", ks.app.Topic.Subnet, ks.app.Topic.ID)), ksKey...)
+				keyByte := append([]byte(fmt.Sprintf("/%s/%s/", ks.app.Topic.Application, ks.app.Topic.ID)), ksKey...)
 				final := [][]byte{}
 				validValue := false
 				isArray := false
@@ -208,7 +208,7 @@ func (ks smartletKeyStore) update(commit bool) (err error) {
 					validValue = true
 				}
 				if _, ok := value.([][]byte); ok {
-					countKey := append([]byte(fmt.Sprintf("/%s/%s/%s/", ks.app.Topic.Subnet, ks.app.Topic.ID, COUNT_KEY)), ksKey...)
+					countKey := append([]byte(fmt.Sprintf("/%s/%s/%s/", ks.app.Topic.Application, ks.app.Topic.ID, COUNT_KEY)), ksKey...)
 					countTracker[key] = 0
 					if countByte, err := txn.Get(countKey); err == nil {
 						countByte.Value(func(val []byte) error {
@@ -274,7 +274,7 @@ func (ks smartletKeyStore) update(commit bool) (err error) {
 		}
 		for k, v := range countTracker {
 			ksKey := toKeystoreKey(k[:])
-			txn.Set(append([]byte(fmt.Sprintf("%s/%s/%s/", ks.app.Topic.Subnet,  ks.app.Topic.ID, COUNT_KEY)),ksKey...), []byte(fmt.Sprint(v)))
+			txn.Set(append([]byte(fmt.Sprintf("%s/%s/%s/", ks.app.Topic.Application,  ks.app.Topic.ID, COUNT_KEY)),ksKey...), []byte(fmt.Sprint(v)))
 		}
 		
 		if commit {

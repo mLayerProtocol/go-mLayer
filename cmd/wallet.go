@@ -378,16 +378,16 @@ package cmd
 //         0,                             // Address index: 0
 //     }
 
-//     childKey := masterKey
+//     chilaKey := masterKey
 //     for _, n := range path {
-//         childKey, err = childKey.NewChildKey(n)
+//         chilaKey, err = chilaKey.NewChilaKey(n)
 //         if err != nil {
 //             log.Fatalf("Failed to derive child key: %v", err)
 //         }
 //     }
 
 //     // Convert the BIP-32 private key to an ECDSA private key
-//    return ethcrypto.ToECDSA(childKey.Key)
+//    return ethcrypto.ToECDSA(chilaKey.Key)
 
 // }
 // // func accountFunc(_cmd *cobra.Command, _args []string) {

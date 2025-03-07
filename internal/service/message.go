@@ -49,11 +49,11 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 		return nil, apperror.BadRequest("Invalid message signer")
 	}
 
-	subsribers := []entities.AddressString{entities.AddressString(payload.Account), entities.AddressString(payload.DeviceKey)}
-	// subscriptions, err := query.GetSubscriptionStateBySubscriber(payload.Subnet, message.Topic, subsribers, sql.SqlDb)
+	subsribers := []entities.AddressString{entities.AddressString(payload.Account), entities.AddressString(payload.AppKey)}
+	// subscriptions, err := query.GetSubscriptionStateBySubscriber(payload.Application, message.Topic, subsribers, sql.SqlDb)
 	subscriptions := []*entities.Subscription{}
 	accountSubcribed, err := dsquery.GetSubscriptions(entities.Subscription{
-		Subnet:     payload.Subnet,
+		Application:     payload.Application,
 		Topic:      message.Topic,
 		Subscriber: subsribers[0],
 	}, dsquery.DefaultQueryLimit, nil)
@@ -65,7 +65,7 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 	}
 
 	agentSubcribed, _err := dsquery.GetSubscriptions(entities.Subscription{
-		Subnet:     payload.Subnet,
+		Application:     payload.Application,
 		Topic:      message.Topic,
 		Subscriber: subsribers[1],
 	}, dsquery.DefaultQueryLimit, nil)
@@ -109,27 +109,27 @@ func ValidateMessageData(payload *entities.ClientPayload, topic *entities.Topic)
 
 		return  subscription, nil
 	} else {
-		// check if the sender is a subnet admin
-		// subnet := models.SubnetState{}
-		subnet, err := dsquery.GetSubnetStateById(payload.Subnet)
+		// check if the sender is a app admin
+		// app := models.ApplicationState{}
+		app, err := dsquery.GetApplicationStateById(payload.Application)
 
 		if err != nil {
-			return nil, apperror.BadRequest("Invalid subnet")
+			return nil, apperror.BadRequest("Invalid app")
 		}
-		if payload.Account != subnet.Account {
+		if payload.Account != app.Account {
 
 			// check if its an admin
 			// auth := models.AuthorizationState{}
-			// err = query.GetOneState(entities.Authorization{Agent: payload.DeviceKey, Account: payload.Account}, &auth)
+			// err = query.GetOneState(entities.Authorization{Agent: payload.AppKey, Account: payload.Account}, &auth)
 			auth, err := dsquery.GetAccountAuthorizations(entities.Authorization{
-				Authorized: entities.AddressString(payload.Account), Account: subnet.Account, Subnet: payload.Subnet,
+				Authorized: entities.AddressString(payload.Account), Account: app.Account, Application: payload.Application,
 			}, nil, nil)
 			if err != nil {
 				// if !dsquery.IsErrorNotFound(err) {
 				return nil, apperror.Unauthorized("Invalid authorization")
 				// }
 				// auth, err = dsquery.GetAccountAuthorizations(entities.Authorization{
-				// 	Agent: entities.DeviceString(payload.Account), Account: subnet.Account, Subnet: payload.Subnet,
+				// 	Agent: entities.DeviceString(payload.Account), Account: app.Account, Application: payload.Application,
 				// }, nil, nil)
 			}
 
@@ -178,9 +178,9 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) ( 
 		return err
 	}
 	data.Hash = hex.EncodeToString(hash)
-	data.DeviceKey = event.Payload.DeviceKey
+	data.AppKey = event.Payload.AppKey
 	data.Sender = event.Payload.Account
-	var subnet = event.Payload.Subnet
+	var app = event.Payload.Application
 	var topic = &entities.Topic{}
 
 
@@ -204,8 +204,8 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) ( 
 	// 			// save it 
 	// 			// dsquery.UpdateEvent(event, nil, true)
 	// 			// switch k.Event.Model {
-	// 			// case entities.SubnetModel:
-	// 			// 	state := entities.Subnet{}
+	// 			// case entities.ApplicationModel:
+	// 			// 	state := entities.Application{}
 	// 			// 	encoder.MsgPackUnpackStruct(stateBytes, state)
 	// 			// 	dsqu
 
@@ -294,7 +294,7 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) ( 
 		}
 	}()
 
-	eventData := PayloadData{Subnet: subnet, localDataState: nil, localDataStateEvent: nil}
+	eventData := PayloadData{Application: app, localDataState: nil, localDataStateEvent: nil}
 	// tx := sql.SqlDb
 	// defer func () {
 	// 	if tx.Error != nil {
@@ -305,11 +305,11 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) ( 
 	// }()
 	// stateTxn, err := stores.MessageStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
 	// if err != nil {
-	// 	// either subnet does not exist or you are not uptodate
+	// 	// either app does not exist or you are not uptodate
 	// }
 	// txn, err := stores.EventStore.NewTransaction(context.Background(), false) // true for read-write, false for read-only
 	// if err != nil {
-	// 	// either subnet does not exist or you are not uptodate
+	// 	// either app does not exist or you are not uptodate
 	// }
 	// defer stateTxn.Discard(context.Background())
 	// defer txn.Discard(context.Background())
@@ -340,7 +340,7 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) ( 
 		// 	topic = models.TopicState{Topic: *_topic}
 		// }
 
-		// errC := dsquery.IncrementCounters(event.Cycle, event.Validator, event.Subnet, nil)
+		// errC := dsquery.IncrementCounters(event.Cycle, event.Validator, event.Application, nil)
 		// if errC != nil {
 		// 	logger.Errorf("CounterError %v", err)
 
@@ -410,7 +410,7 @@ func HandleNewPubSubMessageEvent(event *entities.Event, ctx *context.Context) ( 
 			// 	 dsquery.UpdateAccountCounter(event.Payload.Account.ToString())
 			// 	OnFinishProcessingEvent(ctx, event,  &models.MessageState{
 			// 		Message: data,
-			// 	},  &event.Payload.Subnet)
+			// 	},  &event.Payload.Application)
 			// 	}()
 			// }  else {
 			// 	panic(err)

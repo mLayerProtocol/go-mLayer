@@ -38,7 +38,7 @@ func GetAccountSubscriptionsV2(cfg *configs.MainConfiguration, payload entities.
 	var states []models.SubscriptionState = []models.SubscriptionState{}
 	_states, err := dsquery.GetSubscriptions(payload, dsquery.DefaultQueryLimit, nil)
 	if len(payload.Subscriber) > 0 && len(_states) == 0  && !cfg.BootstrapNode  {
-		cacheKey := stores.AccountConnectedKey.NewKey(string(payload.Subscriber))
+		cacheKey := stores.AccountConnecteaKey.NewKey(string(payload.Subscriber))
 		_, seen := stores.SystemCache.Get(cacheKey)
 		if !seen {
 			// TODO sync with a bootstrap node
@@ -189,7 +189,7 @@ func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *mode
 
 	// var topicData *models.TopicState
 	// query.GetOne(models.TopicState{
-	// 	Topic: entities.Topic{ID: payloadData.Topic, Subnet: payload.Subnet},
+	// 	Topic: entities.Topic{ID: payloadData.Topic, Application: payload.Application},
 	// }, &topicData)
 	_topic, err := dsquery.GetTopicById(payloadData.Topic)
 	
@@ -198,7 +198,7 @@ func ValidateSubscriptionPayload(payload entities.ClientPayload, authState *mode
 		state, _, err := service.SyncStateFromPeer(payloadData.Topic, entities.TopicModel, cfg, "")
 		// logger.Infof("ValidatingTopic 3... %v, %v", err, state)
 		if err != nil || state == nil {
-			return nil, nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in subnet %s", payloadData.Topic, payload.Subnet))
+			return nil, nil, nil, apperror.BadRequest(fmt.Sprintf("Topic %s does not exist in app %s", payloadData.Topic, payload.Application))
 		}
 		_topic = state.(*entities.Topic)
 	}

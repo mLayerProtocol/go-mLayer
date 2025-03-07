@@ -16,14 +16,14 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/pkg/core/ds"
 )
  
-const MAX_SUBNET_IDLE_TIME = 10 * time.Second
-// EventProcessor manages the goroutines for each subnet
+const MAX_APP_IDLE_TIME = 10 * time.Second
+// EventProcessor manages the goroutines for each app
 type EventProcessor struct {
 	mu       sync.Mutex
-	// subnets  map[string]chan *entities.Event       // Map of subnet channels
-	subnets sync.Map     // Map of subnet channels
+	// apps  map[string]chan *entities.Event       // Map of app channels
+	apps sync.Map     // Map of app channels
 	wg       sync.WaitGroup              // WaitGroup to track active goroutines
-	timeouts map[string]context.CancelFunc // Map of cancel functions for subnets
+	timeouts map[string]context.CancelFunc // Map of cancel functions for apps
 	Context *context.Context
 	config *configs.MainConfiguration
 	responseMap sync.Map 
@@ -35,80 +35,80 @@ type EventProcessor struct {
 func NewEventProcessor(c *context.Context) *EventProcessor {
 	cfg := (*c).Value(constants.ConfigKey).(*configs.MainConfiguration)
 	return &EventProcessor{
-		// subnets:  make(map[string]chan *entities.Event),
+		// apps:  make(map[string]chan *entities.Event),
 		timeouts: make(map[string]context.CancelFunc),
 		Context: c,
 		config: cfg,
 	}
 }
 
-// HandleEvent handles an incoming event and manages the subnet goroutine
+// HandleEvent handles an incoming event and manages the app goroutine
 func (ep *EventProcessor) HandleEvent(event *entities.Event, responseChannel *chan *entities.EventProcessorResponse) {
 	// ep.mu.Lock()
 	// defer ep.mu.Unlock()
 	if responseChannel != nil {
 		ep.responseMap.Store(event.ID, responseChannel)
 	}
-	// Check if the subnet goroutine already exists
-	// ch, exists := ep.subnets[event.Subnet]
+	// Check if the app goroutine already exists
+	// ch, exists := ep.apps[event.Application]
 	var ch *chan *entities.Event 
 	// logger.Debugf("Handling event: %+v\n, %v", event, exists)
-	 value, ok := ep.subnets.Load(event.Subnet);
+	 value, ok := ep.apps.Load(event.Application);
 	 if ok {
 		// fmt.Println("Value for 'foo':", value) // Output: Value for 'foo': 42
 		ch = value.(*(chan *entities.Event))
 	}
 	if !ok {
 		logger.Debug("CreatingChannel...")
-		// Create a new channel and goroutine for the subnet
+		// Create a new channel and goroutine for the app
 		chm := make(chan *entities.Event, 1000)
 		ch = &chm
-		subn := event.Subnet
+		subn := event.Application
 		if subn == "" {
 			subn = "subn"
 		}
-		// ep.subnets[subn] = ch
-		 ep.subnets.Store(subn, ch)
+		// ep.apps[subn] = ch
+		 ep.apps.Store(subn, ch)
 	
 		// Create a cancellable context for the goroutine
 		ctx, cancel := context.WithCancel(*ep.Context)
-		ep.timeouts[event.Subnet] = cancel
+		ep.timeouts[event.Application] = cancel
 
 		// Start the goroutine
 		ep.wg.Add(1)
 		modelType := entities.GetModelTypeFromEventType(constants.EventType(event.EventType))
-		subnet := event.Payload.Subnet
+		app := event.Payload.Application
 		switch modelType {
 			case entities.AuthModel:
-				subnet =  event.Payload.Data.(entities.Authorization).Subnet
+				app =  event.Payload.Data.(entities.Authorization).Application
 			case entities.TopicModel:
-				subnet =  event.Payload.Data.(entities.Topic).Subnet
+				app =  event.Payload.Data.(entities.Topic).Application
 			case entities.SubscriptionModel:
-				subnet =  event.Payload.Data.(entities.Subscription).Subnet
+				app =  event.Payload.Data.(entities.Subscription).Application
 			case entities.MessageModel:
-				subnet =  event.Payload.Data.(entities.Message).Subnet
+				app =  event.Payload.Data.(entities.Message).Application
 		}
-		logger.Debugf("Started goroutine for subnet: %s, %s\n", subnet, modelType)
-		go ep.processSubnet(ctx, subnet, ch)
+		logger.Debugf("Started goroutine for app: %s, %s\n", app, modelType)
+		go ep.processApplication(ctx, app, ch)
 	}
 
-	// Send the event to the subnet's channel
+	// Send the event to the app's channel
 	*ch <- event
 }
 
-// processSubnet processes events for a specific subnet
-func (ep *EventProcessor) processSubnet(ctx context.Context, subnet string, eventChannel *chan *entities.Event) {
+// processApplication processes events for a specific app
+func (ep *EventProcessor) processApplication(ctx context.Context, app string, eventChannel *chan *entities.Event) {
 	defer ep.wg.Done()
 	var resp *entities.EventProcessorResponse = &entities.EventProcessorResponse{}
 	
 
 	
-	timer := time.NewTimer(MAX_SUBNET_IDLE_TIME) // Timeout duration
+	timer := time.NewTimer(MAX_APP_IDLE_TIME) // Timeout duration
 	
 	for {
 		select {
-		case <-ctx.Done(): // Subnet goroutine cancelled
-			logger.Debugf("Stopping goroutine for subnet: %s\n", subnet)
+		case <-ctx.Done(): // Application goroutine cancelled
+			logger.Debugf("Stopping goroutine for app: %s\n", app)
 			return
 		case event := <-*eventChannel: // Process incoming event
 			// modelType := event.GetDataModelType()
@@ -119,7 +119,7 @@ func (ep *EventProcessor) processSubnet(ctx context.Context, subnet string, even
 						*respCh  <- resp
 				}()
 			}
-			logger.Debugf("StartedProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
+			logger.Debugf("StartedProcessingEvent \"%s\" in Application: %s", event.ID, event.Application)
 			cfg, ok := (*ep.Context).Value(constants.ConfigKey).(*configs.MainConfiguration)
 			if !ok {
 				logger.Errorf("unable to get config from context")
@@ -128,7 +128,7 @@ func (ep *EventProcessor) processSubnet(ctx context.Context, subnet string, even
 			if event.Validator != entities.PublicKeyString(hex.EncodeToString(cfg.PublicKeyEDD)) {
 				isValidator, err := chain.NetworkInfo.IsValidator(string(event.Validator))
 				if err != nil {
-					logger.Error("processSubnet/IsValidator: ", err)
+					logger.Error("processApplication/IsValidator: ", err)
 					return
 				}
 				if !isValidator {
@@ -165,30 +165,30 @@ func (ep *EventProcessor) processSubnet(ctx context.Context, subnet string, even
 			if !timer.Stop() {
 				<-timer.C // Drain the timer channel if necessary
 			}
-			timer.Reset(MAX_SUBNET_IDLE_TIME)
+			timer.Reset(MAX_APP_IDLE_TIME)
 		case <-timer.C: // Timeout, no events received
-			logger.Debugf("No events for 10 seconds. Stopping subnet: %s\n", subnet)
-			ep.stopSubnet(subnet)
+			logger.Debugf("No events for 10 seconds. Stopping app: %s\n", app)
+			ep.stopApplication(app)
 			return
 		}
 	}
 	
 }
 
-// stopSubnet stops the goroutine and cleans up resources for a subnet
-func (ep *EventProcessor) stopSubnet(subnet string) {
+// stopApplication stops the goroutine and cleans up resources for a app
+func (ep *EventProcessor) stopApplication(app string) {
 	ep.mu.Lock()
 	defer ep.mu.Unlock()
 
-	if cancel, exists := ep.timeouts[subnet]; exists {
+	if cancel, exists := ep.timeouts[app]; exists {
 		cancel() // Cancel the context
-		delete(ep.timeouts, subnet)
+		delete(ep.timeouts, app)
 	}
 	
-	if value, ok := ep.subnets.Load(subnet); ok {
+	if value, ok := ep.apps.Load(app); ok {
 		chm := value.(*chan *entities.Event)
 		close(*chm) // Close the channel
-		ep.subnets.Delete(subnet)
-		// delete(ep.subnets, subnet)
+		ep.apps.Delete(app)
+		// delete(ep.apps, app)
 	}
 }

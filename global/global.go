@@ -5,29 +5,29 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/common/utils"
 	"github.com/mlayerprotocol/go-mlayer/entities"
 )
-var subnetMemberPrivi = constants.MemberPriviledge
-var subnetStatus = uint8(1)
+var appMemberPrivi = constants.MemberPriviledge
+var appStatus = uint8(1)
 
 const TIMESTAMP = 1737460800000 // first crypto friendly government sworn in
 const (
-  SUBNET_UUID_PRIFIX string = "534e4554"
+  APP_UUID_PRIFIX string = "534e4554"
 )
 
 
-var GlobalSubnets = []entities.Subnet {
+var GlobalApplications = []entities.Application {
   {
-    ID: SUBNET_UUID_PRIFIX+"-0000-0000-0000-000000000000",
-    Meta: "{\"name\":\"global subnet\"}",
+    ID: APP_UUID_PRIFIX+"-0000-0000-0000-000000000000",
+    Meta: "{\"name\":\"global app\"}",
     Ref: "global.x1",
-    Status: &subnetStatus,
+    Status: &appStatus,
     Balance: 0,
     Account: "mid:0x0000000000000000000000000000000000000000",
-    DefaultAuthPrivilege: &subnetMemberPrivi,
+    DefaultAuthPrivilege: &appMemberPrivi,
     BlockNumber: 0,
     Cycle  : 0,
     Epoch:		0,
-    DeviceKey:  "did:0x0000000000000000000000000000000000000000",
-    Event: entities.EventPath{EntityPath: entities.EntityPath{ Model: "snet", ID: "00000000-0000-0000-0000-000000000000", Validator: ""}},
+    AppKey:  "did:0x0000000000000000000000000000000000000000",
+    Event: entities.EventPath{EntityPath: entities.EntityPath{ Model: "app", ID: "00000000-0000-0000-0000-000000000000", Validator: ""}},
     Timestamp: TIMESTAMP,
   },
 }
@@ -36,7 +36,7 @@ var GlobalEvent = []entities.Event {
   {
     ID: "00000000-0000-0000-0000-000000000000",
     Payload: entities.ClientPayload{
-      Data: GlobalSubnets[0],
+      Data: GlobalApplications[0],
     },
     BlockNumber: 0,
     Cycle  : 0,
@@ -45,7 +45,7 @@ var GlobalEvent = []entities.Event {
     Broadcasted: true,
     IsValid: utils.TruePtr(),
     Timestamp: TIMESTAMP,
-    EventType: constants.CreateSubnetEvent,
+    EventType: constants.CreateApplicationEvent,
     Signature: "00000000000000000000000000000000",
     Hash: "00000000000000000000000000000000",
   },
@@ -64,7 +64,7 @@ var GlobalEvent = []entities.Event {
     EventType: constants.CreateTopicEvent,
     Signature: "00000000000000000000000000000001",
     Hash: "00000000000000000000000000000001",
-    PreviousEvent: entities.EventPath{EntityPath: entities.EntityPath{ Model: entities.SubnetModel, ID: "00000000-0000-0000-0000-000000000000", Validator: ""}},
+    PreviousEvent: entities.EventPath{EntityPath: entities.EntityPath{ Model: entities.ApplicationModel, ID: "00000000-0000-0000-0000-000000000000", Validator: ""}},
   },
 }
 
@@ -78,7 +78,7 @@ var RegistryTopicRef = []byte("global.x1.registry")
 var GlobalTopics = []entities.Topic {
   {
     ID: TOPIC_UUID_PRIFIX+"-0000-0000-0000-000000000000",
-    Subnet: SUBNET_UUID_PRIFIX+"-0000-0000-0000-000000000000",
+    Application: APP_UUID_PRIFIX+"-0000-0000-0000-000000000000",
     Meta: "{\"name\":\"global topic registry\"}",
     Ref: REGISTERY_TOPIC_REF,
     DefaultSubscriberRole: &constants.TopicWriterRole,
@@ -90,12 +90,12 @@ var GlobalTopics = []entities.Topic {
     Cycle  : 0,
     Epoch:		0,
     
-    DeviceKey:  "did:0x0000000000000000000000000000000000000000",
+    AppKey:  "did:0x0000000000000000000000000000000000000000",
     Event: entities.EventPath{EntityPath: entities.EntityPath{ Model: "top", ID: "00000000-0000-0000-0000-000000000001", Validator: ""}},
   },
   {
     ID: TOPIC_UUID_PRIFIX+"-0000-0000-0000-000000000001",
-    Subnet: SUBNET_UUID_PRIFIX+"-0000-0000-0000-000000000000",
+    Application: APP_UUID_PRIFIX+"-0000-0000-0000-000000000000",
     Meta: "{\"name\":\"global handshake registry\"}",
     Ref: HANDSHAKE_TOPIC_REF,
     DefaultSubscriberRole: &constants.TopicWriterRole,
@@ -107,7 +107,7 @@ var GlobalTopics = []entities.Topic {
     Cycle  : 0,
     Epoch:		0,
     
-    DeviceKey:  "did:0x0000000000000000000000000000000000000000",
+    AppKey:  "did:0x0000000000000000000000000000000000000000",
     Event: entities.EventPath{EntityPath: entities.EntityPath{ Model: "top", ID: "00000000-0000-0000-0000-000000000001", Validator: ""}},
   },
 }

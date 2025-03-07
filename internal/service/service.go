@@ -20,7 +20,7 @@ import (
 )
 
 type PayloadData struct {
-	Subnet         string
+	Application         string
 	localDataState *LocalDataState
 
 	localDataStateEvent *LocalDataStateEvent
@@ -54,7 +54,7 @@ func SaveEvent(model entities.EntityModel, where entities.Event, createData *ent
 		if event != nil {
 			return nil, dsquery.ErrorKeyExist
 		}
-		// create the subnet event
+		// create the app event
 		// event := createData.MsgPack()
 
 		if err := dsquery.UpdateEvent(createData, tx, nil, true); err != nil {
@@ -75,7 +75,7 @@ func SaveEvent(model entities.EntityModel, where entities.Event, createData *ent
 		}
 
 		if event == nil {
-			return nil, fmt.Errorf("subnet event not found")
+			return nil, fmt.Errorf("app event not found")
 		}
 
 		utils.UpdateStruct(updateData, event)
@@ -148,47 +148,47 @@ func ProcessEvent(
 		return false, false, nil, eventIsMoreRecent, fmt.Errorf("invalid event payload")
 	}
 
-	//subnet := models.SubnetState{}
-	var _subnet *entities.Subnet
-	if event.EventType != constants.CreateSubnetEvent && event.EventType != constants.UpdateSubnetEvent {
-		// err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: data.Subnet}}, &subnet)
-		_subnet, err = dsquery.GetSubnetStateById(data.Subnet)
-		if _subnet == nil {
+	//app := models.ApplicationState{}
+	var _app *entities.Application
+	if event.EventType != constants.CreateApplicationEvent && event.EventType != constants.UpdateApplicationEvent {
+		// err = query.GetOne(models.ApplicationState{Application: entities.Application{ID: data.Application}}, &app)
+		_app, err = dsquery.GetApplicationStateById(data.Application)
+		if _app == nil {
 			if err == gorm.ErrRecordNotFound || dsquery.IsErrorNotFound(err) {
-				logger.Debugf("EVENTINFO: %v %s", err, data.Subnet)
-				// get the subnetstate from the sending node
-				subPath := entities.NewEntityPath(event.Validator, entities.SubnetModel, data.Subnet)
-				pp, err := p2p.GetState(cfg, *subPath, &event.Validator, &_subnet)
+				logger.Debugf("EVENTINFO: %v %s", err, data.Application)
+				// get the appstate from the sending node
+				subPath := entities.NewEntityPath(event.Validator, entities.ApplicationModel, data.Application)
+				pp, err := p2p.GetState(cfg, *subPath, &event.Validator, &_app)
 				if err != nil {
 					logger.Error(err, " ", (*subPath).ToString(), " ", event.Validator)
-					return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to get subnetdata")
+					return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to get appdata")
 				}
 				logger.Infof("EVENTFOUND %s", pp.Event)
 				logger.Infof("STATEFOUND %v", pp.States)
 				if len(pp.Event) < 2 {
-					return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to unpack subnetdata")
+					return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to unpack appdata")
 				}
-				subnetEvent, err := entities.UnpackEvent(pp.Event, entities.SubnetModel)
+				appEvent, err := entities.UnpackEvent(pp.Event, entities.ApplicationModel)
 				if err != nil {
 					logger.Errorf("UnpackError: %v", err)
-					return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to unpack subnetdata")
+					return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to unpack appdata")
 				}
-				// err = dsquery.CreateEvent(subnetEvent, txn)
+				// err = dsquery.CreateEvent(appEvent, txn)
 				// if err != nil {
 				// 	return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to save subne event")
 				// }
-				dataDataStates.AddEvent(*subnetEvent)
-				// dataDataStates.Events[subnetEvent.ID] = *subnetEvent
+				dataDataStates.AddEvent(*appEvent)
+				// dataDataStates.Events[appEvent.ID] = *appEvent
 				for _, snetData := range pp.States {
-					_subnet, err := entities.UnpackSubnet(snetData)
+					_app, err := entities.UnpackApplication(snetData)
 					if err == nil {
-						// dataDataStates.CurrentStates[_subnet.ID] = _subnet
-						dataDataStates.AddCurrentState(entities.SubnetModel, _subnet.ID, _subnet)
-						// s, err := dsquery.CreateSubnetState(&_subnet, nil)
+						// dataDataStates.CurrentStates[_app.ID] = _app
+						dataDataStates.AddCurrentState(entities.ApplicationModel, _app.ID, _app)
+						// s, err := dsquery.CreateApplicationState(&_app, nil)
 						// if err != nil {
-						// 	return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to save subnet state")
+						// 	return false, false, nil, eventIsMoreRecent, fmt.Errorf("unable to save app state")
 						// }
-						// _subnet = *s;
+						// _app = *s;
 					}
 				}
 			} else {
@@ -197,7 +197,7 @@ func ProcessEvent(
 		}
 	}
 
-	 agent, _ := entities.AddressFromString(string(event.Payload.DeviceKey))
+	 agent, _ := entities.AddressFromString(string(event.Payload.AppKey))
 	if validAgentRequired || agent.Addr != "" {
 		agentString, err := crypto.GetSignerECC(&d, &event.Payload.Signature)
 		if err != nil {
@@ -233,8 +233,8 @@ func ProcessEvent(
 	// var agentAuthStateEvent models.AuthorizationEvent
 
 	if validAgentRequired {
-		// err = query.GetOne(models.AuthorizationState{Authorization: entities.Authorization{Agent: agent.ToDeviceString(), Subnet: event.Payload.Subnet}}, &agentAuthState)
-		_agentAuthState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Authorized: agent.ToAddressString(), Account: event.Payload.Account, Subnet: event.Payload.Subnet}, dsquery.DefaultQueryLimit, nil)
+		// err = query.GetOne(models.AuthorizationState{Authorization: entities.Authorization{Agent: agent.ToDeviceString(), Application: event.Payload.Application}}, &agentAuthState)
+		_agentAuthState, err := dsquery.GetAccountAuthorizations(entities.Authorization{Authorized: agent.ToAddressString(), Account: event.Payload.Account, Application: event.Payload.Application}, dsquery.DefaultQueryLimit, nil)
 		if err != nil && !dsquery.IsErrorNotFound(err) {
 			return false, false, nil, eventIsMoreRecent, fmt.Errorf("db error: %s", err.Error())
 		}
@@ -261,7 +261,7 @@ func ProcessEvent(
 	var previousEvent *entities.Event
 	var authEvent *entities.Event
 
-	// if agentAuthState == nil { // we dont have any info about the agent within this subnet
+	// if agentAuthState == nil { // we dont have any info about the agent within this app
 	// 	// we need to know if the agent has the right to process this event, else we cant do anything
 	// 	// check the node that sent the event to see if it has the record
 

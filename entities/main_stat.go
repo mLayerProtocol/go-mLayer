@@ -10,5 +10,5 @@ type MainStat struct {
 	TotalEventsValue string `json:"total_events_value"`
 	TopicCount uint64 `json:"topC"`
 	AuthCount uint64 `json:"authC"`
-	AgentCount uint64 `json:"agentC"`
+	AppKeyCount uint64 `json:"appKeyC"`
 }

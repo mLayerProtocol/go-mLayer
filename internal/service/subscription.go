@@ -30,9 +30,9 @@ func ValidateSubscriptionData(payload *entities.ClientPayload, topic *entities.T
 
 	logger.Info("ValidateSubscription...")
 	// err = query.GetOne(models.SubscriptionState{
-	// 	Subscription: entities.Subscription{Subscriber: subscription.Subscriber, Subnet: subscription.Subnet, Topic: subscription.Topic},
+	// 	Subscription: entities.Subscription{Subscriber: subscription.Subscriber, Application: subscription.Application, Topic: subscription.Topic},
 	// }, &currentState)
-	_currentState, err := dsquery.GetSubscriptions(entities.Subscription{Subscriber: subscription.Subscriber, Subnet: subscription.Subnet, Topic: subscription.Topic}, dsquery.DefaultQueryLimit, nil)
+	_currentState, err := dsquery.GetSubscriptions(entities.Subscription{Subscriber: subscription.Subscriber, Application: subscription.Application, Topic: subscription.Topic}, dsquery.DefaultQueryLimit, nil)
 	if err != nil {
 		logger.Errorf("Invalid event payload %e ", err)
 
@@ -53,7 +53,7 @@ func ValidateSubscriptionData(payload *entities.ClientPayload, topic *entities.T
 	// if payload.EventType == uint16(constants.SubscribeTopicEvent) {
 	// 	// someone inviting someone else
 	// 	logger.Infof("ValidateSubscription...3")
-	// 	// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.DeviceKey != payload.DeviceKey 
+	// 	// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.AppKey != payload.AppKey 
 	// 	subscribingSomeoneElse := subscription.Subscriber != payload.Account
 	// 	if subscribingSomeoneElse {
 	// 		if !slices.Contains([]constants.SubscriptionStatus{constants.InvitedSubscriptionStatus, constants.BannedSubscriptionStatus}, *subscription.Status) {
@@ -88,13 +88,13 @@ func ValidateSubscriptionData(payload *entities.ClientPayload, topic *entities.T
 func ValidateSubscription (account entities.AccountString, subscription *entities.Subscription,  topic *entities.Topic, currentState *entities.Subscription) error {
 		// someone inviting someone else
 		logger.Infof("ValidateSubscription...3")
-		// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.DeviceKey != payload.DeviceKey 
+		// subscribingSomeoneElse := subscription.Subscriber != payload.Account && subscription.AppKey != payload.AppKey 
 		subscribingSomeoneElse := subscription.Subscriber != entities.AddressString(account)
-		if len(subscription.Subnet) == 0 {
-			return apperror.BadRequest("subnet must be specified")
+		if len(subscription.Application) == 0 {
+			return apperror.BadRequest("app must be specified")
 		}
-		if subscription.Subnet != topic.Subnet {
-			return apperror.BadRequest("subscription and topic subnet does not match")
+		if subscription.Application != topic.Application {
+			return apperror.BadRequest("subscription and topic app does not match")
 		}
 		if subscribingSomeoneElse {
 			if !slices.Contains([]constants.SubscriptionStatus{constants.InvitedSubscriptionStatus, constants.BannedSubscriptionStatus}, *subscription.Status) {
@@ -142,7 +142,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 	data.BlockNumber = event.BlockNumber
 	data.Cycle = event.Cycle
 	data.Epoch = event.Epoch
-	data.DeviceKey = event.Payload.DeviceKey
+	data.AppKey = event.Payload.AppKey
 	data.EventSignature = event.Signature
 	data.Timestamp = &event.Timestamp
 	hash, err := data.GetHash()
@@ -150,7 +150,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 		return err
 	}
 	data.Hash = hex.EncodeToString(hash)
-	var subnet = data.Subnet
+	var app = data.Application
 	var validator = ""
 	if event.Validator != entities.PublicKeyString(cfg.PublicKeyEDDHex) {
 		validator = string(event.Validator)
@@ -170,12 +170,12 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 
 	localState := models.SubscriptionState{}
 	// err := query.GetOne(&models.TopicState{Topic: entities.Topic{ID: id}}, &localTopicState)
-	// err = sql.SqlDb.Where(&models.SubscriptionState{Subscription: entities.Subscription{Subnet: subnet, Topic: data.Topic, Subscriber: entities.AddressFromString(string(data.Subscriber)).ToDIDString()}}).Take(&localState).Error
+	// err = sql.SqlDb.Where(&models.SubscriptionState{Subscription: entities.Subscription{Application: app, Topic: data.Topic, Subscriber: entities.AddressFromString(string(data.Subscriber)).ToDIDString()}}).Take(&localState).Error
 	// if err != nil {
 	// 	logger.Error(err)
 	// }
 
-	subs, err := dsquery.GetSubscriptions(entities.Subscription{Subnet: subnet, Topic: data.Topic, Subscriber: data.Subscriber}, nil, nil)
+	subs, err := dsquery.GetSubscriptions(entities.Subscription{Application: app, Topic: data.Topic, Subscriber: data.Subscriber}, nil, nil)
 	if err == nil && subs != nil && len(subs) > 0 {
 		localState = models.SubscriptionState{
 			Subscription: *subs[0],
@@ -214,7 +214,7 @@ func HandleNewPubSubSubscriptionEvent(event *entities.Event, ctx *context.Contex
 		}
 	}
 
-	eventData := PayloadData{Subnet: subnet, localDataState: localDataState, localDataStateEvent: localDataStateEvent}
+	eventData := PayloadData{Application: app, localDataState: localDataState, localDataStateEvent: localDataStateEvent}
 	// tx := sql.SqlDb
 	// defer func () {
 	// 	if tx.Error != nil {

@@ -364,7 +364,7 @@ func daemonFunc(cmd *cobra.Command, _ []string) {
 	// ADD EVENT BROADCAST CHANNELS TO THE CONTEXT
 	// ctx = context.WithValue(ctx, constants.BroadcastAuthorizationEventChId, &channelpool.AuthorizationEventPublishC)
 	// ctx = context.WithValue(ctx, constants.BroadcastTopicEventChId, &channelpool.TopicEventPublishC)
-	// ctx = context.WithValue(ctx, constants.BroadcastSubnetEventChId, &channelpool.SubnetEventPublishC)
+	// ctx = context.WithValue(ctx, constants.BroadcastApplicationEventChId, &channelpool.ApplicationEventPublishC)
 
 	// // CLEANUP
 	// ctx = context.WithValue(ctx, constants.IncomingMessageChId, &channelpool.IncomingMessageEvent_P2P_D_C)

@@ -188,7 +188,7 @@ func Provider (chainId configs.ChainId) api.IChainAPI {
 // 	return *bal
 // }
 
-// func (n *MLChainAPI) GetSubnetBalance(hashOrId string) big.Int {
+// func (n *MLChainAPI) GetApplicationBalance(hashOrId string) big.Int {
 // 	bal := new(big.Int)
 // 	bal.SetString("100000000000000000000000000", 10)
 // 	return *bal

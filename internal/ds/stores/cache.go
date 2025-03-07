@@ -16,7 +16,7 @@ type SystemCacheKeyPrefix string
 
 
 const (
-	AccountConnectedKey SystemCacheKeyPrefix = "acct"
+	AccountConnecteaKey SystemCacheKeyPrefix = "acct"
 )
 
 func (c SystemCacheKeyPrefix) NewKey(key string) string {

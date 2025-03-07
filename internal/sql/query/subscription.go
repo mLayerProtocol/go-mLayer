@@ -7,8 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Save Subnet state only when it doesnt exist
-func GetSubscriptionStateBySubscriber(subnet string, topic string, subscribers []entities.AccountString, DB *gorm.DB) (*[]models.SubscriptionState, error) {
+// Save Application state only when it doesnt exist
+func GetSubscriptionStateBySubscriber(app string, topic string, subscribers []entities.AccountString, DB *gorm.DB) (*[]models.SubscriptionState, error) {
 	data := []models.SubscriptionState{}
 	tx := DB
 	if DB == nil {
@@ -22,7 +22,7 @@ func GetSubscriptionStateBySubscriber(subnet string, topic string, subscribers [
 		subsc = append(subsc, sub)
 	}
 	err := tx.Where(models.SubscriptionState{
-		Subscription: entities.Subscription{ Subnet: subnet, Topic: topic },
+		Subscription: entities.Subscription{ Application: app, Topic: topic },
 	}).Where("subscriber IN ?", subsc).Find(&data).Error
 	if err != nil {
 		logger.Debugf("ERROR::: %v", err)

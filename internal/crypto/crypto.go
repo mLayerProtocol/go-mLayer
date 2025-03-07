@@ -336,7 +336,7 @@ func EncryptPrivateKey(privateKey []byte, password string) (cypher []byte, salt 
 }
 
 // Decrypts the private key using a password and the original salt
-func DecryptPrivateKey(encryptedKey []byte, password string, salt []byte) ([]byte, error) {
+func DecryptPrivateKey(encrypteaKey []byte, password string, salt []byte) ([]byte, error) {
 	// Derive the same key from the password using scrypt
 	key, err := scrypt.Key([]byte(password), salt, n, r, p, keySize)
 	if err != nil {
@@ -354,11 +354,11 @@ func DecryptPrivateKey(encryptedKey []byte, password string, salt []byte) ([]byt
 	
 	// Extract the nonce from the encrypted key
 	nonceSize := gcm.NonceSize()
-	if len(encryptedKey) < nonceSize {
+	if len(encrypteaKey) < nonceSize {
 		return nil, errors.New("ciphertext too short")
 	}
 	
-	nonce, ciphertext := encryptedKey[:nonceSize], encryptedKey[nonceSize:]
+	nonce, ciphertext := encrypteaKey[:nonceSize], encrypteaKey[nonceSize:]
 	// Decrypt the private key
 	plainKey, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {

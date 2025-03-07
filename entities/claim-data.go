@@ -14,9 +14,9 @@ type ClaimData struct {
 	// Signature [32]byte
 	// Commitment []byte
 	// PubKeys []*btcec.PublicKey
-	// SubnetRewardCount []SubnetCount
+	// ApplicationRewardCount []ApplicationCount
 	Validator  []byte
-	ClaimData  []SubnetCount
+	ClaimData  []ApplicationCount
 	Cycle      *big.Int
 	Index      *big.Int
 	Signers    []schnorr.Point

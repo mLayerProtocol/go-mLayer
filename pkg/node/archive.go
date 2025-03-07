@@ -11,7 +11,7 @@ import (
 )
 
 // Validator node only
-// Keep a record of all messages sent within a cycle per subnet
+// Keep a record of all messages sent within a cycle per app
 func ArchiveBlocks(ctx *context.Context) error {
 	cfg, ok := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 	if !ok {

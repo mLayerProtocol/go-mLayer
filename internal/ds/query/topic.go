@@ -207,7 +207,7 @@ func GetTopicSmartletData( topic *entities.Topic, id []byte) (data []byte, err e
 	key := ToKeystoreKey([16]byte(id))
 	
     err = stores.GlobalHandlerStore.DB.View(func(txn *badger.Txn) error {
-		key := append([]byte(fmt.Sprintf("/%s/%s/", topic.Subnet, topic.ID)), []byte(key)...)
+		key := append([]byte(fmt.Sprintf("/%s/%s/", topic.Application, topic.ID)), []byte(key)...)
 		item, err := txn.Get(key)
 		if err != nil {
 			return err
@@ -222,7 +222,7 @@ func GetTopicSmartletData( topic *entities.Topic, id []byte) (data []byte, err e
         // opts := badger.DefaultIteratorOptions
 		//  opts.Prefix = prefix
 		
-		// // opts.Prefix = append([]byte(fmt.Sprintf("%s/%s", topic.Subnet, topic.ID)),  id...)
+		// // opts.Prefix = append([]byte(fmt.Sprintf("%s/%s", topic.Application, topic.ID)),  id...)
         // it := txn.NewIterator(opts)
         // defer it.Close()
 

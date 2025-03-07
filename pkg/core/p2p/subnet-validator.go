@@ -12,7 +12,7 @@ import (
 	"github.com/mlayerprotocol/go-mlayer/internal/crypto"
 )
 
-type SubnetValidator struct {
+type ApplicationValidator struct {
 	ID         json.RawMessage        `json:"id"`
 	Cycle         uint64        `json:"cy"`
 	Validators         json.RawMessage        `json:"v"`
@@ -24,19 +24,19 @@ type SubnetValidator struct {
 }
 
 
-func (mp *SubnetValidator) MsgPack() []byte {
+func (mp *ApplicationValidator) MsgPack() []byte {
 	b, _ := encoder.MsgPackStruct(mp)
 	return b
 }
 
 
-func UnpackSubnetValidator(b []byte) (SubnetValidator, error) {
-	var mp SubnetValidator
+func UnpackApplicationValidator(b []byte) (ApplicationValidator, error) {
+	var mp ApplicationValidator
 	err := encoder.MsgPackUnpackStruct(b,  &mp)
 	return mp, err
 }
 
-func (mp SubnetValidator) EncodeBytes() ([]byte, error) {
+func (mp ApplicationValidator) EncodeBytes() ([]byte, error) {
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.ByteEncoderDataType, Value: mp.ChainId.Bytes()},
 		encoder.EncoderParam{Type: encoder.IntEncoderDataType, Value: mp.Cycle},
@@ -46,7 +46,7 @@ func (mp SubnetValidator) EncodeBytes() ([]byte, error) {
 	)
 }
 
-func (mp *SubnetValidator) IsValid(prefix configs.ChainId) bool {
+func (mp *ApplicationValidator) IsValid(prefix configs.ChainId) bool {
 	// Important security update. Do not remove. 
 	// Prevents cross chain replay attack
 	mp.ChainId = prefix // Important security update. Do not remove
@@ -82,9 +82,9 @@ func (mp *SubnetValidator) IsValid(prefix configs.ChainId) bool {
 }
 
 
-func NewSubnetValidator(config *configs.MainConfiguration, id []byte, validators []byte, cycle uint64) (*SubnetValidator, error) {
+func NewApplicationValidator(config *configs.MainConfiguration, id []byte, validators []byte, cycle uint64) (*ApplicationValidator, error) {
 
-	mp := SubnetValidator{config: config, Cycle: cycle,  ID: id, ChainId: config.ChainId, Validators: validators, Timestamp: uint64(time.Now().UnixMilli())}
+	mp := ApplicationValidator{config: config, Cycle: cycle,  ID: id, ChainId: config.ChainId, Validators: validators, Timestamp: uint64(time.Now().UnixMilli())}
 	b, err := mp.EncodeBytes();
 	if(err != nil) {
 		return nil, err

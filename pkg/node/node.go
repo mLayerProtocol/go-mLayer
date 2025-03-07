@@ -124,9 +124,9 @@ func Start(mainCtx *context.Context) {
 		}(globaEvent)
 		
 	}
-	for _, globalSubnet := range global.GlobalSubnets {
-		subnet := globalSubnet // avoid pointer dereferencing issues
-		if _, err := dsquery.UpdateSubnetState(globalSubnet.ID, &subnet, nil, true); err != nil {
+	for _, globalApplication := range global.GlobalApplications {
+		app := globalApplication // avoid pointer dereferencing issues
+		if _, err := dsquery.UpdateApplicationState(globalApplication.ID, &app, nil, true); err != nil {
 			panic(err)
 		}
 	}
@@ -236,15 +236,15 @@ func Start(mainCtx *context.Context) {
 							count[entities.NetworkCounterKey(nil)] ++
 							
 							count[entities.CycleCounterKey(event.Cycle, &event.Validator, utils.FalsePtr(), nil)] ++
-							subnet := event.Subnet
-							if len(subnet) == 0 {
-								subnet = event.Payload.Subnet
+							app := event.Application
+							if len(app) == 0 {
+								app = event.Payload.Application
 							}
-							if len(subnet) > 0 {
-								// keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), &subnet)))
-								count[entities.NetworkCounterKey(&subnet)] ++
+							if len(app) > 0 {
+								// keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), &app)))
+								count[entities.NetworkCounterKey(&app)] ++
 							} else {
-								count[entities.CycleSubnetKey(event.Cycle, subnet)] ++ 
+								count[entities.CycleApplicationKey(event.Cycle, app)] ++ 
 							}
 							for _, keyString := range entities.GetBlockStatsKeys(event) {
 								if keyString == entities.RecentEventKey(event.Cycle) {
@@ -310,7 +310,7 @@ func Start(mainCtx *context.Context) {
 						eventProcessor.HandleEvent(event, nil)
 
 						
-					// 		logger.Debugf("StartedProcessingEvent \"%s\" in Subnet: %s", event.ID, event.Subnet)
+					// 		logger.Debugf("StartedProcessingEvent \"%s\" in Application: %s", event.ID, event.Application)
 					// 		cfg, ok := (*mainCtx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 					// 		if !ok {
 					// 			logger.Errorf("unable to get config from context")
@@ -332,8 +332,8 @@ func Start(mainCtx *context.Context) {
 			
 					// 		// service.SaveEvent(modelType, entities.Event{}, event, nil, nil)
 					// 		switch modelType {
-					// 			case entities.SubnetModel:
-					// 				service.HandleNewPubSubSubnetEvent(event, &ctx)
+					// 			case entities.ApplicationModel:
+					// 				service.HandleNewPubSubApplicationEvent(event, &ctx)
 					// 			case entities.AuthModel:
 					// 				service.HandleNewPubSubAuthEvent(event, &ctx)
 					// 			case entities.TopicModel:
@@ -503,7 +503,7 @@ func Start(mainCtx *context.Context) {
 		// }
 		// }()
 
-		go p2p.ProcessEventsReceivedFromOtherNodes(entities.SubnetModel, &entities.SubnetPubSub, &ctx)
+		go p2p.ProcessEventsReceivedFromOtherNodes(entities.ApplicationModel, &entities.ApplicationPubSub, &ctx)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.AuthModel, &entities.AuthorizationPubSub, &ctx)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.TopicModel, &entities.TopicPubSub, &ctx)
 		go p2p.ProcessEventsReceivedFromOtherNodes(entities.WalletModel, &entities.WalletPubSub, &ctx)
@@ -749,7 +749,7 @@ func loadChainInfo(cfg *configs.MainConfiguration) (ringNodes []*ring.Node, err 
 				// validatorOperators = append(validatorOperators, pubKey)
 				// chain.NetworkInfo.Validators[pubKey] = val.LicenseOwner
 				chain.NetworkInfo.Validators[val.LicenseOwner] = "true"
-				chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/edd", pubKey)] = hex.EncodeToString(val.EddKey[:])
+				chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/edd", pubKey)] = hex.EncodeToString(val.EdaKey[:])
 				chain.NetworkInfo.Validators[fmt.Sprintf("secp/%s/addr", pubKey)] = val.LicenseOwner
 				// chain.NetworkInfo.Validators
 				// keySecP := "/ml/val/" + pubKey
@@ -759,8 +759,8 @@ func loadChainInfo(cfg *configs.MainConfiguration) (ringNodes []*ring.Node, err 
 				// } else {
 				// 	logger.Errorf("loadchainInfo.GetMAD error: %v", err)
 				// }
-				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/secp", hex.EncodeToString(val.EddKey[:]))] = pubKey
-				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/addr", hex.EncodeToString(val.EddKey[:]))] = val.LicenseOwner
+				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/secp", hex.EncodeToString(val.EdaKey[:]))] = pubKey
+				chain.NetworkInfo.Validators[fmt.Sprintf("edd/%s/addr", hex.EncodeToString(val.EdaKey[:]))] = val.LicenseOwner
 				
 			}
 			if len(validators) == 0 || big.NewInt(int64(len(validators))).Cmp(perPage) == -1 {

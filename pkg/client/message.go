@@ -134,10 +134,10 @@ func ValidateMessagePayload(payload entities.ClientPayload, currentAuthState *mo
 			if payload.Account == topicData.Account {
 				assocPrevEvent = &topicData.Event
 			} else {
-				subState, err := dsquery.GetSubnetStateById(topicData.Subnet)
+				subState, err := dsquery.GetApplicationStateById(topicData.Application)
 				if err != nil {
 					if err == gorm.ErrRecordNotFound  || dsquery.IsErrorNotFound(err){
-						return nil, nil, subscription, apperror.Forbidden("Invalid subnet id")
+						return nil, nil, subscription, apperror.Forbidden("Invalid app id")
 					}
 					return nil, nil, subscription,  apperror.Internal(err.Error())
 				}

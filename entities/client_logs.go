@@ -19,7 +19,7 @@ var validSubscriptionFilter =  map[string]bool{
     "sub":  true,
     "top":  true,
     "rol":  true,
-    "snet": true,
+    "app": true,
     "s":    true,
     "cy":   true,
     "blk":  true,
@@ -53,18 +53,18 @@ func NewWsClientLog() WsClientLog {
 func (c *WsClientLog) RegisterClient(subscription *ClientWsSubscription) (topics [] string) {
 	
 	keys := []uint64{}
-	for snet, val := range subscription.Filter {
+	for app, val := range subscription.Filter {
 		// keys = append(keys, key)
 		for _, _type := range val {
 			if _type == "*" {
 				for _, t := range eventModelsAsByte {
-					logger.Debugf("REGISTERING: %s", snet, string(t) )
-					keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(snet), t...)))
+					logger.Debugf("REGISTERING: %s", app, string(t) )
+					keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(app), t...)))
 				}
 				
 			} else {
-				logger.Debugf("REGISTERING: %s", snet, string(_type) )
-				keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(snet), []byte(_type)...)))
+				logger.Debugf("REGISTERING: %s", app, string(_type) )
+				keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(app), []byte(_type)...)))
 				if len(_type) > 10 {
 					topics = append(topics, _type)
 				}
@@ -131,8 +131,8 @@ func (c *WsClientLog) RegisterClientV2(subscription *ClientWsSubscriptionV2) (to
 		// if len(_filter["rol"]) > 0 {
 		// 	subKey = append(subKey, []byte(_filter["rol"])...)
 		// }
-		// if len(_filter["snet"]) > 0 {
-		// 	subKey = append(subKey, []byte(_filter["snet"])...)
+		// if len(_filter["app"]) > 0 {
+		// 	subKey = append(subKey, []byte(_filter["app"])...)
 		// }
 		// // if len(_filter["ref"]) > 0 {
 		// // 	subKey = append(subKey, []byte(_filter["ref"])...)
@@ -145,7 +145,7 @@ func (c *WsClientLog) RegisterClientV2(subscription *ClientWsSubscriptionV2) (to
 		// //	for filterKey, filterValue := range _type {
 		// 		// if _type == "*" {
 		// 			for _, t := range eventModelsAsByte {
-		// 				logger.Debugf("REGISTERING: %s", snet, string(t) )
+		// 				logger.Debugf("REGISTERING: %s", app, string(t) )
 						
 		// 				// for filterKey, filterValue := range _type {
 		// 				// 	if filterKey == "acct" {
@@ -167,11 +167,11 @@ func (c *WsClientLog) RegisterClientV2(subscription *ClientWsSubscriptionV2) (to
 		// 				if len(_type["rol"]) > 0 {
 		// 					subKey = append(subKey, []byte(_type["rol"])...)
 		// 				}
-		// 				keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(snet), t...)))
+		// 				keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(app), t...)))
 		// 			}		
 		// 		// } else {
-		// 		// 	logger.Debugf("REGISTERING: %s", snet, string(_type) )
-		// 		// 	keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(snet), []byte(_type)...)))
+		// 		// 	logger.Debugf("REGISTERING: %s", app, string(_type) )
+		// 		// 	keys = append(keys, murmur3.Sum64(append(utils.UuidToBytes(app), []byte(_type)...)))
 		// 		// 	if len(_type) > 10 {
 		// 		// 		topics = append(topics, _type)
 		// 		// 	}
@@ -218,9 +218,9 @@ func (c *WsClientLog) RemoveClient(conn *websocket.Conn) {
 	c.mutex.Unlock()
 }
 
-func (c *WsClientLog) GetClients(subnetId string, entittyModel string ) []*SocketSubscriptionId {
+func (c *WsClientLog) GetClients(appId string, entittyModel string ) []*SocketSubscriptionId {
 	
-	hash := murmur3.Sum64(append(utils.UuidToBytes(subnetId), []byte(entittyModel)...))
+	hash := murmur3.Sum64(append(utils.UuidToBytes(appId), []byte(entittyModel)...))
 	if c.Clients[hash] == nil {
 		return []*SocketSubscriptionId{}
 	}
@@ -277,8 +277,8 @@ func getSubscriptionKeys( entittyModel string , entity map[string]interface{}) [
 		// if len(entity["rol"]) > 0 {
 		// 	subKey = append(subKey, []byte(entity["rol"])...)
 		// }
-		// if len(entity["snet"]) > 0 {
-		// 	subKey = append(subKey, []byte(entity["snet"])...)
+		// if len(entity["app"]) > 0 {
+		// 	subKey = append(subKey, []byte(entity["app"])...)
 		// }
 		// if len(_filter["ref"]) > 0 {
 		// 	subKey = append(subKey, []byte(_filter["ref"])...)

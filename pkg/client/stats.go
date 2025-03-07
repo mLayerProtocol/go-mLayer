@@ -49,7 +49,7 @@ func GetBlockStats(startBlock uint64, limit *entities.QueryLimit) (*[]models.Blo
 				EventCount: v,
 			},
 		}
-		models := []entities.EntityModel{entities.SubnetModel, entities.AuthModel, entities.TopicModel, entities.SubscriptionModel, entities.MessageModel}
+		models := []entities.EntityModel{entities.ApplicationModel, entities.AuthModel, entities.TopicModel, entities.SubscriptionModel, entities.MessageModel}
 		for _, m := range models {
 			c, err := dsquery.GetStats(dsquery.BlockStatsQuery{
 				Block: &i, 
@@ -59,8 +59,8 @@ func GetBlockStats(startBlock uint64, limit *entities.QueryLimit) (*[]models.Blo
 				continue
 			}
 			switch m {
-			case entities.SubnetModel:
-				stat.SubnetCount = c
+			case entities.ApplicationModel:
+				stat.ApplicationCount = c
 			case entities.AuthModel:
 				stat.AuthorizationCount = c
 			case entities.TopicModel:
@@ -115,7 +115,7 @@ func GetCycleStats(startCycle uint64, limit *entities.QueryLimit) (*[]models.Blo
 				Event: ev,
 			},
 		}
-		// models := []entities.EntityModel{entities.SubnetModel, entities.AuthModel, entities.TopicModel, entities.SubscriptionModel, entities.MessageModel}
+		// models := []entities.EntityModel{entities.ApplicationModel, entities.AuthModel, entities.TopicModel, entities.SubscriptionModel, entities.MessageModel}
 		// for _, m := range models {
 		// 	c, err := dsquery.GetStats(dsquery.BlockStatsQuery{
 		// 		Cycle: &i, 
@@ -125,8 +125,8 @@ func GetCycleStats(startCycle uint64, limit *entities.QueryLimit) (*[]models.Blo
 		// 		continue
 		// 	}
 		// 	switch m {
-		// 	case entities.SubnetModel:
-		// 		stat.SubnetCount = c
+		// 	case entities.ApplicationModel:
+		// 		stat.ApplicationCount = c
 		// 	case entities.AuthModel:
 		// 		stat.AuthorizationCount = c
 		// 	case entities.TopicModel:
@@ -160,7 +160,7 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 
 
 
-	agentCounBytes, err  := stores.StateStore.Get(context.Background(), datastore.NewKey(entities.DeviceKeyCountKey()))
+	agentCounBytes, err  := stores.StateStore.Get(context.Background(), datastore.NewKey(entities.AppKeyCountKey()))
 	
 	if err != nil && !dsquery.IsErrorNotFound(err) {
 		return  &entities.MainStat{}, err
@@ -173,7 +173,7 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 		}
 	}
 	
-	// err = query.GetTx().Model(&models.SubnetState{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&subnetBalanceTotal)
+	// err = query.GetTx().Model(&models.ApplicationState{}).Select("COALESCE(sum(balance), 0)").Row().Scan(&appBalanceTotal)
 	// if err != nil {
 	// 	if err == gorm.ErrRecordNotFound {
 	// 		return nil, nil
@@ -196,7 +196,10 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 	// 	return nil, err
 	// }
 
-	subnetBal, _ := chain.DefaultProvider(cfg).GetTotalValueLockedInSubnets()
+	appBal, _ := chain.DefaultProvider(cfg).GetTotalValueLockedInApplications()
+	if appBal == nil {
+		appBal = big.NewInt(0)
+	}
 	
 	msgCost, err := chain.Provider(cfg.ChainId).GetCurrentMessagePrice()
 	if err != nil {
@@ -213,9 +216,9 @@ func GetMainStats(cfg *configs.MainConfiguration) (*entities.MainStat, error) {
 	return &entities.MainStat{
 		Accounts:  accountCount,
 		MessageCost:  msgCost.String(),
-		TotalValueLocked: subnetBal.String(),
+		TotalValueLocked: appBal.String(),
 		EventCount: msgCount,
 		TotalEventsValue: big.NewInt(1).Mul(msgCost, new(big.Int).SetUint64(msgCount)).String(),
-		AgentCount: agentCount,
+		AppKeyCount: agentCount,
 	}, nil
 }

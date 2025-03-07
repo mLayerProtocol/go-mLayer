@@ -88,7 +88,7 @@ var syncMutex sync.Mutex
 const (
 	AuthorizationChannel string = "ml-authorization-channel"
 	TopicChannel         string = "ml-topic-channel"
-	SubnetChannel        string = "ml-sub-network-channel"
+	ApplicationChannel        string = "ml-sub-network-channel"
 	WalletChannel        string = "ml-wallet-channel"
 	MessageChannel       string = "ml-message-channel"
 	SubscriptionChannel         = "ml-subscription-channel"
@@ -512,11 +512,11 @@ func Run(mainCtx *context.Context) {
 	}
 	entities.TopicPubSub = *topicPubSub
 
-	subnetPubSub, err := entities.JoinChannel(ctx, ps, Host.ID(), defaultNick(Host.ID()), SubnetChannel, cfg.ChannelMessageBufferSize)
+	appPubSub, err := entities.JoinChannel(ctx, ps, Host.ID(), defaultNick(Host.ID()), ApplicationChannel, cfg.ChannelMessageBufferSize)
 	if err != nil {
 		panic(err)
 	}
-	entities.SubnetPubSub = *subnetPubSub
+	entities.ApplicationPubSub = *appPubSub
 
 	walletPubSub, err := entities.JoinChannel(ctx, ps, Host.ID(), defaultNick(Host.ID()), WalletChannel, cfg.ChannelMessageBufferSize)
 	if err != nil {
@@ -555,7 +555,7 @@ func Run(mainCtx *context.Context) {
 	// Publishers
 	go publishChannelEventToNetwork(channelpool.AuthorizationEventPublishC, &entities.AuthorizationPubSub, mainCtx)
 	go publishChannelEventToNetwork(channelpool.TopicEventPublishC, &entities.TopicPubSub, mainCtx)
-	go publishChannelEventToNetwork(channelpool.SubnetEventPublishC, &entities.SubnetPubSub, mainCtx)
+	go publishChannelEventToNetwork(channelpool.ApplicationEventPublishC, &entities.ApplicationPubSub, mainCtx)
 	go publishChannelEventToNetwork(channelpool.WalletEventPublishC, &entities.WalletPubSub, mainCtx)
 	go publishChannelEventToNetwork(channelpool.SubscriptionEventPublishC, &entities.SubscriptionPubSub, mainCtx)
 	go publishChannelEventToNetwork(channelpool.SystemMessagePublishC, &entities.SystemMessagePubSub, mainCtx)
@@ -1474,9 +1474,9 @@ func PublishEvent(event entities.Event) *models.EventInterface {
 	eventPayloadType := entities.GetModelTypeFromEventType(constants.EventType(event.EventType))
 	var model *models.EventInterface
 	switch eventPayloadType {
-		case entities.SubnetModel:
-			channelpool.SubnetEventPublishC <- &event
-			returnModel := models.EventInterface(models.SubnetEvent{Event: event})
+		case entities.ApplicationModel:
+			channelpool.ApplicationEventPublishC <- &event
+			returnModel := models.EventInterface(models.ApplicationEvent{Event: event})
 			model = &returnModel
 		case entities.AuthModel:
 			channelpool.AuthorizationEventPublishC <- &event

@@ -47,8 +47,8 @@ func NewEventFSM(event *entities.Event, validAgentRequired bool, data PayloadDat
 			"init",
 			fsm.Events{
 				{Name: "validate", Src: []string{"init"}, Dst: "validated"},
-				{Name: "sync_subnet", Src: []string{"validated"}, Dst: "subnet_synced"},
-				{Name: "sync_authorization", Src: []string{"subnet_synced"}, Dst: "authorization_synced"},
+				{Name: "sync_app", Src: []string{"validated"}, Dst: "app_synced"},
+				{Name: "sync_authorization", Src: []string{"app_synced"}, Dst: "authorization_synced"},
 				{Name: "validate_agent", Src: []string{"authorization_synced"}, Dst: "agent_validated"},
 				{Name: "process_previous", Src: []string{"agent_validated"}, Dst: "previous_processed"},
 				{Name: "process_auth", Src: []string{"previous_processed"}, Dst: "auth_processed"},

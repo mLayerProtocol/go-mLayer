@@ -12,7 +12,7 @@ import (
 
 var AuthorizationPubSub Channel
 var TopicPubSub Channel
-var SubnetPubSub Channel
+var ApplicationPubSub Channel
 var MessagePubSub Channel
 var SubscriptionPubSub Channel
 var SystemMessagePubSub Channel

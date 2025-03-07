@@ -135,7 +135,7 @@ type Message struct {
 
 	/// DERIVED
 	
-	DeviceKey DeviceString `json:"dKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	AppKey DeviceString `json:"aKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 	Event       EventPath           `json:"e,omitempty" gorm:"index;char(64);"`
 	Hash        string              `json:"h"`
 	// Attachments []MessageAttachment `json:"atts" gorm:"json;"`
@@ -147,7 +147,7 @@ type Message struct {
 	BlockNumber uint64          `json:"blk,omitempty"`
 	Cycle   	uint64			`json:"cy,omitempty"`
 	Epoch		uint64			`json:"ep,omitempty"`
-	Subnet		string			`json:"snet,omitempty" gorm:"-"`
+	Application		string			`json:"app,omitempty" gorm:"-"`
 	EventSignature  string    `json:"csig,omitempty"`
 	EventTimestamp uint64 		`json:"ets,omitempty"`
 	// DEPRECATED COLUMNS
@@ -387,8 +387,8 @@ func (msg *Message) MsgPack() []byte {
 func (entity Message) GetEvent() EventPath {
 	return entity.Event
 }
-func (entity Message) GetDeviceKey() DeviceString {
-	return entity.DeviceKey
+func (entity Message) GetAppKey() DeviceString {
+	return entity.AppKey
 }
 
 func MessageFromBytes(b []byte) *Message {

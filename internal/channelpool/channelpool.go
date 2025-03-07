@@ -11,7 +11,7 @@ var IncomingTopicEventSubscriptionC = make(chan *entities.Event, CHANNEL_SIZE)
 // channels for broadcasting new events to other nodes
 var AuthorizationEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
 var TopicEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
-var SubnetEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
+var ApplicationEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
 var WalletEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
 var SubscriptionEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)
 var MessageEventPublishC = make(chan *entities.Event, CHANNEL_SIZE)

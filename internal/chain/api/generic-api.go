@@ -60,7 +60,7 @@ func (n GenericAPI) GetCycle(blockNumber *big.Int) (*big.Int, error) {
 	}
 	return cycle, err
 }
-func (n GenericAPI) GetTotalValueLockedInSubnets() (*big.Int, error) {
+func (n GenericAPI) GetTotalValueLockedInApplications() (*big.Int, error) {
 	amount, _ := new(big.Int).SetString("2000000000000000000000", 10)
 	return amount, nil
 }
@@ -140,7 +140,7 @@ func (n GenericAPI) GetStakeBalance(address entities.AccountString) big.Int {
 	return *bal
 }
 
-func (n GenericAPI) GetSubnetBalance(id [16]byte) (*big.Int, error) {
+func (n GenericAPI) GetApplicationBalance(id [16]byte) (*big.Int, error) {
 	bal := new(big.Int)
 	bal.SetString("100000000000000000000000000", 10)
 	return bal, nil

@@ -18,7 +18,7 @@ type SystemMessageType uint8
 
 const (
 	AnnounceSelf SystemMessageType = 1
-	AnnounceSubnetInterest SystemMessageType = 2
+	AnnounceApplicationInterest SystemMessageType = 2
 	AnnounceTopicInterest SystemMessageType = 3
 	// NewStateDelta SystemMessageType = 4
 )

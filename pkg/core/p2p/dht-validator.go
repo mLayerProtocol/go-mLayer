@@ -50,8 +50,8 @@ func (v *DhtValidator) Validate(key string, value []byte) error {
         return v.validateValidatorListKey(parts, value)
     case "cost":
         return v.validatePriceKey(&parts, &value)
-    case "snet", "snetRef":
-        return v.validateSubnetKey(&parts, &value)
+    case "app", "snetRef":
+        return v.validateApplicationKey(&parts, &value)
     }
 
     return nil
@@ -66,8 +66,8 @@ func (v *DhtValidator) Select(key string, values [][]byte) (int, error) {
     case "val":
 		return v.selectFromValidatorList(&parts, &values)
 	
-    case "snet", "snetRef":
-		return v.selectFromSubnetValidatorList(&parts, &values)
+    case "app", "snetRef":
+		return v.selectFromApplicationValidatorList(&parts, &values)
 	}
     // Handle selecting the valid value among multiple
     logger.Debugf("FOUND records %d", len(values))
@@ -162,24 +162,24 @@ func (v *DhtValidator) validatePriceKey(parts *[]string, value *[]byte ) error {
 	return nil
 }
 
-func (v *DhtValidator) validateSubnetKey(parts *[]string, value *[]byte ) error {
+func (v *DhtValidator) validateApplicationKey(parts *[]string, value *[]byte ) error {
     if len((*parts)) != 4 {
-		return errors.New("DhtValidator: subnet key parts too short or long")
+		return errors.New("DhtValidator: app key parts too short or long")
 	}
 	if len((*parts)[3]) != 32 || len((*parts)[3]) != 64 {
-		return errors.New("DhtValidator: subnet key value must be subnet uuid or Keccak hash of subnet ref")
+		return errors.New("DhtValidator: app key value must be app uuid or Keccak hash of app ref")
 	}
 
     
-        validatorData, err := UnpackSubnetValidator(*value)
+        validatorData, err := UnpackApplicationValidator(*value)
         if err != nil {
-            return fmt.Errorf("DhtValidator: Invalid subnet validator data - %v", err)
+            return fmt.Errorf("DhtValidator: Invalid app validator data - %v", err)
         }
         isValidator,  _ := chain.NetworkInfo.IsValidator(hex.EncodeToString(validatorData.Signer))
         if !isValidator {
             return errors.New("DhtValidator: Signer is not a validator")
         }
-        if (*parts)[2] == "snet" {
+        if (*parts)[2] == "app" {
             validators := bytes.Split(validatorData.Validators, []byte{':'})
             if len(validators) == 0 {
                 return fmt.Errorf("DhtValidator: must contain list of validators")
@@ -196,14 +196,14 @@ func (v *DhtValidator) validateSubnetKey(parts *[]string, value *[]byte ) error 
 	return nil
 }
 
-func (v *DhtValidator) selectFromSubnetValidatorList(_ *[]string, values *[][]byte ) (int, error) {
-    result := []SubnetValidator{}
+func (v *DhtValidator) selectFromApplicationValidatorList(_ *[]string, values *[][]byte ) (int, error) {
+    result := []ApplicationValidator{}
     selectedIndex := 0
     previouseTimestamp := uint64(0)
     for idx, b := range *values {
-        validatorData, err := UnpackSubnetValidator(b)
+        validatorData, err := UnpackApplicationValidator(b)
         if err != nil {
-            return 0, fmt.Errorf("DhtValidator: Invalid subnet validator data - %v", err)
+            return 0, fmt.Errorf("DhtValidator: Invalid app validator data - %v", err)
         }
         if previouseTimestamp < validatorData.Timestamp {
             selectedIndex = idx

@@ -16,7 +16,7 @@ type BlockStats struct {
 	MessageCount       uint64 `json:"mC"`
 	TopicCount         uint64 `json:"tC"`
 	AuthorizationCount uint64 `json:"authC"`
-	SubnetCount uint64 `json:"snetC"`
+	ApplicationCount uint64 `json:"snetC"`
 	SubscriptionCount uint64 `json:"subC"`
 	Cycle uint64 `json:"cy"`
 	Epoch uint64 `json:"ep"`

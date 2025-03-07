@@ -66,7 +66,7 @@ func SaveAuthorizationState(auth *entities.Authorization, DB *gorm.DB) (*models.
 	result := tx.Where(utils.EnsureNotEmpty(models.AuthorizationState{
 		Authorization: entities.Authorization{
 			Authorized:  auth.Authorized,
-			Subnet: auth.Subnet,
+			Application: auth.Application,
 		},
 	})).Assign(data).FirstOrCreate(&data)
 	

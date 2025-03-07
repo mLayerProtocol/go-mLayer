@@ -28,7 +28,7 @@ import (
 )
 
 // Validator node only
-// Keep a record of all messages sent within a cycle per subnet
+// Keep a record of all messages sent within a cycle per app
 func TrackReward(ctx *context.Context) {
 	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
 	if !cfg.Validator {
@@ -57,13 +57,13 @@ func TrackReward(ctx *context.Context) {
 	// 	return;
 		
 	// }
-	lastCycleClaimedKey :=  datastore.NewKey("c")
+	lastCycleClaimeaKey :=  datastore.NewKey("c")
 	lastClaimedCycle := uint64(0)
 	//batch, err :=	claimedRewardStore.Batch(*ctx)
 	// if err != nil {
 	// 	panic(err)
 	// }
-	lastClaimed, err := stores.ClaimedRewardStore.Get(*ctx, lastCycleClaimedKey)
+	lastClaimed, err := stores.ClaimedRewardStore.Get(*ctx, lastCycleClaimeaKey)
 		if err != nil  {
 			if err != datastore.ErrNotFound {
 				logger.Error("ClaimedRewardStore.Get: ", err)
@@ -100,7 +100,7 @@ func TrackReward(ctx *context.Context) {
 				go processSentryRewardBatch(*ctx, cfg, rewardBatch)
 			}
 		}
-		stores.ClaimedRewardStore.Set(*ctx, lastCycleClaimedKey,  encoder.NumberToByte(i), true)
+		stores.ClaimedRewardStore.Set(*ctx, lastCycleClaimeaKey,  encoder.NumberToByte(i), true)
 }
 			
 	
@@ -129,15 +129,15 @@ func generateBatch(cycle uint64, index int, ctx *context.Context) (*entities.Rew
 		return nil, fmt.Errorf("reward store not loaded")
 	}
 	
-	subnetList := []models.EventCounter{}
+	appList := []models.EventCounter{}
 		claimed := false
-		err := query.GetManyWithLimit(models.EventCounter{Cycle: &cycle, Validator: entities.PublicKeyString(cfg.PublicKeyEDDHex), Claimed: &claimed }, &subnetList, &map[string]query.Order{"count": query.OrderDec}, entities.MaxBatchSize, index*entities.MaxBatchSize)
+		err := query.GetManyWithLimit(models.EventCounter{Cycle: &cycle, Validator: entities.PublicKeyString(cfg.PublicKeyEDDHex), Claimed: &claimed }, &appList, &map[string]query.Order{"count": query.OrderDec}, entities.MaxBatchSize, index*entities.MaxBatchSize)
 		if err != nil {
 			return nil, err
 		}
-		// defer subnetList.Close()
-		// logger.Debugf("ListLen: %d", len(subnetList))
-		if len(subnetList) == 0 {
+		// defer appList.Close()
+		// logger.Debugf("ListLen: %d", len(appList))
+		if len(appList) == 0 {
 			return nil, query.ErrorNotFound //do not change because error string "empty" is checked above
 		}
 		cost, err := p2p.GetCycleMessageCost(*ctx, cycle)
@@ -146,10 +146,10 @@ func generateBatch(cycle uint64, index int, ctx *context.Context) (*entities.Rew
 			return nil, err
 		}
 		
-		rewardBatch := entities.NewRewardBatch(cfg, cycle, index, cost, len(subnetList), cfg.PublicKeySECP)
-		for  _, rsl := range subnetList {
-				rewardBatch.Append(entities.SubnetCount{
-					Subnet: rsl.Subnet,
+		rewardBatch := entities.NewRewardBatch(cfg, cycle, index, cost, len(appList), cfg.PublicKeySECP)
+		for  _, rsl := range appList {
+				rewardBatch.Append(entities.ApplicationCount{
+					Application: rsl.Application,
 				EventCount: *rsl.Count,
 				})
 				if rewardBatch.Closed {
@@ -219,7 +219,7 @@ func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguratio
 				// clear out the batch data. Its unncessary to send as the receiving node wont use it
 				batchCopy := *batch
 				tmpBatch := &batchCopy
-				tmpBatch.Data = []entities.SubnetCount{}
+				tmpBatch.Data = []entities.ApplicationCount{}
 				
 				logger.Debugf("BATCHDATA: %v", batch)
 				// request commitment from validator
@@ -297,7 +297,7 @@ func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguratio
 						logger.Debugf("Signatures: %v", signatures)
 						aggSig := schnorr.AggregateSignatures(signatures)
 						// _, err := chain.DefaultProvider(cfg).ClaimReward(entities.ClaimData{
-						// 	SubnetRewardCount: batch.Data,
+						// 	ApplicationRewardCount: batch.Data,
 						// 	Signature: [32]byte(aggSig),
 						// 	Commitment: commitment,
 						// 	PubKeys: sentryPubKeys,
@@ -324,7 +324,7 @@ func processSentryRewardBatch(ctx context.Context, cfg *configs.MainConfiguratio
 							} else {
 								for _, d := range batch.Data {
 									logger.Debugf("[")
-									logger.Debugf("{'subnetId':'0x%s', 'amount':'%s'},", strings.ReplaceAll(d.Subnet, "-", ""), new(big.Int).SetBytes(d.Cost) )
+									logger.Debugf("{'appId':'0x%s', 'amount':'%s'},", strings.ReplaceAll(d.Application, "-", ""), new(big.Int).SetBytes(d.Cost) )
 									logger.Debugf("]")
 								}
 								for _, k := range sentryPubKeys {
@@ -407,7 +407,7 @@ func ProcessPendingClaims(ctx *context.Context) {
 			signers := []schnorr.Point{}
 			sIds := []string{}
 			for _, sub := range batch.Data {
-				sIds = append(sIds, sub.Subnet)
+				sIds = append(sIds, sub.Application)
 			}
 			for _, p := range proofData.Signers {
 				pubK, err := btcec.ParsePubKey(p)
@@ -447,7 +447,7 @@ func ProcessPendingClaims(ctx *context.Context) {
 				result := sql.SqlDb.Where(
 					models.EventCounter{Cycle: &batch.Cycle,
 						Validator: entities.PublicKeyString(cfg.PublicKeyEDDHex),
-						}).Where("subnet IN ?", sIds).Updates(models.EventCounter{Claimed: &claimed})
+						}).Where("app IN ?", sIds).Updates(models.EventCounter{Claimed: &claimed})
 				if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
 					continue
 				}

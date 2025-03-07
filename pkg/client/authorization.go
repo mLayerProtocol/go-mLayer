@@ -14,7 +14,7 @@ import (
 
 
 
-func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.ClientPayload) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, subnetState *entities.Subnet, err error) {
+func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.ClientPayload) (assocPrevEvent *entities.EventPath, assocAuthEvent *entities.EventPath, appState *entities.Application, err error) {
 	authData := entities.Authorization{}
 	
 	d, _ := json.Marshal(payload.Data)
@@ -39,12 +39,12 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 	// 	dataStates.Commit(nil, nil, nil)
 	// }
 	
-	// TODO If error is because the subnet was not found, check the dht for the subnet
+	// TODO If error is because the app was not found, check the dht for the app
 	if err != nil {
 		logger.Error("ValidateuthPayload: ", err)
 		return nil, nil, nil, err
 	}
-	subnetState, _ = dsquery.GetSubnetStateById(authData.Subnet)
+	appState, _ = dsquery.GetApplicationStateById(authData.Application)
 	
 	// generate associations
 	if currentState != nil {
@@ -56,14 +56,14 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 		// 	Model: entities.AuthorizationEventModel,
 		// }.ToString()
 	} else {
-		// Get the subnets state event
-		// subnetState := &models.SubnetState{}
-		//err = query.GetOne(&models.SubnetState{Subnet: entities.Subnet{ID: authData.Subnet }}, subnetState)
+		// Get the apps state event
+		// appState := &models.ApplicationState{}
+		//err = query.GetOne(&models.ApplicationState{Application: entities.Application{ID: authData.Application }}, appState)
 		
-		if subnetState == nil {
-			// find ways to get the subnet
+		if appState == nil {
+			// find ways to get the app
 		} else {
-			assocPrevEvent = &subnetState.Event
+			assocPrevEvent = &appState.Event
 		}
 
 
@@ -76,7 +76,7 @@ func ValidateAuthPayload(cfg *configs.MainConfiguration, payload entities.Client
 		// 	Model: entities.AuthorizationEventModel,
 		// }
 	}
-	return assocPrevEvent, assocAuthEvent, subnetState, nil
+	return assocPrevEvent, assocAuthEvent, appState, nil
 }
 
 func GetAuthorizations(auth *entities.Authorization) (*[]models.AuthorizationState, error) {

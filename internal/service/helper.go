@@ -147,8 +147,8 @@ func SyncStateFromPeer(id string, modelType entities.EntityModel, cfg *configs.M
 	var pp *p2p.P2pEventResponse
 	var err error
 	switch modelType {
-	case entities.SubnetModel:
-		newState := state.(entities.Subnet)
+	case entities.ApplicationModel:
+		newState := state.(entities.Application)
 		pp, err = p2p.GetState(cfg, *subPath, nil, &newState)
 		state = newState
 	case entities.AuthModel:
@@ -188,10 +188,10 @@ func SyncStateFromPeer(id string, modelType entities.EntityModel, cfg *configs.M
 		return nil, nil, err
 	}
 	switch modelType {
-	case entities.SubnetModel:
-		newState := state.(entities.Subnet)
+	case entities.ApplicationModel:
+		newState := state.(entities.Application)
 		newState.ID = id
-		_, err = dsquery.CreateSubnetState(&newState, nil)
+		_, err = dsquery.CreateApplicationState(&newState, nil)
 	case entities.AuthModel:
 		newState := state.(entities.Authorization)
 		newState.ID = id
@@ -216,17 +216,17 @@ func SyncStateFromPeer(id string, modelType entities.EntityModel, cfg *configs.M
 		return nil, nil, err
 	}
 	// for _, data := range pp.States {
-	// 	state, err := entities.UnpackSubnet(snetData)
-	// 	logger.Infof("FoundSubnet %v", _subnet)
+	// 	state, err := entities.UnpackApplication(snetData)
+	// 	logger.Infof("FoundApplication %v", _app)
 	// 	if err != nil {
-	// 		return  nil, apperror.NotFound("unable to retrieve subnet")
+	// 		return  nil, apperror.NotFound("unable to retrieve app")
 	// 	}
-	// 		s, err := dsquery.CreateSubnetState(&_subnet, nil)
-	// 		logger.Infof("FoundSubnet 2 %v", _subnet)
+	// 		s, err := dsquery.CreateApplicationState(&_app, nil)
+	// 		logger.Infof("FoundApplication 2 %v", _app)
 	// 		if err != nil {
-	// 			return  nil, apperror.NotFound("subnet not saved")
+	// 			return  nil, apperror.NotFound("app not saved")
 	// 		}
-	// 		_subnet = *s;
+	// 		_app = *s;
 
 	// }
 	return &state, event, nil
@@ -301,9 +301,9 @@ func HandleNewPubSubEvent(event entities.Event, ctx *context.Context) (*entities
 		channelpool.EventCounterChannel <- &event
 	}()
 	switch event.Payload.Data.(type) {
-	case entities.Subnet,entities.Authorization,entities.Topic, entities.Subscription,  entities.Message  :
+	case entities.Application,entities.Authorization,entities.Topic, entities.Subscription,  entities.Message  :
 		return processEvent(&event, ctx)
-		//resp, err := HandleNewPubSubSubnetEvent(&event, ctx)
+		//resp, err := HandleNewPubSubApplicationEvent(&event, ctx)
 		// return nil, nil
 		//	return resp, broadcastEvent(&event, ctx, err)
 		// case entities.Authorization:
@@ -324,12 +324,14 @@ func HandleNewPubSubEvent(event entities.Event, ctx *context.Context) (*entities
 func processEvent(event *entities.Event, ctx *context.Context) (localResponse *entities.EventProcessorResponse, err error) {
 	var wg sync.WaitGroup
 	cfg, _ := (*ctx).Value(constants.ConfigKey).(*configs.MainConfiguration)
+	var minValidators = uint8(1)
+	var same bool
 	wg.Add(1)
 	//var localResponse *entities.EventProcessorResponse
 	remoteResponse := []*entities.EventDelta{}
 	go func() {
 		defer wg.Done()
-		l, errh := HandleNewPubSubSubnetEvent(event, ctx)
+		l, errh := HandleNewPubSubApplicationEvent(event, ctx)
 		if errh == nil {
 			localResponse = l
 			logger.Debugf("LOCALHOSREPOS: %v", l)
@@ -342,13 +344,27 @@ func processEvent(event *entities.Event, ctx *context.Context) (localResponse *e
 		wg.Wait()
 		return
 	}
-	
+	isTopicMessage := event.GetDataModelType() == entities.MessageModel 
+	if isTopicMessage {
+		// get the topic
+		topic := entities.Topic{}
+		_, err := SyncTypedStateById(event.Payload.Data.(entities.Message).Topic, &topic, cfg, "" )
+		if err != nil {
+			wg.Wait()
+			return localResponse, err
+		}
+		minValidators = topic.MinimumValidators
+		
+	}
+	if minValidators > 0 {
 		wg.Add(1)
+	}
 		go func() {
-			defer wg.Done()
+			if minValidators > 0 {
+				defer wg.Done()
+			}
 			responses, err := broadcastEvent(event, ctx, nil)
 			// logger.Infof("REMOTERESPONSE %+v", responses)
-		
 			if err == nil {
 				for _, resp := range responses {
 					delta := entities.EventDelta{}
@@ -358,35 +374,29 @@ func processEvent(event *entities.Event, ctx *context.Context) (localResponse *e
 						continue
 					}
 					remoteResponse = append(remoteResponse, &delta)
-
 				}
 			}
 		}()
 	
+	
 	wg.Wait()
 	
 	sameMap := map[string]bool{}
-	var same bool
-	for _, deltaResp := range remoteResponse {
-		delta := map[string]interface{}{}
-		err = encoder.MsgPackUnpackStruct(deltaResp.Delta, &delta)
-		if err == nil && delta["h"] == localResponse.Hash {
-			sameMap[string(deltaResp.Signatures[0].PublicKey)] = true
-			same = true
+	if minValidators > 0 {
+		for _, deltaResp := range remoteResponse {
+			delta := map[string]interface{}{}
+			err = encoder.MsgPackUnpackStruct(deltaResp.Delta, &delta)
+			if err == nil && delta["h"] == localResponse.Hash {
+				sameMap[string(deltaResp.Signatures[0].PublicKey)] = true
+				same = true
+			}
 		}
 	}
 	// logger.Infof("REMOTERESPONSE %+v, %+v", remoteResponse, sameMap)
-	if len(sameMap) > 0 && len(sameMap) == len(remoteResponse) {
-
-		// notify all validators that it is valid
-		go func() {
-			for k := range sameMap {
-				logger.Infof("NOTIFYNODE %v", k)
-				validPaylaod := p2p.NewP2pPayload(cfg, p2p.P2pActionNotifyValidEvent, event.GetPath().MsgPack())
-				go p2p.SendSecureQuicRequestToValidator(cfg, string(k), validPaylaod)
-			}
-		}()
-		// ALL SAME (sync and notify validators)
+	if minValidators > 0  && len(sameMap) < int(minValidators) {
+		return nil, fmt.Errorf("minimum commitment count not reached")
+	}
+	if minValidators == 0 || ((len(sameMap) > 0 && len(sameMap) == len(remoteResponse)))  {
 		go func() {
 			v, err := system.Mempool.GetData(event.ID)
 			if err != nil {
@@ -405,6 +415,17 @@ func processEvent(event *entities.Event, ctx *context.Context) (localResponse *e
 				logger.Errorf("ErrorSavingCommitment: %v", same)
 			}
 		}()
+
+		// notify all validators that it is valid
+		go func() {
+			for k := range sameMap {
+				logger.Infof("NOTIFYNODE %v", k)
+				validPaylaod := p2p.NewP2pPayload(cfg, p2p.P2pActionNotifyValidEvent, event.GetPath().MsgPack())
+				go p2p.SendSecureQuicRequestToValidator(cfg, string(k), validPaylaod)
+			}
+		}()
+		// ALL SAME (sync and notify validators)
+		
 		go func() {
 			sigData := remoteResponse[0]
 			for i, r := range remoteResponse {
@@ -414,10 +435,10 @@ func processEvent(event *entities.Event, ctx *context.Context) (localResponse *e
 				sigData.Signatures = append(sigData.Signatures, r.Signatures...)
 			}
 
-			// FIND NODES INTERESTED IN THE SUBNET AND SEND THEM THE DELTA
-			subnet := event.Subnet
+			// FIND NODES INTERESTED IN THE APP AND SEND THEM THE DELTA
+			app := event.Application
 
-			dsquery.GetInterestedNodes(subnet, func(publicKey string) {
+			dsquery.GetInterestedNodes(app, func(publicKey string) {
 				p2p.SendSecureQuicRequestToValidator(cfg, publicKey, p2p.NewP2pPayload(cfg, p2p.P2pActionSyncState, sigData.MsgPack()))
 			})
 		}()
@@ -458,7 +479,8 @@ func broadcastEvent(event *entities.Event, ctx *context.Context, err error) (res
 		responses = []p2p.P2pPayload{}
 		var wg sync.WaitGroup
 		var mu sync.Mutex
-
+		 
+		
 		for _, vNode := range node.VirtualNodes {
 			if vNode.Node.PubKey == cfg.PublicKeySECPHex {
 				continue
@@ -470,7 +492,10 @@ func broadcastEvent(event *entities.Event, ctx *context.Context, err error) (res
 			// } else {
 			//logger.Info(d.Hostname, d.IP, d.QuicPort)
 			// 	// conn, err := p2p.NodeQuicPool.GetConnection(*ctx, address)
-			wg.Add(1)
+			//if uint8(i) < minCommitments {
+				wg.Add(1)
+			// }
+			
 			go func(vNode ring.VirtualNode) error {
 				defer wg.Done()
 
@@ -566,7 +591,7 @@ func OnFinishProcessingEvent(cfg *configs.MainConfiguration, event *entities.Eve
 		payload := entities.SocketSubscriptoinResponseData{
 			Event: map[string]interface{}{
 				"id":        event.ID,
-				"snet":      event.Subnet,
+				"app":      event.Application,
 				"blk":       event.BlockNumber,
 				"cy":        event.Cycle,
 				"ep":        event.Epoch,
@@ -583,14 +608,14 @@ func OnFinishProcessingEvent(cfg *configs.MainConfiguration, event *entities.Eve
 		if eventModelType == entities.MessageModel {
 			message := state.(*entities.Message)
 			payload.Event["topic"] = message.Topic
-			for _, subs := range wsClientList.GetClients(event.Subnet, message.Topic) {
+			for _, subs := range wsClientList.GetClients(event.Application, message.Topic) {
 				if subs != nil {
 					payload.SubscriptionId = subs.Id
 					subs.Conn.WriteJSON(payload)
 				}
 			}
 		}
-		for _, subs := range wsClientList.GetClients(event.Subnet, string(eventModelType)) {
+		for _, subs := range wsClientList.GetClients(event.Application, string(eventModelType)) {
 			if subs != nil {
 				payload.SubscriptionId = subs.Id
 				subs.Conn.WriteJSON(payload)
@@ -624,7 +649,7 @@ func OnFinishProcessingEvent(cfg *configs.MainConfiguration, event *entities.Eve
 	// if err == nil || event != nil {
 
 	// 	// increment count
-	// 	currentSubnetCount := uint64(0);
+	// 	currentApplicationCount := uint64(0);
 	// 	currentCycleCount := uint64(0);
 
 	// 	batch, err :=	eventCounterStore.Batch(*ctx)
@@ -637,9 +662,9 @@ func OnFinishProcessingEvent(cfg *configs.MainConfiguration, event *entities.Eve
 	// 		// TODO
 	// 		panic(err)
 	// 	}
-	// 	subnetKey :=  datastore.NewKey(fmt.Sprintf("%s/%d/%s", event.Payload.Validator, cycle, utils.IfThenElse(event.Payload.Subnet == "", *subnetId, event.Payload.Subnet)))
+	// 	appKey :=  datastore.NewKey(fmt.Sprintf("%s/%d/%s", event.Payload.Validator, cycle, utils.IfThenElse(event.Payload.Application == "", *appId, event.Payload.Application)))
 	// 	cycleKey :=  datastore.NewKey(fmt.Sprintf("%s/%d", event.Payload.Validator, cycle))
-	// 	val, err := eventCounterStore.Get(*ctx, subnetKey)
+	// 	val, err := eventCounterStore.Get(*ctx, appKey)
 
 	// 	if err != nil  {
 	// 		if err != datastore.ErrNotFound {
@@ -647,7 +672,7 @@ func OnFinishProcessingEvent(cfg *configs.MainConfiguration, event *entities.Eve
 	// 			return;
 	// 		}
 	// 	} else {
-	// 		currentSubnetCount = encoder.NumberFromByte(val)
+	// 		currentApplicationCount = encoder.NumberFromByte(val)
 	// 	}
 
 	// 	cycleCount, err := eventCounterStore.Get(*ctx, cycleKey)
@@ -662,32 +687,32 @@ func OnFinishProcessingEvent(cfg *configs.MainConfiguration, event *entities.Eve
 	// 	}
 	// 	logger.Debugf("CURRENTCYCLE %d, %d", cycleCount, currentCycleCount)
 	// 	// if event.Payload.Validator == entities.PublicKeyString(cfg.NetworkPublicKey) {
-	// 	// 	subnetCycleClaimed := uint64(0);
-	// 	// 	subnetClaimStatusKey :=  datastore.NewKey(fmt.Sprintf("%s/%d/%s/claimed", event.Payload.Validator, chain.GetCycle(event.BlockNumber), utils.IfThenElse(event.Payload.Subnet == "", *stateId, event.Payload.Subnet)))
-	// 	// 	claimStatus, err := eventCounterStore.Get(*ctx, subnetClaimStatusKey)
+	// 	// 	appCycleClaimed := uint64(0);
+	// 	// 	appClaimStatusKey :=  datastore.NewKey(fmt.Sprintf("%s/%d/%s/claimed", event.Payload.Validator, chain.GetCycle(event.BlockNumber), utils.IfThenElse(event.Payload.Application == "", *stateId, event.Payload.Application)))
+	// 	// 	claimStatus, err := eventCounterStore.Get(*ctx, appClaimStatusKey)
 	// 	// 	logger.Debugf("CURRENTCYCLECLAIM %d", claimStatus)
 	// 	// 	if err != nil  {
 	// 	// 		if err != badger.ErrKeyNotFound {
 	// 	// 			logger.Error(err)
 	// 	// 			return;
 	// 	// 		} else {
-	// 	// 			err = batch.Put(*ctx, subnetClaimStatusKey, encoder.NumberToByte(0))
+	// 	// 			err = batch.Put(*ctx, appClaimStatusKey, encoder.NumberToByte(0))
 	// 	// 			if err != nil {
 	// 	// 				panic(err)
 	// 	// 			}
 	// 	// 		}
 	// 	// 	} else {
-	// 	// 		subnetCycleClaimed = encoder.NumberFromByte(claimStatus)
+	// 	// 		appCycleClaimed = encoder.NumberFromByte(claimStatus)
 	// 	// 	}
-	// 	// 	if subnetCycleClaimed == 0 {
-	// 	// 		err = batch.Put(*ctx, subnetClaimStatusKey, encoder.NumberToByte(1))
+	// 	// 	if appCycleClaimed == 0 {
+	// 	// 		err = batch.Put(*ctx, appClaimStatusKey, encoder.NumberToByte(1))
 	// 	// 		if err != nil {
 	// 	// 			panic(err)
 	// 	// 		}
 	// 	// 	}
 	// 	// }
 
-	// 	err = batch.Put(*ctx, subnetKey, encoder.NumberToByte(1+currentSubnetCount))
+	// 	err = batch.Put(*ctx, appKey, encoder.NumberToByte(1+currentApplicationCount))
 	// 	if err != nil {
 	// 		panic(err)
 	// 	}
@@ -696,7 +721,7 @@ func OnFinishProcessingEvent(cfg *configs.MainConfiguration, event *entities.Eve
 	// 		panic(err)
 	// 	}
 
-	// 	// err = eventCounterStore.Set(*ctx, subnetKey, encoder.NumberToByte(1+currentSubnetCount), true)
+	// 	// err = eventCounterStore.Set(*ctx, appKey, encoder.NumberToByte(1+currentApplicationCount), true)
 	// 	err = batch.Commit(*ctx)
 	// 	if err != nil {
 	// 		panic(err)
@@ -983,11 +1008,11 @@ func FinalizeEvent [ T entities.Payload, State any] (
 		event.IsValid = markAsSynced && len(eventError) == 0.
 		event.Synced = markAsSynced
 		event.Broadcasted = true
-		// _, _, err := query.SaveRecord(models.SubnetEvent{
+		// _, _, err := query.SaveRecord(models.ApplicationEvent{
 		// 	Event: entities.Event{
 		// 		PayloadHash: event.PayloadHash,
 		// 	},
-		// }, models.SubnetEvent{
+		// }, models.ApplicationEvent{
 		// 	Event: event,
 		// }, false, tx)
 		_, _, err := saveEvent(payloadType, entities.Event{
@@ -1013,10 +1038,10 @@ func FinalizeEvent [ T entities.Payload, State any] (
 			}
 		} else {
 			// mark as broadcasted
-			// _, _, err := query.SaveRecord(models.SubnetEvent{
+			// _, _, err := query.SaveRecord(models.ApplicationEvent{
 			// 	Event: entities.Event{PayloadHash: event.PayloadHash, Broadcasted: false},
 			// },
-			// 	models.SubnetEvent{
+			// 	models.ApplicationEvent{
 			// 		Event: entities.Event{Broadcasted: true},
 			// 	}, true, tx)
 				_, _, err := saveEvent(payloadType, entities.Event{PayloadHash: event.PayloadHash, Broadcasted: false},  &entities.Event{Broadcasted: true}, false, tx)
@@ -1034,18 +1059,18 @@ func FinalizeEvent [ T entities.Payload, State any] (
 	// if err != nil {
 	// 	logger.Errorf("Invalid event payload")
 	// }
-	//data.Event = *entities.NewEventPath(event.Validator, entities.SubnetModel, event.Hash)
-	//state["event"] = *entities.NewEventPath(event.Validator, entities.SubnetModel, event.Hash)
+	//data.Event = *entities.NewEventPath(event.Validator, entities.ApplicationModel, event.Hash)
+	//state["event"] = *entities.NewEventPath(event.Validator, entities.ApplicationModel, event.Hash)
 	//data.Account = event.Payload.Account
-	//state["account"] = *entities.NewEventPath(event.Validator, entities.SubnetModel, event.Hash)
+	//state["account"] = *entities.NewEventPath(event.Validator, entities.ApplicationModel, event.Hash)
 	// logger.Error("data.Public ", data.Public)
 
 	if updateState {
-		// _, _, err := query.SaveRecord(models.SubnetState{
-		// 	Subnet: entities.Subnet{ID: data.ID},
-		// }, models.SubnetState{
-		// 	Subnet: *data,
-		// }, event.EventType == uint16(constants.UpdateSubnetEvent), tx)
+		// _, _, err := query.SaveRecord(models.ApplicationState{
+		// 	Application: entities.Application{ID: data.ID},
+		// }, models.ApplicationState{
+		// 	Application: *data,
+		// }, event.EventType == uint16(constants.UpdateApplicationEvent), tx)
 		// if err != nil {
 		// 	tx.Rollback()
 		// 	logger.Error("7000: Db Error", err)
@@ -1061,7 +1086,7 @@ func FinalizeEvent [ T entities.Payload, State any] (
 			logger.Debug("Unable to get dependent events", err)
 		}
 		for _, dep := range *dependent {
-			go HandleNewPubSubSubnetEvent(&dep, ctx)
+			go HandleNewPubSubApplicationEvent(&dep, ctx)
 		}
 	}
 }
@@ -1078,10 +1103,10 @@ func saveEvent(payloadType constants.EventPayloadType, where entities.Event, dat
 		}, update, tx)
 
 
-	case constants.SubnetPayloadType:
-		return query.SaveRecord(models.SubnetEvent{
+	case constants.ApplicationPayloadType:
+		return query.SaveRecord(models.ApplicationEvent{
 			Event: where,
-		}, models.SubnetEvent{
+		}, models.ApplicationEvent{
 			Event: *data,
 		}, update, tx)
 	}
@@ -1280,7 +1305,7 @@ func HandleNewPubSubEvent(event *entities.Event, ctx *context.Context, validator
 		logger.Errorf("Invalid event payload")
 	}
 	data.Event = *entities.NewEventPath(event.Validator, entities.TopicModel, event.Hash)
-	data.DeviceKey = entities.AccountString(agent)
+	data.AppKey = entities.AccountString(agent)
 	data.Account = event.Payload.Account
 	// logger.Error("data.Public ", data.Public)
 

@@ -70,7 +70,7 @@ type Key struct {
 }
 type Keys struct {
 	IdentityKey Key   `json:"idKeys"`
-	DeviceKeys  []Key `json:"deviceKeys"`
+	AppKeys  []Key `json:"appKeys"`
 }
 
 type Creator struct {

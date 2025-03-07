@@ -219,7 +219,7 @@ func (p *WsService) HandleConnection(w http.ResponseWriter, r *http.Request) {
 							}
 						}
 						
-						filter[fmt.Sprint(iFilter["t"])]["snet"] = fmt.Sprint(iFilter["snet"])
+						filter[fmt.Sprint(iFilter["t"])]["app"] = fmt.Sprint(iFilter["app"])
 						logger.Debugf("NewWebsocketSubscriptionFilter for %v:  %+v",  payload.Id, filter)
 					channelpool.ClientWsSubscriptionChannelV2 <- &entities.ClientWsSubscriptionV2{
 						Conn:    c,

@@ -159,15 +159,17 @@ func UpdateEvent(event *entities.Event, tx *datastore.Txn, wbParam *badger.Write
 	if tx != nil {
 		defer txn.Discard(context.Background())
 	}
-	_, err = stores.EventStore.Get(context.Background(), datastore.NewKey(event.BlockKey()))
+	_, err = stores.EventStore.Get(context.Background(), datastore.NewKey(event.DataKey()))
 	// logger.Infof("ERRORGETINGEVENT: %v, %s", err, event.BlockKey())
 	if create {
+	
 	  if IsErrorNotFound(err) {
 		err = createEvent(event, tx, wb)
 		if err != nil {
 			return err
 		}
 		if tx == nil && wbParam == nil {
+			
 			return wb.Flush()
 		}
 	  } 
@@ -318,7 +320,7 @@ func  IncrementCounterByKey(key string, delta uint64, tx *datastore.Txn) error {
 	} else {
 		count = new(big.Int).Add(new(big.Int).SetBytes(value), new(big.Int).SetUint64(delta))
 	}
-	// logger.Infof("IncrementingCounterForSubnet: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
+	// logger.Infof("IncrementingCounterForApplication: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
 	err = txn.Put(context.Background(), datastore.NewKey( key), count.Bytes())
 	if err != nil {
 		return err
@@ -330,7 +332,7 @@ func  IncrementCounterByKey(key string, delta uint64, tx *datastore.Txn) error {
 }
 
 
-func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet string, tx *datastore.Txn) (err error) {
+func IncrementCounters(cycle uint64, validator entities.PublicKeyString, app string, tx *datastore.Txn) (err error) {
 	ds := stores.NetworkStatsStore
 	txn, err := InitTx(ds, tx)
 	if tx == nil {
@@ -344,11 +346,11 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 	}
 	
 	keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), nil)))
-	if len(subnet) > 0 {
-		// keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), &subnet)))
-		keys = append(keys, datastore.NewKey(entities.NetworkCounterKey(&subnet))) // subnetcount in its lifetime
+	if len(app) > 0 {
+		// keys = append(keys, datastore.NewKey(entities.CycleCounterKey(cycle, &validator, utils.FalsePtr(), &app)))
+		keys = append(keys, datastore.NewKey(entities.NetworkCounterKey(&app))) // appcount in its lifetime
 	} else {
-		keys = append(keys, datastore.NewKey(entities.CycleSubnetKey(cycle, subnet))) //
+		keys = append(keys, datastore.NewKey(entities.CycleApplicationKey(cycle, app))) //
 		
 	}
 	for _, key := range keys {
@@ -361,7 +363,7 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 		} else {
 			count = new(big.Int).Add(new(big.Int).SetBytes(value), big.NewInt(delta))
 		}
-		// logger.Infof("IncrementingCounterForSubnet: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
+		// logger.Infof("IncrementingCounterForApplication: %s, %s", key,  new(big.Int).SetBytes(count.Bytes()))
 		err = txn.Put(context.Background(), key, count.Bytes())
 		if err != nil {
 			return err
@@ -373,9 +375,9 @@ func IncrementCounters(cycle uint64, validator entities.PublicKeyString, subnet 
 	return nil
 }
 
-func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *bool, subnet *string, limit *entities.QueryLimit) ([]models.EventCounter, error) {
+func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *bool, app *string, limit *entities.QueryLimit) ([]models.EventCounter, error) {
 	rsl, err := stores.NetworkStatsStore.Query(context.Background(), query.Query{
-		Prefix: entities.CycleCounterKey(cycle, &validator, claimed, subnet),
+		Prefix: entities.CycleCounterKey(cycle, &validator, claimed, app),
 		Limit:  limit.Limit,
 		Offset: limit.Offset,
 	})
@@ -397,17 +399,17 @@ func GetCycleCounts(cycle uint64, validator entities.PublicKeyString, claimed *b
 		counts = append(counts, models.EventCounter{
 			Cycle:     &cy,
 			Validator: validator,
-			Subnet:    parts[4],
+			Application:    parts[4],
 			Count:     &count,
 		})
 	}
 	return counts, err
 }
 
-func GetNetworkCounts(subnet *string, limit *entities.QueryLimit) ([]models.EventCounter, error) {
+func GetNetworkCounts(app *string, limit *entities.QueryLimit) ([]models.EventCounter, error) {
 	counts := []models.EventCounter{}
-	if subnet == nil {
-		rsl, err := stores.NetworkStatsStore.Get(context.Background(), datastore.NewKey(entities.NetworkCounterKey(subnet)))
+	if app == nil {
+		rsl, err := stores.NetworkStatsStore.Get(context.Background(), datastore.NewKey(entities.NetworkCounterKey(app)))
 		if err != nil && !IsErrorNotFound(err) {
 			return counts, err
 		}
@@ -420,7 +422,7 @@ func GetNetworkCounts(subnet *string, limit *entities.QueryLimit) ([]models.Even
 		return counts, nil
 	}
 	rsl, err := stores.EventStore.Query(context.Background(), query.Query{
-		Prefix: entities.NetworkCounterKey(subnet),
+		Prefix: entities.NetworkCounterKey(app),
 		Limit:  limit.Limit,
 		Offset: limit.Offset,
 	})
@@ -443,7 +445,7 @@ func GetNetworkCounts(subnet *string, limit *entities.QueryLimit) ([]models.Even
 		}
 		count := new(big.Int).SetBytes(entry.Value).Uint64()
 		counts = append(counts, models.EventCounter{
-			Subnet: subn,
+			Application: subn,
 			Count:  &count,
 		})
 	}

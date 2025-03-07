@@ -22,10 +22,10 @@ func GetStateModelFromModelType(modelType entities.EntityModel) (any) {
 		table = TopicState{}
 	case entities.AuthModel:
 		table = AuthorizationState{}
-	case entities.SubnetModel:
-		table = SubnetState{}
+	case entities.ApplicationModel:
+		table = ApplicationState{}
 	case entities.SubscriptionModel:
-		table = SubnetState{}
+		table = ApplicationState{}
 	case entities.WalletModel:
 		table = WalletState{}
 	}
@@ -38,8 +38,8 @@ func GetEventModelFromModelType(modelType entities.EntityModel) (any) {
 		table = TopicEvent{}
 	case entities.AuthModel:
 		table = AuthorizationEvent{}
-	case entities.SubnetModel:
-		table = SubnetEvent{}
+	case entities.ApplicationModel:
+		table = ApplicationEvent{}
 	case entities.SubscriptionModel:
 		table = SubscriptionEvent{}
 	case entities.WalletModel:

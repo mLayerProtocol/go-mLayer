@@ -26,15 +26,15 @@ package service
 // Validate an agent authorization
 // */
 // // func dataValidator[Entt any, Auth any, M any](topic *Entt, authState *Auth) (currentTopicState *M, err error) {
-// // 	subnet := models.SubnetState{}
+// // 	app := models.ApplicationState{}
 // // 	rTopic := reflect.ValueOf(topic)
-// // 	subnetId := rTopic.FieldByName("Subnet").Interface()
+// // 	appId := rTopic.FieldByName("Application").Interface()
 
 // // 	// TODO state might have changed befor receiving event, so we need to find state that is relevant to this event.
-// // 	err = query.GetOne(models.SubnetState{Subnet: entities.Subnet{ID: fmt.Sprint(subnetId)}}, &subnet)
+// // 	err = query.GetOne(models.ApplicationState{Application: entities.Application{ID: fmt.Sprint(appId)}}, &app)
 // // 	if err != nil {
 // // 		if err == gorm.ErrRecordNotFound {
-// // 			return nil, apperror.Forbidden("Invalid subnet id")
+// // 			return nil, apperror.Forbidden("Invalid app id")
 // // 		}
 // // 		return nil, apperror.Internal(err.Error())
 // // 	}
@@ -104,7 +104,7 @@ package service
 // 	var currentStateEvent entities.Event
 // 	var where any
 // 	var broadcastedWhere any
-// 	var subnet string
+// 	var app string
 // 	// var currentAgentAuthState *models.AuthorizationState
 
 // 	previousEventHash := event.PreviousEvent
@@ -130,8 +130,8 @@ package service
 // 	// reject event if not
 
 // 	// save event
-// 	// if len(event.Payload.DeviceKey) > 0 {
-// 	// 	currentAgentAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Agent: event.Payload.DeviceKey, Subnet: event.Payload.Subnet})
+// 	// if len(event.Payload.AppKey) > 0 {
+// 	// 	currentAgentAuthState, err = query.GetOneAuthorizationState(entities.Authorization{Agent: event.Payload.AppKey, Application: event.Payload.Application})
 // 	// 	if err != nil {
 // 	// 		logger.Errorf("query: %v", err)
 // 	// 	}
@@ -146,7 +146,7 @@ package service
 // 			hashByte, _ := topic.GetHash()
 // 			entityHash = hex.EncodeToString(hashByte)
 // 			topic.Hash = entityHash
-// 			subnet = topic.Subnet
+// 			app = topic.Application
 // 			account = string(event.Payload.Account)
 
 // 			// check if the current local state is based on thise event
@@ -176,7 +176,7 @@ package service
 // 				Event: entities.Event{Hash: event.Hash},
 // 			}
 // 			topic.Event = *entities.NewEventPath(event.Validator, modelName, event.Hash)
-// 			topic.DeviceKey = entities.AddressFromString(agent).ToDeviceString()
+// 			topic.AppKey = entities.AddressFromString(agent).ToDeviceString()
 // 			topic.Account = event.Payload.Account
 // 			data = topic
 // 		case entities.Authorization:
@@ -187,35 +187,35 @@ package service
 // 			hashByte, _ := authRequest.GetHash()
 // 			entityHash = hex.EncodeToString(hashByte)
 // 			authRequest.Hash = entityHash
-// 			subnet = authRequest.Subnet
+// 			app = authRequest.Application
 // 			account = string(event.Payload.Account)
-// 			agent = string(authRequest.DeviceKey)
-// 			authRequest.DeviceKey = entities.AddressFromString(string(authRequest.DeviceKey)).ToDeviceString()
+// 			agent = string(authRequest.AppKey)
+// 			authRequest.AppKey = entities.AddressFromString(string(authRequest.AppKey)).ToDeviceString()
 // 			// check if the current local state is based on thise event
-// 			// authState, authError = query.GetOneAuthorizationState(entities.Authorization{Subnet: subnet, Agent: entities.DeviceString(agent)})
+// 			// authState, authError = query.GetOneAuthorizationState(entities.Authorization{Application: app, Agent: entities.DeviceString(agent)})
 // 			// validate from here
 // 			// validateAuthState(authState)
 
 // 			logger.Debugf("AUTHSTATE %s, %v", authEventHash, authState)
-// 			curState, grantorAuthState, subnetData, authError := ValidateAuthPayloadData(&authRequest, cfg.ChainId)
+// 			curState, grantorAuthState, appData, authError := ValidateAuthPayloadData(&authRequest, cfg.ChainId)
 
 // 			if authError != nil {
 // 				// penalize node for broadcasting invalid data
 
-// 				// check if the subnet exists, if it doesnt, get it from the dht
-// 				if strings.Contains(authError.Error(), "4004:")  && subnetData == nil {
+// 				// check if the app exists, if it doesnt, get it from the dht
+// 				if strings.Contains(authError.Error(), "4004:")  && appData == nil {
 
-// 					// get the subnet from the sending node
+// 					// get the app from the sending node
 
-// 					subnetState := entities.Subnet{}
-// 					_, err := p2p.GetState(cfg, *entities.NewEntityPath(event.Validator, entities.SubnetModel, subnet),nil, &subnetState)
+// 					appState := entities.Application{}
+// 					_, err := p2p.GetState(cfg, *entities.NewEntityPath(event.Validator, entities.ApplicationModel, app),nil, &appState)
 
 // 					if err != nil {
-// 						logger.Errorf("service/GetSubnet: %v", err)
+// 						logger.Errorf("service/GetApplication: %v", err)
 // 						// return
 // 					} else {
-// 						logger.Debugf("SUBNETTTTT: %v", subnetState)
-// 						if event.PreviousEvent.Model != entities.SubnetModel {
+// 						logger.Debugf("APPTTTT: %v", appState)
+// 						if event.PreviousEvent.Model != entities.ApplicationModel {
 
 // 						}
 
@@ -247,7 +247,7 @@ package service
 // 				Event: entities.Event{Hash: event.Hash},
 // 			}
 // 			authRequest.Event = *entities.NewEventPath(event.Validator, modelName, event.Hash)
-// 			authRequest.DeviceKey = entities.AddressFromString(agent).ToDeviceString()
+// 			authRequest.AppKey = entities.AddressFromString(agent).ToDeviceString()
 // 			// authRequest.Account = event.Payload.Account
 // 			data = authRequest
 
@@ -262,8 +262,8 @@ package service
 // 			return
 // 		}
 
-// 	if !slices.Contains([]string{string(entities.AuthModel), string(entities.SubnetModel)}, string(modelName)) {
-// 		validAuth, err = validateAuthState(ctx, cfg, authState, authState, event, subnet, agent, account)
+// 	if !slices.Contains([]string{string(entities.AuthModel), string(entities.ApplicationModel)}, string(modelName)) {
+// 		validAuth, err = validateAuthState(ctx, cfg, authState, authState, event, app, agent, account)
 // 		if err != nil {
 // 			logger.Errorf("validateAuthError: %v", err)
 // 		}
@@ -425,12 +425,12 @@ package service
 // 				// 	Authorization: auth,
 // 				// }
 // 				// query.GetOne(models.AuthorizationState{
-// 				// 	Authorization: entities.Authorization{Agent: auth.DeviceKey, Subnet: auth.Subnet},
+// 				// 	Authorization: entities.Authorization{Agent: auth.AppKey, Application: auth.Application},
 // 				// }, &auth)
-// 				logger.Debug("AuthState", auth.DeviceKey, " ",  auth.Subnet, " ", auth.Account)
+// 				logger.Debug("AuthState", auth.AppKey, " ",  auth.Application, " ", auth.Account)
 // 				// if len(auth.ID) > 0 {
 // 				// 	newState, txResult = SaveState(models.AuthorizationState{
-// 				// 		Authorization: entities.Authorization{Agent: auth.DeviceKey, Subnet: auth.Subnet},
+// 				// 		Authorization: entities.Authorization{Agent: auth.AppKey, Application: auth.Application},
 // 				// 	}, models.AuthorizationState{Authorization: entities.Authorization{ID: auth.ID}}, true, tx)
 // 				// } else {
 // 				// 	txResult = tx.Model(&models.AuthorizationState{}).Create(&newState)
@@ -565,7 +565,7 @@ package service
 // // The validateAuthState function checks if the authorization presented by an Agent is currently and valid.
 // // It compares the presented authEvent with the local one. To do this, it must get the current state from the signing
 // // node and checks if the event that resulted in it is older or more recent than its local
-// func validateAuthState(ctx *context.Context, cfg *configs.MainConfiguration, eventAuthState *models.AuthorizationState, localAuthState *models.AuthorizationState, event *entities.Event, subnet string, agent string, account string) (valid bool, err error) {
+// func validateAuthState(ctx *context.Context, cfg *configs.MainConfiguration, eventAuthState *models.AuthorizationState, localAuthState *models.AuthorizationState, event *entities.Event, app string, agent string, account string) (valid bool, err error) {
 // 	//1. I dont have the event auth, I dont have any auth for the agent
 // 	//2. I dont have the event auth, but I have an auth for the agent. Get the event auth from the validator,save it if valid, check if its older than your local, if it is, check if the event depending on it is older than the event that modified my local authstate, if it is, then its valid, process the even if there is no other more recent event that has updated the state
 // 	//3. I have the event auth, but its different from the current auth of the agent - check which is most recent, if mine, check if the event was initiated before my state, if it was, then its valid, else, check if the authEvent was older than mine, if it was, throw error else accept the event
@@ -598,7 +598,7 @@ package service
 // 		go HandleNewPubSubTopicEvent(event, ctx)
 // 		valid = false
 // 		// // lets get my local authstate and see if its the same
-// 		// localAuthState, _ := query.GetOneAuthorizationState(entities.Authorization{Subnet: subnet, Agent: entities.DeviceString(agent), Account: entities.AccountString(account)})
+// 		// localAuthState, _ := query.GetOneAuthorizationState(entities.Authorization{Application: app, Agent: entities.DeviceString(agent), Account: entities.AccountString(account)})
 // 		// if localAuthState == nil  { // I have no auth state record as well.
 // 		// 	// all i can do is store this event and try to get the authstate from this node
 // 		// 	// i will still have to validate it

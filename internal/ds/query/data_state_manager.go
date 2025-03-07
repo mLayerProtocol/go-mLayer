@@ -179,15 +179,15 @@ func (ds *DataStates) Commit(stateTx *datastore.Txn, eventTx *datastore.Txn, mes
 		
 		 
 		switch k.Model {
-		case entities.SubnetModel:
-			state := entities.Subnet{}
+		case entities.ApplicationModel:
+			state := entities.Application{}
 			if reflect.TypeOf(v).Kind() == reflect.Map {
 				b, _ := encoder.MsgPackStruct(v)
 				encoder.MsgPackUnpackStruct(b, &state)
 			} else {
-				state = v.(entities.Subnet)
+				state = v.(entities.Application)
 			}
-			_, err = UpdateSubnetState(k.ID, &state, &_stateTxn, true)
+			_, err = UpdateApplicationState(k.ID, &state, &_stateTxn, true)
 		case entities.AuthModel:
 			state := entities.Authorization{}
 			if reflect.TypeOf(v).Kind() == reflect.Map {
@@ -258,7 +258,7 @@ func (ds *DataStates) Commit(stateTx *datastore.Txn, eventTx *datastore.Txn, mes
 	   if err != nil {
 		   return err
 	   }
-	  //  err = IncrementCounters(v.Cycle, v.Validator, v.Subnet, &_eventTxn)
+	  //  err = IncrementCounters(v.Cycle, v.Validator, v.Application, &_eventTxn)
 
    }
    if stateTx == nil && err == nil {

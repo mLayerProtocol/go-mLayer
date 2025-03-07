@@ -14,7 +14,7 @@ var StateDhtSyncer DhtSyncer
 type DhtPrefix string
 
 const (
-    SnetDhtPrefix  DhtPrefix = "snet"
+    SnetDhtPrefix  DhtPrefix = "app"
     SnetRefDhtPrefix  DhtPrefix = "snetRef"
     ValDhtPrefix  DhtPrefix = "val"
 )
@@ -35,7 +35,7 @@ func NewDhtSyncer(store *ds.Datastore, ctx context.Context) DhtSyncer {
 }
 
 
-func (v *DhtSyncer) AddKey(dhtKeyPrefix DhtPrefix, dataKey string, dataValue []byte) error {
+func (v *DhtSyncer) AdaKey(dhtKeyPrefix DhtPrefix, dataKey string, dataValue []byte) error {
   return  v.store.Set(*v.context,  ds.Key(fmt.Sprintf("/dht/%s/%s", dhtKeyPrefix, dataKey)), dataValue, true)
 }   
 

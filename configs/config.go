@@ -19,8 +19,8 @@ import (
 
 type IpfsConfig struct {
 	Host          string `toml:"ipfs_url"`
-	ProjectId     string `toml:"ipfs_username"`
-	ProjectSecret string `toml:"ipfs_password"`
+	ApplicationId     string `toml:"ipfs_username"`
+	ApplicationSecret string `toml:"ipfs_password"`
 }
 
 
@@ -53,7 +53,7 @@ type EthConfig struct {
 	ChainInfoContract  string `toml:"chain_info_contract"`
 	SentryNodeContract   string  `toml:"sentry_node_contract"`
 	ValidatorNodeContract   string  `toml:"validator_node_contract"`
-	SubnetContract	string `toml:"subnet_contract"`
+	ApplicationContract	string `toml:"app_contract"`
 	RegistryContract string  `toml:"registry_contract"`
 }
 

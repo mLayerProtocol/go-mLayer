@@ -36,11 +36,11 @@ func init() {
 		Migrate: AddClaimedFieldToEventCount,
 	})
 
-	AddMigration(DropOwnerColumnFromSubnetState, "2024-09-16 5:43PM") 
+	AddMigration(DropOwnerColumnFromApplicationState, "2024-09-16 5:43PM") 
 	AddMigration(DropTopicIdColumnFromMessageState, "2024-09-16 5:12PM") 
 	AddMigration(DropAttachmentsColumnFromMessageState, "2024-09-16 5:42PM") 
 	AddMigration(RenameEventAndAuthHashColumns, "2024-10-03 5:42PM") 
-	// AddMigration(DropAgentColumnFromSubnetState, "2024-09-16=7 10:42AM") 
+	// AddMigration(DropAgentColumnFromApplicationState, "2024-09-16=7 10:42AM") 
 
 }
 

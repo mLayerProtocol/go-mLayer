@@ -43,13 +43,13 @@ type TopicEvent struct {
 // 	if err != nil {
 // 		return nil, err
 // 	}
-// 	subnet := SubnetState{}
-// 	// authState, authError := db.SqlDb.Where($AuthorizationState{Authorization: entities.Authorization{Event: authEventHash}}).Take(&subnet).Error
+// 	app := ApplicationState{}
+// 	// authState, authError := db.SqlDb.Where($AuthorizationState{Authorization: entities.Authorization{Event: authEventHash}}).Take(&app).Error
 // 	// TODO state might have changed befor receiving event, so we need to find state that is relevant to this event.
-// 	err = db.SqlDb.Where(&SubnetState{Subnet: entities.Subnet{ID: d.Payload.Subnet}}).Take(&subnet).Error
+// 	err = db.SqlDb.Where(&ApplicationState{Application: entities.Application{ID: d.Payload.Application}}).Take(&app).Error
 // 	if err != nil {
 // 		if err == gorm.ErrRecordNotFound {
-// 			return authState,  apperror.Forbidden("Invalid subnet id")
+// 			return authState,  apperror.Forbidden("Invalid app id")
 // 		}
 // 		return authState, apperror.Internal(err.Error())
 // 	}

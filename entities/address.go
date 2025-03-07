@@ -45,11 +45,11 @@ func (a AddressString) IsAccount() bool {
 }
 
 func (a Address) IsAccount() bool {
-	return strings.EqualFold(a.Prefix, "mid:") && len(string(a.Addr)) > 10
+	return strings.EqualFold(a.Prefix, "mid") && len(string(a.Addr)) > 10
 }
 
 func (a Address) IsDevice() bool {
-	return strings.EqualFold(a.Prefix, "did:") && len(string(a.Addr)) > 10
+	return strings.EqualFold(a.Prefix, "did") && len(string(a.Addr)) > 10
 }
 
 

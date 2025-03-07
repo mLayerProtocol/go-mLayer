@@ -17,11 +17,11 @@ type Wallet struct {
 	// Primary
 	ID        string        `gorm:"primaryKey;type:uuid;not null" json:"id,omitempty"`
 	Account   AccountString `json:"acct"`
-	Subnet    string        `json:"snet" gorm:"type:varchar(32);index;not null" msgpack:",noinline"`
+	Application    string        `json:"app" gorm:"type:varchar(32);index;not null" msgpack:",noinline"`
 	Name      string        `json:"n" gorm:"type:varchar(12);not null"`
 	Symbol      string      `json:"sym" gorm:"type:varchar(8);not null"`
 	Timestamp 	uint64       `json:"ts"`
-	DeviceKey 	DeviceString `json:"dKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
+	AppKey 	DeviceString `json:"aKey,omitempty" binding:"required"  gorm:"not null;type:varchar(100)"`
 
 	// Derived
 	Event EventPath `json:"e,omitempty" gorm:"index;varchar;"`
@@ -90,7 +90,7 @@ func (entity Wallet) GetEvent() (EventPath) {
 	return entity.Event
 }
 func (entity Wallet) GetAgent() (DeviceString) {
-	return entity.DeviceKey
+	return entity.AppKey
 }
 
 func (e Wallet) ToString() (string, error) {
@@ -99,7 +99,7 @@ func (e Wallet) ToString() (string, error) {
 	values := []string{}
 	values = append(values, e.ID)
 	values = append(values, e.Name)
-	values = append(values, e.Subnet)
+	values = append(values, e.Application)
 	values = append(values, string(e.Account))
 
 	return strings.Join(values, ""), nil
@@ -109,7 +109,7 @@ func (e Wallet) EncodeBytes() ([]byte, error) {
 
 	return encoder.EncodeBytes(
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: e.Name},
-		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: e.Subnet},
+		encoder.EncoderParam{Type: encoder.HexEncoderDataType, Value: e.Application},
 		encoder.EncoderParam{Type: encoder.StringEncoderDataType, Value: e.Account},
 	)
 }

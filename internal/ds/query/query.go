@@ -149,7 +149,7 @@ func CreateState(newState CreateStateParam, tx *datastore.Txn) (err error) {
 			}
 			if err := txn.Put(context.Background(), datastore.NewKey(*newState.RefKey), []byte(newState.ID)); err != nil {
 				logger.Errorf("ErrorAddingNewStateKey: %v, %v", key, err)
-				logger.Errorf("error updating subnet ref: %v", err)
+				logger.Errorf("error updating app ref: %v", err)
 				return err
 			}
 			continue
@@ -187,7 +187,7 @@ func UpdateState(id string, newState NewStateParam, tx *datastore.Txn) error {
 	// }
 	stateBytes := newState.Data
 
-	// oldState, err := GetSubnetStateById(id)
+	// oldState, err := GetApplicationStateById(id)
 
 	if err != nil {
 		return err
@@ -209,7 +209,7 @@ func UpdateState(id string, newState NewStateParam, tx *datastore.Txn) error {
 			return err
 		}
 		if err := txn.Put(context.Background(), datastore.NewKey(*newState.RefKey), []byte(id)); err != nil {
-			logger.Errorf("error updateing subnet ref: %v", err)
+			logger.Errorf("error updateing app ref: %v", err)
 			return err
 		}
 	}
@@ -220,16 +220,16 @@ func UpdateState(id string, newState NewStateParam, tx *datastore.Txn) error {
 		}
 	}
 
-	logger.Infof("SubnetKey: %s", newState.EventHash)
+	logger.Infof("ApplicationKey: %s", newState.EventHash)
 
 	return nil
 }
 
-func RefExists(entityType entities.EntityModel, ref string, subnet string) (bool, error) {
+func RefExists(entityType entities.EntityModel, ref string, app string) (bool, error) {
 	ds := stores.StateStore
 	refKey := fmt.Sprintf("%s|ref|%s", entityType, ref)
-	if subnet != "" {
-		refKey = fmt.Sprintf("%s|ref|%s|%s", entityType, subnet, ref)
+	if app != "" {
+		refKey = fmt.Sprintf("%s|ref|%s|%s", entityType, app, ref)
 	}
 	value, err := ds.Get(context.Background(), datastore.NewKey(refKey))
 	if err != nil {
